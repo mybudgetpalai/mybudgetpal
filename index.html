@@ -1511,6 +1511,12 @@ function App() {
     supabaseClient.auth.getSession().then(async ({ data }) => {
       const session = data?.session;
       if (session?.user) {
+        const { data: userCheck, error: userErr } = await supabaseClient.auth.getUser();
+        if (userErr || !userCheck?.user) {
+          await supabaseClient.auth.signOut();
+          setCheckingSession(false);
+          return;
+        }
         const uid = session.user.id;
         setUserId(uid);
         const profile = await fetchProfile(uid);
