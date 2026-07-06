@@ -140,6 +140,7 @@ const INCOME_MONTHLY = [3100, 3150, 3200];
 const CATEGORY_COLORS = {
   Groceries: "#4f8cff", Dining: "#b56bff", Transport: "#ff8bd6",
   Shopping: "#ffb84f", Subscriptions: "#4fe0c0", Bills: "#ff8b8b",
+  Income: "#4fe0c0", Uncategorized: "#9aa4b8", Other: "#9aa4b8",
 };
 
 const SAVINGS_GOAL = { label: "Emergency fund", target: 10000, current: 4200, months: 6 };
@@ -184,26 +185,242 @@ function parseCSVLine(line) {
   return out;
 }
 
+/* ---------------- Transaction parsing & categorization engine ---------------- */
+
+const TX_CATEGORIES = ["Groceries", "Dining", "Transport", "Shopping", "Subscriptions", "Bills"];
+const CATEGORY_RULES = {
+  Groceries: ["waitrose", "carrefour", "spinneys", "lulu", "choithram", "union coop", "west zone", "grandiose", "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "grocery", "supermarket", "hypermarket"],
+  Dining: ["restaurant", "cafe", "caffe", "coffee", "costa", "starbucks", "mcdonald", "kfc", "burger", "pizza", "subway", "deliveroo", "talabat", "zomato", "uber eats", "grill", "bakery", "dunkin", "tim hortons", "nando", "shake shack", "five guys", "wagamama", "pret a manger"],
+  Transport: ["uber", "careem", "bolt ", "taxi", "rta ", "salik", "nol ", "metro", "parking", "petrol", "fuel", "adnoc", "enoc", "eppco", "shell ", "valet"],
+  Shopping: ["amazon", "noon", "namshi", "shein", "zara", "h&m", "ikea", "sharaf dg", "emax", "decathlon", "nike", "adidas", "apple store", "apple.com", "dubai mall", "city centre", "sephora", "primark", "asos"],
+  Subscriptions: ["netflix", "spotify", "youtube", "disney", "apple music", "icloud", "prime video", "amazon prime", "openai", "chatgpt", "claude", "anthropic", "adobe", "microsoft 365", "office 365", "playstation", "xbox", "nintendo", "patreon", "dropbox", "canva", "subscription"],
+  Bills: ["dewa", "sewa", "addc", "etisalat", " du ", "virgin mobile", "rent", "insurance", "takaful", "gym", "fitness first", "emicool", "empower", "chiller", "electricity", "internet", "broadband", "school fee", "tuition", "loan", "mortgage", "water bill"],
+};
+function categorizeByRules(desc, amount) {
+  if (amount > 0) return "Income";
+  const d = " " + String(desc || "").toLowerCase() + " ";
+  for (const cat of TX_CATEGORIES) {
+    if (CATEGORY_RULES[cat].some((k) => d.includes(k))) return cat;
+  }
+  return "Uncategorized";
+}
+
+const MONTHS_SHORT = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTHS_LABEL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function pad2(n) { return String(n).padStart(2, "0"); }
+function normalizeDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + "-" + pad2(m[2]) + "-" + pad2(m[3]);
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (m) {
+    let d = +m[1], mo = +m[2], y = +m[3];
+    if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }
+    if (y < 100) y += 2000;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    return y + "-" + pad2(mo) + "-" + pad2(d);
+  }
+  m = s.toLowerCase().match(/^(\d{1,2})\s+([a-z]{3})[a-z]*\s*(\d{4})?/);
+  if (m) {
+    const mo = MONTHS_SHORT.indexOf(m[2]) + 1;
+    if (mo > 0) return (m[3] || String(new Date().getFullYear())) + "-" + pad2(mo) + "-" + pad2(m[1]);
+  }
+  const dt = new Date(s);
+  if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
+  return null;
+}
+function formatTxDate(d) {
+  if (!d) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return (+d.slice(8, 10)) + " " + MONTHS_LABEL[+d.slice(5, 7) - 1];
+  return d;
+}
+function monthLabelFromKey(k) { return MONTHS_LABEL[+k.slice(5, 7) - 1]; }
+function latestMonthKey(txs) {
+  let max = "";
+  (txs || []).forEach((t) => { if (t.date && t.date.slice(0, 7) > max) max = t.date.slice(0, 7); });
+  return max || new Date().toISOString().slice(0, 7);
+}
+function lastNMonthKeys(endKey, n) {
+  let y = +endKey.slice(0, 4), m = +endKey.slice(5, 7);
+  const keys = [];
+  for (let i = 0; i < n; i++) { keys.unshift(y + "-" + pad2(m)); m--; if (m === 0) { m = 12; y--; } }
+  return keys;
+}
+function spendForMonth(txs, k) { return txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k).reduce((s, t) => s + Math.abs(t.amount), 0); }
+function incomeForMonth(txs, k) { return txs.filter((t) => t.amount > 0 && t.date.slice(0, 7) === k).reduce((s, t) => s + t.amount, 0); }
+function spendByCategoryForMonth(txs, k) {
+  const o = {};
+  txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k).forEach((t) => { o[t.category] = (o[t.category] || 0) + Math.abs(t.amount); });
+  return o;
+}
+function catColor(c) { return CATEGORY_COLORS[c] || "#9aa4b8"; }
+function topMerchantsFor(txs, k, n) {
+  const o = {};
+  txs.filter((t) => t.amount < 0 && (!k || t.date.slice(0, 7) === k)).forEach((t) => { o[t.name] = (o[t.name] || 0) + Math.abs(t.amount); });
+  return Object.entries(o).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount).slice(0, n);
+}
+function ordinalDay(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function detectRecurringBills(txs) {
+  const groups = {};
+  txs.filter((t) => t.amount < 0 && t.date).forEach((t) => {
+    const key = t.name.toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim();
+    (groups[key] = groups[key] || []).push(t);
+  });
+  const bills = [];
+  Object.values(groups).forEach((list) => {
+    const months = new Set(list.map((t) => t.date.slice(0, 7)));
+    if (months.size < 2) return;
+    const avg = list.reduce((s, t) => s + Math.abs(t.amount), 0) / list.length;
+    const steady = list.every((t) => Math.abs(Math.abs(t.amount) - avg) <= Math.max(avg * 0.2, 2));
+    if (!steady) return;
+    const days = list.map((t) => +t.date.slice(8, 10));
+    const due = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
+    bills.push({ name: list[0].name, amount: Math.round(avg * 100) / 100, frequency: "Monthly", due: ordinalDay(due) });
+  });
+  return bills.sort((a, b) => b.amount - a.amount);
+}
+function buildInsights(txs, targets) {
+  const out = [];
+  const cur = latestMonthKey(txs);
+  const prev = lastNMonthKeys(cur, 2)[0];
+  const curCats = spendByCategoryForMonth(txs, cur);
+  const prevCats = spendByCategoryForMonth(txs, prev);
+  Object.keys(curCats).forEach((c) => {
+    const a = curCats[c], b = prevCats[c];
+    if (b > 20 && a > 20) {
+      const chg = Math.round(((a - b) / b) * 100);
+      if (chg >= 25) out.push({ type: "warning", text: c + " spend is up " + chg + "% vs last month." });
+      else if (chg <= -25) out.push({ type: "positive", text: c + " spend is down " + Math.abs(chg) + "% vs last month." });
+    }
+  });
+  const totalTarget = Object.values(targets || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  const spent = spendForMonth(txs, cur);
+  if (totalTarget > 0) {
+    if (spent <= totalTarget) out.push({ type: "positive", text: "You've used " + Math.round((spent / totalTarget) * 100) + "% of your monthly target." });
+    else out.push({ type: "warning", text: "You're " + formatMoney(spent - totalTarget) + " over your total monthly target." });
+  }
+  const top = topMerchantsFor(txs, cur, 1)[0];
+  if (top) out.push({ type: "info", text: "Your biggest merchant this month is " + top.name + " (" + formatMoney(top.amount) + ")." });
+  return out.slice(0, 5);
+}
+
 function parseStatementCSV(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) throw new Error("empty");
   const header = parseCSVLine(lines[0]).map((h) => h.toLowerCase());
   const dateIdx = header.findIndex((h) => h.includes("date"));
-  const descIdx = header.findIndex((h) => h.includes("desc") || h.includes("name") || h.includes("merchant"));
+  const descIdx = header.findIndex((h) => h.includes("desc") || h.includes("narrat") || h.includes("detail") || h.includes("particular") || h.includes("name") || h.includes("merchant") || h.includes("reference"));
   const catIdx = header.findIndex((h) => h.includes("categ"));
-  const amtIdx = header.findIndex((h) => h.includes("amount"));
-  if (dateIdx === -1 || descIdx === -1 || amtIdx === -1) throw new Error("headers");
+  const amtIdx = header.findIndex((h) => h.includes("amount") || h === "value");
+  const debitIdx = header.findIndex((h) => h.includes("debit") || h.includes("money out") || h.includes("withdraw") || h.includes("paid out"));
+  const creditIdx = header.findIndex((h) => h.includes("credit") || h.includes("money in") || h.includes("deposit") || h.includes("paid in"));
+  if (dateIdx === -1 || descIdx === -1 || (amtIdx === -1 && debitIdx === -1 && creditIdx === -1)) throw new Error("headers");
+  const num = (v) => { const n = Number(String(v || "").replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; };
 
   return lines.slice(1).map((line) => {
     const cols = parseCSVLine(line);
-    const amount = Number(cols[amtIdx].replace(/[^0-9.\-]/g, ""));
+    let amount = 0;
+    if (amtIdx !== -1 && cols[amtIdx]) amount = num(cols[amtIdx]);
+    else {
+      const dr = debitIdx !== -1 ? Math.abs(num(cols[debitIdx])) : 0;
+      const cr = creditIdx !== -1 ? Math.abs(num(cols[creditIdx])) : 0;
+      amount = cr - dr;
+    }
+    const name = (cols[descIdx] || "").trim();
     return {
-      date: cols[dateIdx] || "",
-      name: cols[descIdx] || "",
-      category: catIdx !== -1 && cols[catIdx] ? cols[catIdx] : "Other",
-      amount: isNaN(amount) ? 0 : amount,
+      date: normalizeDate(cols[dateIdx]) || "",
+      name,
+      category: catIdx !== -1 && cols[catIdx] ? cols[catIdx].trim() : categorizeByRules(name, amount),
+      amount,
     };
-  }).filter((t) => t.name);
+  }).filter((t) => t.name && t.amount !== 0);
+}
+
+/* PDF text extraction (pdf.js, loaded on demand) */
+let pdfjsPromise = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!pdfjsPromise) {
+    pdfjsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => reject(new Error("Couldn't load PDF reader"));
+      document.head.appendChild(s);
+    });
+  }
+  return pdfjsPromise;
+}
+async function extractPdfText(file) {
+  const pdfjs = await loadPdfJs();
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjs.getDocument({ data: buf }).promise;
+  let text = "";
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    text += content.items.map((i) => i.str).join(" ") + "\n";
+  }
+  return text;
+}
+
+/* AI helpers via Supabase Edge Function "ai-statement" */
+async function aiParseStatementText(text) {
+  const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
+    body: { action: "parse", text: String(text).slice(0, 150000) },
+  });
+  if (error || !data || !Array.isArray(data.transactions)) throw new Error((error && error.message) || (data && data.error) || "AI parsing unavailable");
+  return data.transactions.map((t) => {
+    const amount = Number(t.amount) || 0;
+    const name = String(t.description || "").trim();
+    return { date: normalizeDate(t.date) || "", name, amount, category: categorizeByRules(name, amount) };
+  }).filter((t) => t.name && t.amount !== 0);
+}
+async function aiCategorize(descriptions) {
+  const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
+    body: { action: "categorize", items: descriptions },
+  });
+  if (error || !data || !data.categories) throw new Error((error && error.message) || (data && data.error) || "AI categorization unavailable");
+  return data.categories;
+}
+
+/* One entry point: file -> transactions */
+async function parseStatementFile(file) {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".csv")) return parseStatementCSV(await file.text());
+  if (lower.endsWith(".pdf")) {
+    const text = await extractPdfText(file);
+    if (!text.trim()) throw new Error("This PDF has no readable text (it may be a scanned image) — try a CSV export instead.");
+    return await aiParseStatementText(text);
+  }
+  throw new Error("Only PDF or CSV files are supported.");
+}
+
+/* Supabase persistence for transactions */
+function rowToTx(r) { return { id: r.id, date: r.tx_date || "", name: r.description, amount: Number(r.amount), category: r.category || "Uncategorized", bank: r.bank_name }; }
+async function fetchTransactions(userId) {
+  const { data, error } = await supabaseClient.from("transactions").select("*").eq("user_id", userId).order("tx_date", { ascending: false });
+  if (error) return [];
+  return (data || []).map(rowToTx);
+}
+async function saveTransactionsToDb(userId, bankName, txs) {
+  if (!userId || !txs.length) return txs;
+  const rows = txs.map((t) => ({
+    user_id: userId, bank_name: bankName || t.bank || null,
+    tx_date: t.date || null, description: t.name, amount: t.amount, category: t.category,
+  }));
+  const { data, error } = await supabaseClient.from("transactions").insert(rows).select();
+  if (error) throw error;
+  return (data || []).map(rowToTx);
+}
+async function updateTransactionCategoriesInDb(idToCat) {
+  await Promise.all(Object.entries(idToCat).map(([id, category]) =>
+    supabaseClient.from("transactions").update({ category }).eq("id", id)
+  ));
 }
 
 /* ---------------- Landing (marketing) ---------------- */
@@ -377,27 +594,23 @@ function UploadStatementModal({ onClose, onParsed, pushToast }) {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef(null);
 
-  const handleFile = (file) => {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      pushToast("Only CSV files are supported.", "error");
+  const handleFile = async (file) => {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".csv") && !lower.endsWith(".pdf")) {
+      pushToast("Only PDF or CSV files are supported.", "error");
       return;
     }
-    setBusy(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = parseStatementCSV(reader.result);
-        if (!parsed.length) throw new Error("no rows");
-        setBusy(false);
-        pushToast(parsed.length + " transactions imported", "success");
-        onParsed(parsed);
-      } catch (e) {
-        setBusy(false);
-        pushToast("Couldn't read that file — check the format.", "error");
-      }
-    };
-    reader.onerror = () => { setBusy(false); pushToast("Couldn't read that file.", "error"); };
-    reader.readAsText(file);
+    setBusy(lower.endsWith(".pdf") ? "AI is reading your PDF…" : "Reading file…");
+    try {
+      const parsed = await parseStatementFile(file);
+      if (!parsed.length) throw new Error("no rows");
+      setBusy(false);
+      pushToast(parsed.length + " transactions imported", "success");
+      onParsed(parsed);
+    } catch (e) {
+      setBusy(false);
+      pushToast(e.message || "Couldn't read that file — check the format.", "error");
+    }
   };
 
   const handleDrop = (e) => {
@@ -412,7 +625,7 @@ function UploadStatementModal({ onClose, onParsed, pushToast }) {
           <span className="brand-name">Upload statement</span>
           <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "#fff" }}>×</button>
         </div>
-        <p className="subtitle">Upload a CSV bank statement to see it feed into your dashboard.</p>
+        <p className="subtitle">Upload a PDF or CSV bank statement and it feeds straight into your dashboard.</p>
         <div
           className={"dropzone " + (dragActive ? "dropzone-active" : "")}
           onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -420,11 +633,11 @@ function UploadStatementModal({ onClose, onParsed, pushToast }) {
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
         >
-          <p className="dropzone-text">{busy ? "Reading file…" : "Drag & drop a CSV here, or click to browse"}</p>
-          <input ref={inputRef} type="file" accept=".csv" style={{ display: "none" }}
+          <p className="dropzone-text">{busy ? busy : "Drag & drop a PDF or CSV here, or click to browse"}</p>
+          <input ref={inputRef} type="file" accept=".csv,.pdf" style={{ display: "none" }}
             onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         </div>
-        <p className="summary-note" style={{ marginTop: 14 }}>Expected columns: Date, Description, Category, Amount</p>
+        <p className="summary-note" style={{ marginTop: 14 }}>CSV needs Date, Description and Amount (or Debit/Credit) columns. PDFs are read by AI.</p>
       </div>
     </div>
   );
@@ -742,27 +955,40 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
 
   const handleContinue = async (skip) => {
     setSubmitting(true);
-    try {
-      for (const bank of banks) {
-        const bal = balanceByBank[bank];
-        if (bal.balance || bal.date) {
+    const allParsed = [];
+    for (const bank of banks) {
+      const bal = balanceByBank[bank];
+      if (bal.balance || bal.date) {
+        try {
           await supabaseClient.from("banks").update({
             starting_balance: bal.balance ? Number(bal.balance) : null,
             as_of_date: bal.date || null,
           }).eq("user_id", userId).eq("bank_name", bank);
-        }
-        if (!skip) {
-          for (const f of filesByBank[bank]) {
-            const path = userId + "/" + bank + "/" + Date.now() + "_" + f.name;
-            await supabaseClient.storage.from("statements").upload(path, f.rawFile);
-          }
+        } catch (e) {}
+      }
+      if (skip) continue;
+      for (const f of filesByBank[bank]) {
+        try {
+          const path = userId + "/" + bank + "/" + Date.now() + "_" + f.name;
+          await supabaseClient.storage.from("statements").upload(path, f.rawFile);
+        } catch (e) {}
+        try {
+          const parsed = await parseStatementFile(f.rawFile);
+          parsed.forEach((t) => { t.bank = bank; });
+          allParsed.push(...parsed);
+        } catch (e) {
+          pushToast("Couldn't read " + f.name + " — " + (e.message || "check the format"), "error");
         }
       }
-    } catch (e) {
-      pushToast("Some files failed to upload", "error");
+    }
+    let saved = allParsed;
+    if (allParsed.length) {
+      try { saved = await saveTransactionsToDb(userId, null, allParsed); }
+      catch (e) { pushToast("Transactions parsed but couldn't be saved to your account", "error"); }
+      pushToast(allParsed.length + " transactions imported", "success");
     }
     setSubmitting(false);
-    onDone(filesByBank, balanceByBank);
+    onDone(filesByBank, balanceByBank, saved);
   };
 
   return (
@@ -862,12 +1088,29 @@ function ProcessingScreen({ onDone }) {
 
 /* ---------------- Monthly breakdown table ---------------- */
 
-function MonthlyBreakdownScreen({ onDone }) {
-  const categories = Object.keys(CATEGORY_MONTHLY);
-  const totalsByMonth = MONTH_LABELS.map((_, mi) =>
-    categories.reduce((s, c) => s + CATEGORY_MONTHLY[c][mi], 0)
+function MonthlyBreakdownScreen({ onDone, transactions }) {
+  const hasReal = transactions && transactions.length > 0;
+  let categories, monthLabels, byCatByMonth, incomeByMonth;
+  if (hasReal) {
+    const keys = lastNMonthKeys(latestMonthKey(transactions), 3);
+    monthLabels = keys.map(monthLabelFromKey);
+    const perMonth = keys.map((k) => spendByCategoryForMonth(transactions, k));
+    const catSet = new Set();
+    perMonth.forEach((o) => Object.keys(o).forEach((c) => catSet.add(c)));
+    categories = [...TX_CATEGORIES.filter((c) => catSet.has(c)), ...[...catSet].filter((c) => !TX_CATEGORIES.includes(c))];
+    if (!categories.length) categories = ["Uncategorized"];
+    byCatByMonth = Object.fromEntries(categories.map((c) => [c, perMonth.map((o) => Math.round(o[c] || 0))]));
+    incomeByMonth = keys.map((k) => Math.round(incomeForMonth(transactions, k)));
+  } else {
+    categories = Object.keys(CATEGORY_MONTHLY);
+    monthLabels = MONTH_LABELS;
+    byCatByMonth = CATEGORY_MONTHLY;
+    incomeByMonth = INCOME_MONTHLY;
+  }
+  const totalsByMonth = monthLabels.map((_, mi) =>
+    categories.reduce((s, c) => s + byCatByMonth[c][mi], 0)
   );
-  const netByMonth = MONTH_LABELS.map((_, mi) => INCOME_MONTHLY[mi] - totalsByMonth[mi]);
+  const netByMonth = monthLabels.map((_, mi) => incomeByMonth[mi] - totalsByMonth[mi]);
 
   return (
     <div className="page stage-fade">
@@ -875,24 +1118,24 @@ function MonthlyBreakdownScreen({ onDone }) {
       <div className="glass-card breakdown-screen-card">
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
         <h1 className="title">Your spending, last 3 months</h1>
-        <p className="subtitle">Simulated from your uploaded statements.</p>
+        <p className="subtitle">{hasReal ? "Built from your uploaded statements." : "Simulated from your uploaded statements."}</p>
 
         <div className="table-wrap">
           <table className="month-table">
             <thead>
               <tr>
                 <th className="row-label-head">Category</th>
-                {MONTH_LABELS.map((m) => <th key={m}>{m}</th>)}
+                {monthLabels.map((m) => <th key={m}>{m}</th>)}
               </tr>
             </thead>
             <tbody>
               {categories.map((c) => (
                 <tr key={c}>
                   <td className="row-label">
-                    <span className="cat-dot" style={{ background: CATEGORY_COLORS[c] }} />
+                    <span className="cat-dot" style={{ background: catColor(c) }} />
                     {c}
                   </td>
-                  {CATEGORY_MONTHLY[c].map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
+                  {byCatByMonth[c].map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
                 </tr>
               ))}
               <tr className="totals-row">
@@ -901,7 +1144,7 @@ function MonthlyBreakdownScreen({ onDone }) {
               </tr>
               <tr className="income-row">
                 <td className="row-label">Income</td>
-                {INCOME_MONTHLY.map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
+                {incomeByMonth.map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
               </tr>
               <tr className="net-row">
                 <td className="row-label">Net inflow / outflow</td>
@@ -925,11 +1168,13 @@ function MonthlyBreakdownScreen({ onDone }) {
 
 /* ---------------- Target setting ---------------- */
 
-function TargetSettingScreen({ onDone, pushToast, userId }) {
-  const categories = Object.keys(CATEGORY_MONTHLY);
+function TargetSettingScreen({ onDone, pushToast, userId, transactions }) {
+  const hasReal = transactions && transactions.length > 0;
+  const realLastMonth = hasReal ? spendByCategoryForMonth(transactions, latestMonthKey(transactions)) : null;
+  const categories = TX_CATEGORIES;
   const lastMonthIndex = MONTH_LABELS.length - 1;
   const [targets, setTargets] = useState(() =>
-    Object.fromEntries(categories.map((c) => [c, CATEGORY_MONTHLY[c][lastMonthIndex]]))
+    Object.fromEntries(categories.map((c) => [c, hasReal ? Math.round(realLastMonth[c] || 0) : CATEGORY_MONTHLY[c][lastMonthIndex]]))
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -1116,7 +1361,7 @@ function SidePanel({ open, active, setActive }) {
 function SummaryCard({ targets, transactions }) {
   const lastIdx = MONTH_LABELS.length - 1;
   const spent = (transactions && transactions.length > 0)
-    ? transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+    ? spendForMonth(transactions, latestMonthKey(transactions))
     : Object.keys(CATEGORY_MONTHLY).reduce((s, c) => s + CATEGORY_MONTHLY[c][lastIdx], 0);
   const target = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0) || 1;
   const pct = Math.min(100, Math.round((spent / target) * 100));
@@ -1140,7 +1385,7 @@ function SummaryCard({ targets, transactions }) {
     </div>
   );
 }
-function DAYS_INTO_MONTH() { return 10; }
+function DAYS_INTO_MONTH() { return new Date().getDate(); }
 
 function TransactionFeed({ limit, transactions }) {
   const source = (transactions && transactions.length > 0) ? transactions : TRANSACTIONS;
@@ -1151,7 +1396,7 @@ function TransactionFeed({ limit, transactions }) {
       <div className="tx-list">
         {list.map((t, i) => (
           <div className="tx-row" key={i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} · {t.date}</span></div>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} · {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -1159,10 +1404,16 @@ function TransactionFeed({ limit, transactions }) {
     </div>
   );
 }
-function BreakdownCard() {
-  const lastIdx = MONTH_LABELS.length - 1;
-  const cats = Object.keys(CATEGORY_MONTHLY).map((c) => ({ name: c, amount: CATEGORY_MONTHLY[c][lastIdx], color: CATEGORY_COLORS[c] }));
-  const total = cats.reduce((s, c) => s + c.amount, 0);
+function BreakdownCard({ transactions }) {
+  let cats;
+  if (transactions && transactions.length > 0) {
+    const byCat = spendByCategoryForMonth(transactions, latestMonthKey(transactions));
+    cats = Object.entries(byCat).map(([name, amount]) => ({ name, amount, color: catColor(name) })).sort((a, b) => b.amount - a.amount);
+  } else {
+    const lastIdx = MONTH_LABELS.length - 1;
+    cats = Object.keys(CATEGORY_MONTHLY).map((c) => ({ name: c, amount: CATEGORY_MONTHLY[c][lastIdx], color: CATEGORY_COLORS[c] }));
+  }
+  const total = cats.reduce((s, c) => s + c.amount, 0) || 1;
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Spending by category</span>
@@ -1191,37 +1442,50 @@ function GoalsCard() {
     </div>
   );
 }
-function TrendsCard() {
-  const max = Math.max(...TREND_SPEND);
+function TrendsCard({ transactions }) {
+  let months = TREND_MONTHS, spend = TREND_SPEND;
+  if (transactions && transactions.length > 0) {
+    const keys = lastNMonthKeys(latestMonthKey(transactions), 6);
+    months = keys.map(monthLabelFromKey);
+    spend = keys.map((k) => Math.round(spendForMonth(transactions, k)));
+  }
+  const max = Math.max(...spend, 1);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Spending trend, last 6 months</span>
       <div className="trend-chart">
-        {TREND_MONTHS.map((m, i) => (
-          <div className="trend-bar-col" key={m}>
+        {months.map((m, i) => (
+          <div className="trend-bar-col" key={m + i}>
             <div className="trend-bar-wrap">
-              <div className="trend-bar" style={{ height: (TREND_SPEND[i] / max) * 100 + "%" }} />
+              <div className="trend-bar" style={{ height: (spend[i] / max) * 100 + "%" }} />
             </div>
             <span className="trend-bar-label">{m}</span>
           </div>
         ))}
       </div>
-      <p className="summary-note">Total spend per month · {formatMoney(TREND_SPEND[TREND_SPEND.length - 1])} last month</p>
+      <p className="summary-note">Total spend per month · {formatMoney(spend[spend.length - 1])} last month</p>
     </div>
   );
 }
 
-function CashFlowCard() {
-  const max = Math.max(...TREND_INCOME);
+function CashFlowCard({ transactions }) {
+  let months = TREND_MONTHS, income = TREND_INCOME, spend = TREND_SPEND;
+  if (transactions && transactions.length > 0) {
+    const keys = lastNMonthKeys(latestMonthKey(transactions), 6);
+    months = keys.map(monthLabelFromKey);
+    income = keys.map((k) => Math.round(incomeForMonth(transactions, k)));
+    spend = keys.map((k) => Math.round(spendForMonth(transactions, k)));
+  }
+  const max = Math.max(...income, ...spend, 1);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Income vs outgoings</span>
       <div className="trend-chart">
-        {TREND_MONTHS.map((m, i) => (
-          <div className="trend-bar-col" key={m}>
+        {months.map((m, i) => (
+          <div className="trend-bar-col" key={m + i}>
             <div className="trend-bar-wrap dual">
-              <div className="trend-bar income-bar" style={{ height: (TREND_INCOME[i] / max) * 100 + "%" }} />
-              <div className="trend-bar spend-bar" style={{ height: (TREND_SPEND[i] / max) * 100 + "%" }} />
+              <div className="trend-bar income-bar" style={{ height: (income[i] / max) * 100 + "%" }} />
+              <div className="trend-bar spend-bar" style={{ height: (spend[i] / max) * 100 + "%" }} />
             </div>
             <span className="trend-bar-label">{m}</span>
           </div>
@@ -1231,18 +1495,24 @@ function CashFlowCard() {
         <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Income</span>
         <span className="legend-item"><span className="legend-dot" style={{ background: "#4f8cff" }} />Outgoings</span>
       </div>
-      <p className="summary-note">Net last month: {formatMoney(TREND_INCOME[TREND_INCOME.length - 1] - TREND_SPEND[TREND_SPEND.length - 1])}</p>
+      <p className="summary-note">Net last month: {formatMoney(income[income.length - 1] - spend[spend.length - 1])}</p>
     </div>
   );
 }
 
-function BillsCard() {
-  const total = BILLS.reduce((s, b) => s + b.amount, 0);
+function BillsCard({ transactions }) {
+  let bills = BILLS;
+  if (transactions && transactions.length > 0) {
+    const detected = detectRecurringBills(transactions);
+    bills = detected.length ? detected : [];
+  }
+  if (!bills.length) return <EmptyState text="No recurring payments detected yet — they show up once the same payment appears in 2+ months." />;
+  const total = bills.reduce((s, b) => s + b.amount, 0);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Bills & subscriptions</span>
       <div className="tx-list">
-        {BILLS.map((b) => (
+        {bills.map((b) => (
           <div className="tx-row" key={b.name}>
             <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} · due {b.due}</span></div>
             <span className="tx-amount">{formatMoney(-b.amount)}</span>
@@ -1272,13 +1542,19 @@ function BankAccountsCard({ banks }) {
   );
 }
 
-function MerchantsCard() {
-  const max = Math.max(...MERCHANTS.map((m) => m.amount));
+function MerchantsCard({ transactions }) {
+  let merchants = MERCHANTS;
+  if (transactions && transactions.length > 0) {
+    merchants = topMerchantsFor(transactions, latestMonthKey(transactions), 5);
+    if (merchants.length < 3) merchants = topMerchantsFor(transactions, null, 5);
+  }
+  if (!merchants.length) return <EmptyState text="No merchant data yet — upload a statement to get started." />;
+  const max = Math.max(...merchants.map((m) => m.amount), 1);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Top merchants</span>
       <div className="category-list">
-        {MERCHANTS.map((m) => (
+        {merchants.map((m) => (
           <div className="category-row" key={m.name}>
             <div className="category-top"><span className="category-name">{m.name}</span><span className="category-amount">{formatMoney(m.amount)}</span></div>
             <div className="category-track"><div className="category-fill" style={{ width: (m.amount / max) * 100 + "%", background: "#4f8cff" }} /></div>
@@ -1289,12 +1565,17 @@ function MerchantsCard() {
   );
 }
 
-function InsightsCard() {
+function InsightsCard({ transactions, targets }) {
+  let insights = INSIGHTS;
+  if (transactions && transactions.length > 0) {
+    const built = buildInsights(transactions, targets);
+    insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
+  }
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Insights</span>
       <div className="insight-list">
-        {INSIGHTS.map((ins, i) => (
+        {insights.map((ins, i) => (
           <div className={"insight-row insight-" + ins.type} key={i}>
             <span className="insight-icon">{ins.type === "warning" ? "!" : ins.type === "positive" ? "✓" : "i"}</span>
             <span>{ins.text}</span>
@@ -1332,14 +1613,14 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions }) {
   switch (key) {
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
-    case "breakdown": return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+    case "breakdown": return hasData ? <BreakdownCard transactions={transactions} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
     case "goals": return <GoalsCard />;
-    case "trends": return hasData ? <TrendsCard /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-    case "cashflow": return hasData ? <CashFlowCard /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
-    case "bills": return hasData ? <BillsCard /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+    case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
+    case "cashflow": return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
+    case "bills": return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
     case "accounts": return <BankAccountsCard banks={banks} />;
-    case "merchants": return hasData ? <MerchantsCard /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
-    case "insights": return hasData ? <InsightsCard /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+    case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
+    case "insights": return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
     default: return null;
   }
 }
@@ -1372,15 +1653,15 @@ function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transacti
 
 function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots }) {
   if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} />;
-  if (view === "breakdown") return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
-  if (view === "trends") return hasData ? <TrendsCard /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-  if (view === "cashflow") return hasData ? <CashFlowCard /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
-  if (view === "bills") return hasData ? <BillsCard /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+  if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
+  if (view === "cashflow") return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
+  if (view === "bills") return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
   if (view === "accounts") return <BankAccountsCard banks={banks} />;
-  if (view === "merchants") return hasData ? <MerchantsCard /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
-  if (view === "insights") return hasData ? <InsightsCard /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+  if (view === "merchants") return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
+  if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
 function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots }) {
@@ -1579,6 +1860,31 @@ function App() {
 
   const hasData = Object.values(uploadedFiles).some((arr) => arr && arr.length > 0) || customTransactions.length > 0;
 
+  const runAiFallback = async (txs) => {
+    const uncats = txs.filter((t) => t.category === "Uncategorized");
+    if (!uncats.length) return;
+    try {
+      const unique = [...new Set(uncats.map((t) => t.name))].slice(0, 200);
+      const mapping = await aiCategorize(unique);
+      if (!mapping || !Object.keys(mapping).length) return;
+      setCustomTransactions((prev) => prev.map((t) =>
+        t.category === "Uncategorized" && mapping[t.name] ? { ...t, category: mapping[t.name] } : t
+      ));
+      const idToCat = {};
+      txs.forEach((t) => { if (t.id && t.category === "Uncategorized" && mapping[t.name]) idToCat[t.id] = mapping[t.name]; });
+      if (Object.keys(idToCat).length) await updateTransactionCategoriesInDb(idToCat);
+      pushToast("AI categorized " + Object.keys(idToCat).length + " transactions", "success");
+    } catch (e) { /* stays Uncategorized if AI unavailable */ }
+  };
+
+  const handleAddTransactions = async (list, bankName) => {
+    let saved = list;
+    try { saved = await saveTransactionsToDb(userId, bankName || null, list); }
+    catch (e) { pushToast("Imported, but couldn't save to your account — run the transactions SQL setup", "error"); }
+    setCustomTransactions((prev) => [...saved, ...prev]);
+    runAiFallback(saved);
+  };
+
   useEffect(() => {
     supabaseClient.auth.getSession().then(async ({ data }) => {
       const session = data?.session;
@@ -1595,9 +1901,11 @@ function App() {
         if (profile?.name) {
           const bankRows = await fetchBanks(uid);
           const targetObj = await fetchTargets(uid);
+          const txRows = await fetchTransactions(uid);
           setName(profile.name);
           setBanks(bankRows.map((b) => b.bank_name));
           setTargets(targetObj);
+          setCustomTransactions(txRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
           setOverviewSlots(parseOverviewLayout(profile));
           setStage("dashboard");
@@ -1652,10 +1960,12 @@ function App() {
 
       const bankRows = await fetchBanks(uid);
       const targetObj = await fetchTargets(uid);
+      const txRows = await fetchTransactions(uid);
       profile = await fetchProfile(uid);
       setName(profile?.name || "Shezaad");
       setBanks(bankRows.map((b) => b.bank_name));
       setTargets(targetObj);
+      setCustomTransactions(txRows);
       setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
       setOverviewSlots(parseOverviewLayout(profile));
       setStage("dashboard");
@@ -1697,7 +2007,7 @@ function App() {
   };
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
-    setUserId(null); setName(""); setBanks([]); setTargets({}); setUploadedFiles({});
+    setUserId(null); setName(""); setBanks([]); setTargets({}); setUploadedFiles({}); setCustomTransactions([]);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
     setStage("landing");
@@ -1735,9 +2045,11 @@ function App() {
             if (profile?.name) {
               const bankRows = await fetchBanks(uid);
               const targetObj = await fetchTargets(uid);
+              const txRows = await fetchTransactions(uid);
               setName(profile.name);
               setBanks(bankRows.map((b) => b.bank_name));
               setTargets(targetObj);
+              setCustomTransactions(txRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
               setOverviewSlots(parseOverviewLayout(profile));
               setStage("dashboard");
@@ -1759,15 +2071,19 @@ function App() {
         banks={banks}
         userId={userId}
         pushToast={pushToast}
-        onDone={(files, bal) => { setUploadedFiles(files); setBalances(bal); setStage("processing"); }}
+        onDone={(files, bal, parsedTxs) => {
+          setUploadedFiles(files); setBalances(bal);
+          if (parsedTxs && parsedTxs.length) { setCustomTransactions((prev) => [...parsedTxs, ...prev]); runAiFallback(parsedTxs); }
+          setStage("processing");
+        }}
       />
     );
   } else if (stage === "processing") {
     content = <ProcessingScreen onDone={() => setStage("breakdown")} />;
   } else if (stage === "breakdown") {
-    content = <MonthlyBreakdownScreen onDone={() => setStage("targets")} />;
+    content = <MonthlyBreakdownScreen transactions={customTransactions} onDone={() => setStage("targets")} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} pushToast={pushToast} onDone={(t) => { setTargets(t); setShowExtraBanner(true); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onDone={(t) => { setTargets(t); setShowExtraBanner(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -1803,7 +2119,7 @@ function App() {
         onDismissExtra={() => setShowExtraBanner(false)}
         onLogout={handleLogout}
         transactions={customTransactions}
-        onAddTransactions={(list) => setCustomTransactions((prev) => [...list, ...prev])}
+        onAddTransactions={handleAddTransactions}
         pushToast={pushToast}
         overviewSlots={overviewSlots}
         onChangeOverviewSlots={handleChangeOverviewSlots}
