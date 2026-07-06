@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
   #root { min-height: 100vh; }
 </style>
 </head>
@@ -212,8 +212,13 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
   const revealRef = useRef(null);
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => { if (entry.isIntersecting) entry.target.classList.add("in-view"); });
-    }, { threshold: 0.15 });
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in-view");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: "0px 0px -5% 0px" });
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
@@ -1828,10 +1833,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     background: linear-gradient(160deg, #0b1224 0%, #101a35 45%, #191035 100%);
     padding: 24px;
   }
-  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; z-index: 0; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; z-index: 0; will-change: transform; transform: translateZ(0); contain: layout paint; }
   .blob1 { width: 420px; height: 420px; background: radial-gradient(circle at 30% 30%, #4f8cff, transparent 70%); top: -100px; left: -80px; animation: float1 16s ease-in-out infinite; }
   .blob2 { width: 380px; height: 380px; background: radial-gradient(circle at 60% 40%, #b56bff, transparent 70%); bottom: -120px; right: -60px; animation: float2 20s ease-in-out infinite; }
   .blob3 { width: 320px; height: 320px; background: radial-gradient(circle at 50% 50%, #ff8bd6, transparent 70%); top: 40%; left: 60%; animation: float3 18s ease-in-out infinite; }
+  @media (max-width: 640px) {
+    .blob { animation: none !important; filter: blur(45px); }
+  }
   @keyframes float1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(40px, 60px); } }
   @keyframes float2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-50px, -30px); } }
   @keyframes float3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-30px, 40px) scale(1.08); } }
@@ -1989,7 +1997,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* dashboard */
   .app-shell { min-height: 100vh; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
-  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 10; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(20, 22, 40, 0.75); backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 20; will-change: transform; transform: translateZ(0); }
   .topbar-left { display: flex; align-items: center; gap: 14px; }
   .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; }
   .hamburger, .hamburger::before, .hamburger::after { display: block; width: 18px; height: 2px; background: #fff; border-radius: 2px; position: relative; }
@@ -2004,22 +2012,25 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .menu-item { font-family: inherit; text-align: left; background: none; border: none; color: #fff; font-size: 14px; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
   .menu-item:hover { background: rgba(255,255,255,0.1); }
   .body-row { display: flex; }
-  .side-panel { width: 0; overflow: hidden; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); }
+  .side-panel { width: 0; overflow: hidden; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); position: sticky; top: 65px; align-self: flex-start; z-index: 11; }
   .side-panel-open { width: 220px; padding: 20px 14px; }
   .side-panel-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; padding: 0 8px; white-space: nowrap; }
   .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
   .side-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
   .side-item-active { background: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3)); color: #fff; }
   .main-content { flex: 1; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 640px; }
-  .main-content-wide { max-width: 860px; }
-  .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .overview-slot { border: 1.5px dashed rgba(255,255,255,0.28); border-radius: 22px; padding: 14px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 10px; transition: border-color 0.18s ease; }
+  .main-content-wide { max-width: none; width: 100%; height: calc(100vh - 65px); padding: 20px 24px; overflow: hidden; }
+  .overview-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 16px; height: 100%; }
+  .overview-slot { border: 1.5px dashed rgba(255,255,255,0.28); border-radius: 22px; padding: 14px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 10px; transition: border-color 0.18s ease; height: 100%; min-height: 0; }
   .overview-slot:hover { border-color: rgba(255,255,255,0.45); }
   .overview-slot-head { display: flex; justify-content: flex-end; }
   .slot-select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.22); color: #fff; font-family: inherit; font-size: 12px; font-weight: 500; padding: 6px 10px; border-radius: 10px; cursor: pointer; outline: none; }
   .slot-select option { background: #171727; color: #fff; }
-  .overview-slot-body { display: flex; flex-direction: column; }
-  .overview-slot-body .dash-card { border-style: solid; }
+  .overview-slot-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .overview-slot-body .dash-card { border-style: solid; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+  .overview-slot-body .tx-list,
+  .overview-slot-body .category-list,
+  .overview-slot-body .insight-list { flex: 1; overflow-y: auto; min-height: 0; }
   .dash-card { background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 24px; padding: 22px; max-width: none; }
   .card-label { color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
   .summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -2149,7 +2160,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .tx-category { font-size: 11px; }
     .trend-chart { height: 110px; gap: 6px; }
     .insight-row { font-size: 12px; }
-    .overview-grid { grid-template-columns: 1fr; }
+    .main-content-wide { height: auto; overflow: visible; padding: 16px; }
+    .overview-grid { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
+    .overview-slot { height: auto; }
+    .overview-slot-body .dash-card { height: auto; overflow: visible; }
 
     /* side panel becomes an overlay drawer instead of pushing content */
     .side-panel {
@@ -2192,9 +2206,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .landing-page { position: relative; min-height: 100vh; overflow-x: hidden; }
   .lp-wrap { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 0 24px; }
   .lp-nav {
-    position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 24px; background: rgba(11,18,36,0.55); backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(255,255,255,0.08); position: sticky; top: 0;
+    position: sticky; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px; background: rgba(11,18,36,0.85); backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.08); top: 0;
+    will-change: transform; transform: translateZ(0);
   }
   .lp-nav-actions { display: flex; gap: 10px; }
   .btn { font-family: inherit; font-weight: 600; cursor: pointer; border-radius: 14px; padding: 10px 18px; font-size: 14px; border: 1px solid rgba(255,255,255,0.22); transition: all 0.18s ease; }
@@ -2215,8 +2231,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .section-head h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 8px; color: #fff; }
   .section-head p { color: rgba(255,255,255,0.55); font-size: 14px; margin: 0; }
 
-  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
-  .reveal.in-view { opacity: 1; transform: translateY(0); }
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.5s ease, transform 0.5s ease; will-change: opacity, transform; }
+  .reveal.in-view { opacity: 1; transform: translateY(0); will-change: auto; }
 
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .step-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 24px; backdrop-filter: blur(16px); }
