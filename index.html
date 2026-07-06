@@ -462,26 +462,32 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError }) {
         )}
         {isLogin && <button className="link-btn" onClick={() => setMode("forgot")}>Forgot password?</button>}
         <button className="glass-btn primary" disabled={!canSubmit || submitting} onClick={async () => {
-          if (isForgot) {
-            setSubmitting(true);
-            const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
-            setSubmitting(false);
-            if (error) return onError(error.message);
-            onError("Check your email for a reset link.", "success");
-            return;
-          }
           setSubmitting(true);
-          if (mode === "signup") {
-            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+          try {
+            if (isForgot) {
+              const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+              if (error) return onError(error.message);
+              onError("Check your email for a reset link.", "success");
+              return;
+            }
+            if (mode === "signup") {
+              const { data, error } = await supabaseClient.auth.signUp({ email, password });
+              if (error) return onError(error.message);
+              if (!data.session) {
+                onError("Account created. Check your email to confirm before logging in.", "success");
+                return;
+              }
+              onDone(mode, data.user?.id, null);
+            } else {
+              const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+              if (error) return onError(error.message);
+              const profile = await fetchProfile(data.user.id);
+              onDone(mode, data.user.id, profile);
+            }
+          } catch (e) {
+            onError("Something went wrong: " + (e?.message || "please try again"));
+          } finally {
             setSubmitting(false);
-            if (error) return onError(error.message);
-            onDone(mode, data.user?.id, null);
-          } else {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            setSubmitting(false);
-            if (error) return onError(error.message);
-            const profile = await fetchProfile(data.user.id);
-            onDone(mode, data.user.id, profile);
           }
         }}>
           {submitting ? <span className="btn-spinner" /> : isForgot ? "Send reset link" : isLogin ? "Log in" : "Sign up"}
