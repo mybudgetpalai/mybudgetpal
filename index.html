@@ -1552,9 +1552,20 @@ function App() {
     try {
       let signIn = await supabaseClient.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
       if (signIn.error) {
+        const msg = signIn.error.message || "";
+        if (msg.toLowerCase().includes("confirm")) {
+          pushToast("Dev account needs email confirmation disabled in Supabase settings", "error");
+          setCheckingSession(false);
+          return;
+        }
         const signUp = await supabaseClient.auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
         if (signUp.error) { pushToast("Dev login failed: " + signUp.error.message, "error"); setCheckingSession(false); return; }
         signIn = await supabaseClient.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
+        if (signIn.error) {
+          pushToast("Dev account created but needs email confirmation disabled in Supabase settings", "error");
+          setCheckingSession(false);
+          return;
+        }
       }
       const uid = signIn.data.user.id;
       setUserId(uid);
