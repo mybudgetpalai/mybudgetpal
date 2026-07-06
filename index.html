@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="MyBudgetPal — upload your bank statements, track spending by category, and hit your savings goals." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='1' stop-color='%23b56bff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E" />
+<title>MyBudgetPal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect } = React;
+const APP_NAME = "MyBudgetPal";
+
+const SUPABASE_URL = "https://pjqjzcmqbeqgzyhpbhfz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_M6NKJyabkWYkzYoEMPgoaA_Pw8x53Vg";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function fetchProfile(userId) {
+  const { data } = await supabaseClient.from("profiles").select("*").eq("id", userId).single();
+  return data;
+}
+async function fetchBanks(userId) {
+  const { data } = await supabaseClient.from("banks").select("*").eq("user_id", userId);
+  return data || [];
+}
+async function fetchTargets(userId) {
+  const { data } = await supabaseClient.from("targets").select("*").eq("user_id", userId);
+  const obj = {};
+  (data || []).forEach((row) => { obj[row.category] = row.monthly_target; });
+  return obj;
+}
+
+/* ---------------- shared data ---------------- */
+
+const BANKS = [
+  "HSBC", "Barclays", "Emirates NBD", "ADCB", "Dubai Islamic Bank",
+  "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "Citibank", "Standard Chartered",
+  "JPMorgan Chase", "Bank of America", "Wells Fargo", "Deutsche Bank", "BNP Paribas",
+  "Santander", "Revolut", "Monzo", "Wise", "N26",
+];
+const SAVVY_OPTIONS = [
+  { key: "beginner", label: "Just starting out" },
+  { key: "intermediate", label: "Getting the hang of it" },
+  { key: "confident", label: "Pretty confident" },
+];
+const TRACKING_OPTIONS = [
+  { key: "yes", label: "Yes" }, { key: "no", label: "No" }, { key: "sometimes", label: "Sometimes" },
+];
+const BALANCE_OPTIONS = [
+  { key: "daily", label: "Daily" }, { key: "weekly", label: "Weekly" }, { key: "rarely", label: "Rarely" },
+];
+const GOALS = [
+  "Save more each month", "Pay off debt", "Build an investment portfolio", "Track my spending",
+  "Build my credit", "Plan for a big purchase", "Grow my business", "Just stay organised",
+];
+const ONBOARD_STEPS = 6;
+const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "size-sm", 5: "size-md" };
+
+const VIEWS = [
+  { key: "overview", label: "Overview" },
+  { key: "breakdown", label: "Spending Breakdown" },
+  { key: "goals", label: "Goals Tracker" },
+  { key: "transactions", label: "Transactions" },
+  { key: "trends", label: "Trends" },
+  { key: "cashflow", label: "Cash Flow" },
+  { key: "bills", label: "Bills & Subscriptions" },
+  { key: "accounts", label: "Bank Accounts" },
+  { key: "merchants", label: "Merchants" },
+  { key: "insights", label: "Insights" },
+];
+
+const TREND_MONTHS = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
+const TREND_SPEND = [1850, 1920, 1980, 2050, 2100, 2150];
+const TREND_INCOME = [3100, 3100, 3150, 3150, 3200, 3200];
+
+const BILLS = [
+  { name: "Rent", amount: 1200, frequency: "Monthly", due: "1st" },
+  { name: "DEWA", amount: 280, frequency: "Monthly", due: "5th" },
+  { name: "Netflix", amount: 12.99, frequency: "Monthly", due: "12th" },
+  { name: "Spotify", amount: 9.99, frequency: "Monthly", due: "15th" },
+  { name: "Gym Membership", amount: 45, frequency: "Monthly", due: "28th" },
+];
+
+const MERCHANTS = [
+  { name: "Amazon", category: "Shopping", amount: 420 },
+  { name: "Waitrose", category: "Groceries", amount: 380 },
+  { name: "Uber", category: "Transport", amount: 210 },
+  { name: "Costa Coffee", category: "Dining", amount: 95 },
+  { name: "Netflix", category: "Subscriptions", amount: 77 },
+];
+
+const INSIGHTS = [
+  { type: "warning", text: "Dining spend is up 40% compared to last month." },
+  { type: "positive", text: "You're on track to hit your savings goal 2 months early." },
+  { type: "info", text: "Bills increased by 8% since last month, mostly from DEWA." },
+  { type: "positive", text: "Groceries spend has stayed consistent for 3 months running." },
+];
+const TRANSACTIONS = [
+  { name: "Waitrose", category: "Groceries", date: "5 Jul", amount: -84.20 },
+  { name: "Uber", category: "Transport", date: "5 Jul", amount: -18.50 },
+  { name: "Salary", category: "Income", date: "1 Jul", amount: 3200.00 },
+  { name: "Netflix", category: "Subscriptions", date: "1 Jul", amount: -12.99 },
+  { name: "Costa Coffee", category: "Dining", date: "30 Jun", amount: -6.40 },
+  { name: "Amazon", category: "Shopping", date: "29 Jun", amount: -142.00 },
+  { name: "DEWA", category: "Bills", date: "27 Jun", amount: -310.00 },
+  { name: "Gym Membership", category: "Health", date: "28 Jun", amount: -45.00 },
+];
+
+const MONTH_LABELS = ["Apr", "May", "Jun"];
+const CATEGORY_MONTHLY = {
+  Groceries: [380, 410, 420],
+  Dining: [220, 245, 260],
+  Transport: [150, 165, 180],
+  Shopping: [300, 260, 340],
+  Subscriptions: [60, 60, 65],
+  Bills: [480, 520, 560],
+};
+const INCOME_MONTHLY = [3100, 3150, 3200];
+const CATEGORY_COLORS = {
+  Groceries: "#4f8cff", Dining: "#b56bff", Transport: "#ff8bd6",
+  Shopping: "#ffb84f", Subscriptions: "#4fe0c0", Bills: "#ff8b8b",
+};
+
+const SAVINGS_GOAL = { label: "Emergency fund", target: 10000, current: 4200, months: 6 };
+
+const PRIVACY_SECTIONS = [
+  { h: "What we collect", b: "Account details (name, email, password), bank statement files you upload, transaction data extracted from them, and any goals/targets you set." },
+  { h: "Why we collect it", b: "To categorize your spending, show summaries and trends, and let you log back in to the same data." },
+  { h: "How it's protected", b: "Encrypted in transit and at rest. Access to your data is restricted to your account only. We never store your online banking login — only the statement files you upload directly." },
+  { h: "Retention", b: "Kept while your account is active. You can request deletion of your account and data at any time." },
+  { h: "Sharing", b: "We do not sell your data. Limited service providers (hosting, database, AI processing) may handle data strictly to run the app, under confidentiality." },
+  { h: "Your rights", b: "Access, correct, delete, or export your data at any time." },
+];
+const TERMS_SECTIONS = [
+  { h: "What the service does", b: "A tracking and budgeting tool. Not a bank, financial advisor, or regulated financial institution." },
+  { h: "Your responsibilities", b: "Provide accurate information, keep your login secure, only upload statements you're authorized to access." },
+  { h: "No financial advice", b: "Insights, targets, and categorizations are informational only, not financial, tax, or legal advice." },
+  { h: "Accuracy of data", b: "Automated (including AI) extraction and categorization may occasionally be inaccurate. Verify important figures against your actual statements." },
+  { h: "Account termination", b: "You may delete your account anytime. We may suspend accounts that misuse the service." },
+  { h: "Liability", b: "Provided \"as is.\" We are not liable for financial decisions made based on app data, or losses from data inaccuracies." },
+];
+
+function formatMoney(n) {
+  const sign = n < 0 ? "-" : "";
+  return sign + "£" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+/* ---------------- Landing (marketing) ---------------- */
+
+function LandingScreen({ onSignup, onLogin, onSkip }) {
+  const revealRef = useRef(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => { if (entry.isIntersecting) entry.target.classList.add("in-view"); });
+    }, { threshold: 0.15 });
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="landing-page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+
+      <div className="lp-nav">
+        <div className="brand-row" style={{ marginBottom: 0 }}><div className="brand-dot" /><span className="brand-name" style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{APP_NAME}</span></div>
+        <div className="lp-nav-actions">
+          <button className="btn btn-ghost" onClick={onLogin}>Log in</button>
+          <button className="btn btn-primary" onClick={onSignup}>Start free trial</button>
+        </div>
+      </div>
+
+      <div className="lp-hero lp-wrap">
+        <span className="hero-eyebrow">Now in early access</span>
+        <h1>See exactly where your money goes.</h1>
+        <p>Upload your bank statements, set monthly targets by category, and finally get a clear picture of your spending — without the spreadsheets.</p>
+        <div className="hero-actions">
+          <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
+          <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
+        </div>
+      </div>
+
+      <div className="lp-section lp-wrap" id="lp-how">
+        <div className="section-head reveal"><h2>How it works</h2><p>Three steps to a clearer picture of your finances.</p></div>
+        <div className="steps">
+          <div className="step-card reveal"><div className="step-num">1</div><h3>Upload your statements</h3><p>Add a few months of statements from any bank. PDF or CSV, no bank login required.</p></div>
+          <div className="step-card reveal"><div className="step-num">2</div><h3>We categorize it for you</h3><p>Transactions are automatically sorted into categories like groceries, bills, and dining.</p></div>
+          <div className="step-card reveal"><div className="step-num">3</div><h3>Set targets, hit goals</h3><p>See spend vs target by category, track savings goals, and stay on pace each month.</p></div>
+        </div>
+      </div>
+
+      <div className="lp-section lp-wrap">
+        <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
+        <div className="features">
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Spending breakdown</h3><p>See exactly what you spend by category, every month.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Monthly targets</h3><p>Set a budget per category and track how you're pacing.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Savings goals</h3><p>Plan toward a goal and see your progress over time.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Bills & subscriptions</h3><p>Keep track of recurring payments and due dates in one place.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Trends over time</h3><p>See how your spending and income shift month to month.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Customizable views</h3><p>Switch between different dashboard views to see the data your way.</p></div>
+        </div>
+      </div>
+
+      <div className="lp-section lp-wrap">
+        <div className="section-head reveal"><h2>Simple pricing</h2><p>Start free. Upgrade whenever you're ready.</p></div>
+        <div className="pricing">
+          <div className="price-card reveal">
+            <div className="price-tag">Free trial</div>
+            <div className="price-amount">£0</div>
+            <div className="price-period">for 14 days</div>
+            <ul className="price-features"><li>Upload up to 2 banks</li><li>Full dashboard access</li><li>Monthly targets & goals</li></ul>
+            <button className="btn btn-ghost" style={{ width: "100%" }} onClick={onSignup}>Start free</button>
+          </div>
+          <div className="price-card highlight reveal">
+            <div className="price-tag">Pro</div>
+            <div className="price-amount">£4.99</div>
+            <div className="price-period">per month</div>
+            <ul className="price-features"><li>Unlimited banks</li><li>Full dashboard access</li><li>Monthly targets & goals</li><li>Priority support</li></ul>
+            <button className="btn btn-primary" style={{ width: "100%" }} onClick={onSignup}>Start free trial</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="lp-final-cta lp-wrap reveal">
+        <h2>Ready to see where your money goes?</h2>
+        <p>No bank login required. Cancel anytime.</p>
+        <button className="btn btn-primary btn-large" onClick={onSignup}>Start your free trial</button>
+      </div>
+
+      <footer className="lp-footer">
+        {APP_NAME} · <button className="link-btn inline" onClick={onSkip}>Skip to homepage (dev)</button>
+      </footer>
+    </div>
+  );
+}
+
+/* ---------------- Welcome (entry) ---------------- */
+
+function WelcomeScreen({ onChoose, onSkip, onOpenLegal }) {
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card welcome-card">
+        <div className="brand-row" style={{ justifyContent: "center", marginBottom: 8 }}>
+          <div className="brand-dot" /><span className="brand-name">{APP_NAME}</span>
+        </div>
+        <h1 className="title" style={{ textAlign: "center" }}>Welcome</h1>
+        <p className="subtitle" style={{ textAlign: "center" }}>Are you new here, or already have an account?</p>
+        <div className="welcome-btn-col">
+          <button className="glass-btn primary" onClick={() => onChoose("signup")}>New customer</button>
+          <button className="glass-btn ghost welcome-ghost" onClick={() => onChoose("login")}>Existing customer</button>
+        </div>
+        <p className="legal-note">
+          By continuing you agree to our{" "}
+          <button className="link-btn inline" onClick={() => onOpenLegal("terms")}>Terms</button> and{" "}
+          <button className="link-btn inline" onClick={() => onOpenLegal("privacy")}>Privacy Policy</button>
+        </p>
+        <button className="skip-btn" onClick={onSkip}>Skip to homepage →</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Legal (privacy / terms) ---------------- */
+
+function LegalScreen({ initialTab, onBack }) {
+  const [tab, setTab] = useState(initialTab || "privacy");
+  const sections = tab === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card legal-card">
+        <div className="brand-row">
+          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
+          <span className="brand-name">Legal</span>
+        </div>
+        <div className="legal-tabs">
+          <button className={"legal-tab " + (tab === "privacy" ? "legal-tab-active" : "")} onClick={() => setTab("privacy")}>Privacy Policy</button>
+          <button className={"legal-tab " + (tab === "terms" ? "legal-tab-active" : "")} onClick={() => setTab("terms")}>Terms of Service</button>
+        </div>
+        <p className="test-banner">Test copy for development only — not yet reviewed by a lawyer.</p>
+        <div className="legal-scroll">
+          {sections.map((s, i) => (
+            <div className="legal-section" key={i}>
+              <h3 className="legal-heading">{s.h}</h3>
+              <p className="legal-body">{s.b}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Toasts ---------------- */
+
+function ToastContainer({ toasts }) {
+  if (!toasts.length) return null;
+  return (
+    <div className="toast-stack">
+      {toasts.map((t) => (
+        <div key={t.id} className={"toast toast-" + (t.type || "info")}>{t.message}</div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- Auth ---------------- */
+
+function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError }) {
+  const [mode, setMode] = useState(initialMode || "login");
+  const [submitting, setSubmitting] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const isLogin = mode === "login", isSignup = mode === "signup", isForgot = mode === "forgot";
+  const canSubmit = isForgot
+    ? email.trim().length > 0
+    : isSignup
+    ? email.trim().length > 0 && password.length > 0 && password === confirmPassword
+    : email.trim().length > 0 && password.length > 0;
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card auth-card">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        {isForgot ? (
+          <><h1 className="title">Reset your password</h1><p className="subtitle">We'll send a reset link to your email.</p></>
+        ) : (
+          <><h1 className="title">{isLogin ? "Welcome back" : "Create your account"}</h1>
+          <p className="subtitle">{isLogin ? "Log in to keep tracking your finances." : "Let's get you set up."}</p></>
+        )}
+        <div className="field-group">
+          <label className="field-label">Email</label>
+          <input className="glass-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        {!isForgot && (
+          <div className="field-group">
+            <label className="field-label">Password</label>
+            <input className="glass-input" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+        )}
+        {isSignup && (
+          <div className="field-group">
+            <label className="field-label">Confirm password</label>
+            <input className="glass-input" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          </div>
+        )}
+        {isLogin && <button className="link-btn" onClick={() => setMode("forgot")}>Forgot password?</button>}
+        <button className="glass-btn primary" disabled={!canSubmit || submitting} onClick={async () => {
+          if (isForgot) {
+            setSubmitting(true);
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+            setSubmitting(false);
+            if (error) return onError(error.message);
+            onError("Check your email for a reset link.", "success");
+            return;
+          }
+          setSubmitting(true);
+          if (mode === "signup") {
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            setSubmitting(false);
+            if (error) return onError(error.message);
+            onDone(mode, data.user?.id, null);
+          } else {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            setSubmitting(false);
+            if (error) return onError(error.message);
+            const profile = await fetchProfile(data.user.id);
+            onDone(mode, data.user.id, profile);
+          }
+        }}>
+          {submitting ? <span className="btn-spinner" /> : isForgot ? "Send reset link" : isLogin ? "Log in" : "Sign up"}
+        </button>
+        <div className="switch-row">
+          {isForgot ? (
+            <span>Remembered it? <button className="link-btn inline" onClick={() => setMode("login")}>Log in</button></span>
+          ) : isLogin ? (
+            <span>New here? <button className="link-btn inline" onClick={() => setMode("signup")}>Sign up</button></span>
+          ) : (
+            <span>Already have an account? <button className="link-btn inline" onClick={() => setMode("login")}>Log in</button></span>
+          )}
+        </div>
+        <p className="legal-note">
+          By continuing you agree to our{" "}
+          <button className="link-btn inline" onClick={() => onOpenLegal("terms")}>Terms</button> and{" "}
+          <button className="link-btn inline" onClick={() => onOpenLegal("privacy")}>Privacy Policy</button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Onboarding ---------------- */
+
+function OnboardingScreen({ onDone, userId, pushToast }) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [banks, setBanks] = useState([]);
+  const [savvy, setSavvy] = useState(null);
+  const [tracking, setTracking] = useState(null);
+  const [balanceCheck, setBalanceCheck] = useState(null);
+  const [goals, setGoals] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const canContinue = [
+    name.trim().length > 0, banks.length > 0, savvy !== null, tracking !== null, balanceCheck !== null, goals.length > 0,
+  ][step];
+
+  const toggleBank = (b) => setBanks((prev) => prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]);
+  const toggleGoal = (g) => setGoals((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+  const next = async () => {
+    if (step === ONBOARD_STEPS - 1) {
+      setSubmitting(true);
+      try {
+        await supabaseClient.from("profiles").update({ name: name.trim() }).eq("id", userId);
+        await supabaseClient.from("banks").insert(banks.map((b) => ({ user_id: userId, bank_name: b })));
+      } catch (e) {
+        pushToast("Couldn't save — check your connection", "error");
+      }
+      setSubmitting(false);
+      onDone({ name: name.trim(), banks });
+    }
+    else setStep((s) => s + 1);
+  };
+  const back = () => setStep((s) => Math.max(s - 1, 0));
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className={"glass-card " + CARD_SIZE[step]}>
+        <div className="progress-dots">
+          {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
+            <div key={i} className={"dot " + (i <= step ? "dot-active" : "")} />
+          ))}
+        </div>
+
+        {step === 0 && (
+          <div className="step">
+            <h1 className="title">Nice to meet you, what's your name?</h1>
+            <input className="glass-input" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </div>
+        )}
+        {step === 1 && (
+          <div className="step">
+            <h1 className="title">Who's your bank?</h1>
+            <p className="subtitle">Select all that apply. We'll get more specific by country later.</p>
+            <div className="bank-grid">
+              {BANKS.map((b) => (
+                <button key={b} className={"chip bank-chip " + (banks.includes(b) ? "chip-selected" : "")} onClick={() => toggleBank(b)}>
+                  <span>{b}</span>
+                  {banks.includes(b) && <span className="check-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 2 && (
+          <div className="step">
+            <h1 className="title">How smart are you with your finances?</h1>
+            <div className="segmented">
+              {SAVVY_OPTIONS.map((opt) => (
+                <button key={opt.key} className={"segment " + (savvy === opt.key ? "segment-active" : "")} onClick={() => setSavvy(opt.key)}>
+                  <span>{opt.label}</span>
+                  {savvy === opt.key && <span className="check-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 3 && (
+          <div className="step">
+            <h1 className="title">Do you currently track your spending?</h1>
+            <div className="segmented">
+              {TRACKING_OPTIONS.map((opt) => (
+                <button key={opt.key} className={"segment " + (tracking === opt.key ? "segment-active" : "")} onClick={() => setTracking(opt.key)}>
+                  <span>{opt.label}</span>
+                  {tracking === opt.key && <span className="check-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 4 && (
+          <div className="step">
+            <h1 className="title">How often do you check your bank balance?</h1>
+            <div className="segmented">
+              {BALANCE_OPTIONS.map((opt) => (
+                <button key={opt.key} className={"segment " + (balanceCheck === opt.key ? "segment-active" : "")} onClick={() => setBalanceCheck(opt.key)}>
+                  <span>{opt.label}</span>
+                  {balanceCheck === opt.key && <span className="check-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 5 && (
+          <div className="step">
+            <h1 className="title">What do you want to achieve?</h1>
+            <p className="subtitle">Pick as many as apply.</p>
+            <div className="goal-wrap">
+              {GOALS.map((g) => (
+                <button key={g} className={"chip goal-chip " + (goals.includes(g) ? "chip-selected" : "")} onClick={() => toggleGoal(g)}>
+                  <span>{g}</span>
+                  {goals.includes(g) && <span className="check-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="nav-row">
+          {step > 0 && <button className="glass-btn ghost" onClick={back} disabled={submitting}>Back</button>}
+          <button className="glass-btn primary" disabled={!canContinue || submitting} onClick={next}>
+            {submitting ? <span className="btn-spinner" /> : step === ONBOARD_STEPS - 1 ? "Finish" : "Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Per-bank statement upload ---------------- */
+
+const VALID_EXTENSIONS = [".pdf", ".csv"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function validateFile(file) {
+  const lower = file.name.toLowerCase();
+  const validExt = VALID_EXTENSIONS.some((ext) => lower.endsWith(ext));
+  if (!validExt) return "Only PDF or CSV files are supported.";
+  if (file.size > MAX_FILE_SIZE) return "File too large (max 10MB).";
+  return null;
+}
+
+function BankUploadBlock({ bank, files, error, onAdd, onRemove }) {
+  const [dragActive, setDragActive] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragActive(false);
+    if (e.dataTransfer.files?.length) onAdd(e.dataTransfer.files);
+  };
+
+  return (
+    <div className="bank-upload-block">
+      <div className="bank-upload-head">
+        <span className="bank-upload-name">{bank}</span>
+        <span className={"bank-upload-count " + (files.length >= 3 ? "count-good" : "")}>
+          {files.length} file{files.length !== 1 ? "s" : ""} added
+        </span>
+      </div>
+      <div
+        className={"dropzone dropzone-compact " + (dragActive ? "dropzone-active" : "") + (error ? " dropzone-error" : "")}
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+      >
+        <p className="dropzone-text">Drag & drop, or click to browse</p>
+        <input ref={inputRef} type="file" multiple accept=".pdf,.csv" style={{ display: "none" }}
+          onChange={(e) => e.target.files?.length && onAdd(e.target.files)} />
+      </div>
+      {error && <p className="error-text">{error}</p>}
+      {files.length > 0 && (
+        <div className="file-list">
+          {files.map((f) => (
+            <div key={f.id} className="file-row">
+              <div className="file-info"><span className="file-name">{f.name}</span><span className="file-size">{formatSize(f.size)}</span></div>
+              <button className="file-remove" onClick={() => onRemove(f.id)}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UploadScreen({ banks, onDone, pushToast, userId }) {
+  const [filesByBank, setFilesByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, []])));
+  const [balanceByBank, setBalanceByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, { balance: "", date: "" }])));
+  const [errorsByBank, setErrorsByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, null])));
+  const [submitting, setSubmitting] = useState(false);
+
+  const addFiles = (bank, fileList) => {
+    const incoming = [];
+    let firstError = null;
+    Array.from(fileList).forEach((f) => {
+      const err = validateFile(f);
+      if (err) { if (!firstError) firstError = err; return; }
+      incoming.push({ name: f.name, size: f.size, id: f.name + f.size + Math.random(), rawFile: f });
+    });
+    if (firstError) {
+      setErrorsByBank((prev) => ({ ...prev, [bank]: firstError }));
+      pushToast(firstError, "error");
+      setTimeout(() => setErrorsByBank((prev) => ({ ...prev, [bank]: null })), 4000);
+    }
+    if (incoming.length) {
+      setFilesByBank((prev) => ({ ...prev, [bank]: [...prev[bank], ...incoming] }));
+      pushToast(incoming.length > 1 ? "Files added" : "File added", "success");
+    }
+  };
+  const removeFile = (bank, id) => {
+    setFilesByBank((prev) => ({ ...prev, [bank]: prev[bank].filter((f) => f.id !== id) }));
+    pushToast("File removed", "info");
+  };
+  const setBalance = (bank, field, value) => setBalanceByBank((prev) => ({ ...prev, [bank]: { ...prev[bank], [field]: value } }));
+
+  const allHaveAtLeastOne = banks.every((b) => filesByBank[b].length > 0);
+
+  const handleContinue = async (skip) => {
+    setSubmitting(true);
+    try {
+      for (const bank of banks) {
+        const bal = balanceByBank[bank];
+        if (bal.balance || bal.date) {
+          await supabaseClient.from("banks").update({
+            starting_balance: bal.balance ? Number(bal.balance) : null,
+            as_of_date: bal.date || null,
+          }).eq("user_id", userId).eq("bank_name", bank);
+        }
+        if (!skip) {
+          for (const f of filesByBank[bank]) {
+            const path = userId + "/" + bank + "/" + Date.now() + "_" + f.name;
+            await supabaseClient.storage.from("statements").upload(path, f.rawFile);
+          }
+        }
+      }
+    } catch (e) {
+      pushToast("Some files failed to upload", "error");
+    }
+    setSubmitting(false);
+    onDone(filesByBank, balanceByBank);
+  };
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card upload-card">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        <h1 className="title">Upload your bank statements</h1>
+        <p className="subtitle">Add at least 3 months per bank so we can spot regular patterns.</p>
+
+        <div className="bank-upload-list">
+          {banks.map((b) => (
+            <div key={b}>
+              <BankUploadBlock
+                bank={b}
+                files={filesByBank[b]}
+                error={errorsByBank[b]}
+                onAdd={(fl) => addFiles(b, fl)}
+                onRemove={(id) => removeFile(b, id)}
+              />
+              <div className="balance-row">
+                <div className="balance-field">
+                  <label className="field-label">Starting balance</label>
+                  <div className="target-input-wrap" style={{ width: "100%" }}>
+                    <span className="target-currency">£</span>
+                    <input
+                      className="target-input"
+                      style={{ width: "100%" }}
+                      type="number"
+                      placeholder="0"
+                      value={balanceByBank[b].balance}
+                      onChange={(e) => setBalance(b, "balance", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="balance-field">
+                  <label className="field-label">As of date</label>
+                  <input
+                    className="glass-input"
+                    style={{ padding: "10px 12px", fontSize: 13, marginTop: 4 }}
+                    type="date"
+                    value={balanceByBank[b].date}
+                    onChange={(e) => setBalance(b, "date", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="nav-row">
+          <button className="glass-btn ghost" disabled={submitting} onClick={() => handleContinue(true)}>Skip for now</button>
+          <button className="glass-btn primary" disabled={!allHaveAtLeastOne || submitting} onClick={() => handleContinue(false)}>
+            {submitting ? <span className="btn-spinner" /> : "Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Processing simulation ---------------- */
+
+function ProcessingScreen({ onDone }) {
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const duration = 2400;
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const p = Math.min(100, Math.round((elapsed / duration) * 100));
+      setPct(p);
+      if (p >= 100) {
+        clearInterval(interval);
+        setTimeout(onDone, 300);
+      }
+    }, 60);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card processing-card">
+        <div className="spinner" />
+        <h1 className="title" style={{ marginTop: 20 }}>We're reviewing your data</h1>
+        <p className="subtitle">Matching transactions to categories. This usually takes a few seconds.</p>
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: pct + "%" }} />
+        </div>
+        <p className="summary-note">{pct}%</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Monthly breakdown table ---------------- */
+
+function MonthlyBreakdownScreen({ onDone }) {
+  const categories = Object.keys(CATEGORY_MONTHLY);
+  const totalsByMonth = MONTH_LABELS.map((_, mi) =>
+    categories.reduce((s, c) => s + CATEGORY_MONTHLY[c][mi], 0)
+  );
+  const netByMonth = MONTH_LABELS.map((_, mi) => INCOME_MONTHLY[mi] - totalsByMonth[mi]);
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card breakdown-screen-card">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        <h1 className="title">Your spending, last 3 months</h1>
+        <p className="subtitle">Simulated from your uploaded statements.</p>
+
+        <div className="table-wrap">
+          <table className="month-table">
+            <thead>
+              <tr>
+                <th className="row-label-head">Category</th>
+                {MONTH_LABELS.map((m) => <th key={m}>{m}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((c) => (
+                <tr key={c}>
+                  <td className="row-label">
+                    <span className="cat-dot" style={{ background: CATEGORY_COLORS[c] }} />
+                    {c}
+                  </td>
+                  {CATEGORY_MONTHLY[c].map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
+                </tr>
+              ))}
+              <tr className="totals-row">
+                <td className="row-label">Total spent</td>
+                {totalsByMonth.map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
+              </tr>
+              <tr className="income-row">
+                <td className="row-label">Income</td>
+                {INCOME_MONTHLY.map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
+              </tr>
+              <tr className="net-row">
+                <td className="row-label">Net inflow / outflow</td>
+                {netByMonth.map((v, i) => (
+                  <td key={i} className={v >= 0 ? "net-positive" : "net-negative"}>
+                    {v >= 0 ? "+" : ""}{formatMoney(v)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="nav-row">
+          <button className="glass-btn primary" onClick={onDone}>Set my monthly targets</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Target setting ---------------- */
+
+function TargetSettingScreen({ onDone, pushToast, userId }) {
+  const categories = Object.keys(CATEGORY_MONTHLY);
+  const lastMonthIndex = MONTH_LABELS.length - 1;
+  const [targets, setTargets] = useState(() =>
+    Object.fromEntries(categories.map((c) => [c, CATEGORY_MONTHLY[c][lastMonthIndex]]))
+  );
+  const [submitting, setSubmitting] = useState(false);
+
+  const setTarget = (c, v) => setTargets((prev) => ({ ...prev, [c]: v }));
+  const totalTarget = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0);
+
+  const handleFinish = async () => {
+    setSubmitting(true);
+    try {
+      const rows = categories.map((c) => ({ user_id: userId, category: c, monthly_target: Number(targets[c]) || 0 }));
+      await supabaseClient.from("targets").insert(rows);
+      pushToast("Targets saved", "success");
+    } catch (e) {
+      pushToast("Couldn't save targets", "error");
+    }
+    setSubmitting(false);
+    onDone(targets);
+  };
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card target-card">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        <h1 className="title">Set your monthly targets</h1>
+        <p className="subtitle">We've pre-filled these based on last month. Adjust as you like.</p>
+
+        <div className="target-list">
+          {categories.map((c) => (
+            <div className="target-row" key={c}>
+              <div className="target-label">
+                <span className="cat-dot" style={{ background: CATEGORY_COLORS[c] }} />
+                {c}
+              </div>
+              <div className="target-input-wrap">
+                <span className="target-currency">£</span>
+                <input
+                  className="target-input"
+                  type="number"
+                  min="0"
+                  value={targets[c]}
+                  onChange={(e) => setTarget(c, e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="target-total-row">
+          <span>Total monthly target</span>
+          <span className="target-total-amount">{formatMoney(totalTarget)}</span>
+        </div>
+
+        <div className="nav-row">
+          <button className="glass-btn primary" disabled={submitting} onClick={handleFinish}>
+            {submitting ? <span className="btn-spinner" /> : "Finish setup"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Extra questions (post-signup) ---------------- */
+
+const SALARY_RANGES = ["Under £50k", "£50k–£100k", "£100k–£200k", "£200k+", "Prefer not to say"];
+const EMPLOYMENT_TYPES = ["Employed", "Self-employed", "Business owner", "Student", "Other"];
+
+function ExtraQuestionsScreen({ onDone, onSkip, pushToast, userId }) {
+  const [occupation, setOccupation] = useState("");
+  const [salary, setSalary] = useState(null);
+  const [employment, setEmployment] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSave = async () => {
+    setSubmitting(true);
+    try {
+      await supabaseClient.from("profiles").update({
+        occupation, salary_range: salary, employment_type: employment,
+      }).eq("id", userId);
+      pushToast("Saved", "success");
+    } catch (e) {
+      pushToast("Couldn't save", "error");
+    }
+    setSubmitting(false);
+    onDone({ occupation, salary, employment });
+  };
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card size-md">
+        <h1 className="title">A few more details</h1>
+        <p className="subtitle">Optional — helps us personalize things further. Skip anytime.</p>
+
+        <div className="field-group">
+          <label className="field-label">Occupation</label>
+          <input className="glass-input" type="text" placeholder="e.g. Marketing Manager" value={occupation} onChange={(e) => setOccupation(e.target.value)} />
+        </div>
+
+        <div className="field-group">
+          <label className="field-label">Salary range</label>
+          <div className="segmented" style={{ marginTop: 4 }}>
+            {SALARY_RANGES.map((s) => (
+              <button key={s} className={"segment " + (salary === s ? "segment-active" : "")} onClick={() => setSalary(s)}>
+                <span>{s}</span>
+                {salary === s && <span className="check-badge">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field-group">
+          <label className="field-label">Employment type</label>
+          <div className="segmented" style={{ marginTop: 4 }}>
+            {EMPLOYMENT_TYPES.map((e) => (
+              <button key={e} className={"segment " + (employment === e ? "segment-active" : "")} onClick={() => setEmployment(e)}>
+                <span>{e}</span>
+                {employment === e && <span className="check-badge">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="nav-row">
+          <button className="glass-btn ghost" disabled={submitting} onClick={() => { pushToast("Skipped", "info"); onSkip(); }}>Skip</button>
+          <button className="glass-btn primary" disabled={submitting} onClick={handleSave}>
+            {submitting ? <span className="btn-spinner" /> : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExtraInfoBanner({ onComplete, onDismiss }) {
+  return (
+    <div className="extra-banner">
+      <span>Complete a few additional questions to personalize your experience</span>
+      <div className="extra-banner-actions">
+        <button className="extra-banner-btn" onClick={onComplete}>Complete</button>
+        <button className="extra-banner-x" onClick={onDismiss} aria-label="Dismiss">×</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Dashboard ---------------- */
+
+function TopBar({ onToggleMenu, name, onOpenSettings, onLogout }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const initial = (name[0] || "?").toUpperCase();
+  return (
+    <div className="topbar">
+      <div className="topbar-left">
+        <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
+        <div className="brand">{APP_NAME}</div>
+      </div>
+      <div className="avatar-wrap">
+        <button className="avatar" onClick={() => setMenuOpen((v) => !v)}>{initial}</button>
+        {menuOpen && (
+          <div className="avatar-menu">
+            <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>Settings</button>
+            <button className="menu-item" onClick={onLogout}>Log out</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function SidePanel({ open, active, setActive }) {
+  return (
+    <div className={"side-panel " + (open ? "side-panel-open" : "")}>
+      <div className="side-panel-label">Views</div>
+      {VIEWS.map((v) => (
+        <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
+      ))}
+    </div>
+  );
+}
+function SummaryCard({ targets }) {
+  const lastIdx = MONTH_LABELS.length - 1;
+  const spent = Object.keys(CATEGORY_MONTHLY).reduce((s, c) => s + CATEGORY_MONTHLY[c][lastIdx], 0);
+  const target = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0) || 1;
+  const pct = Math.min(100, Math.round((spent / target) * 100));
+  const expectedPct = Math.round((DAYS_INTO_MONTH() / 30) * 100);
+  const overPace = pct > expectedPct;
+  return (
+    <div className="glass-card dash-card">
+      <div className="summary-head">
+        <span className="card-label">This month</span>
+        <span className={"pace-badge " + (overPace ? "pace-over" : "pace-good")}>{overPace ? "Over pace" : "On track"}</span>
+      </div>
+      <div className="summary-amounts">
+        <span className="summary-spent">{formatMoney(spent)}</span>
+        <span className="summary-target">of {formatMoney(target)} target</span>
+      </div>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: pct + "%" }} />
+        <div className="progress-marker" style={{ left: expectedPct + "%" }} />
+      </div>
+      <p className="summary-note">{pct}% of budget used</p>
+    </div>
+  );
+}
+function DAYS_INTO_MONTH() { return 10; }
+
+function TransactionFeed({ limit }) {
+  const list = limit ? TRANSACTIONS.slice(0, limit) : TRANSACTIONS;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Recent transactions</span>
+      <div className="tx-list">
+        {list.map((t, i) => (
+          <div className="tx-row" key={i}>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} · {t.date}</span></div>
+            <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function BreakdownCard() {
+  const lastIdx = MONTH_LABELS.length - 1;
+  const cats = Object.keys(CATEGORY_MONTHLY).map((c) => ({ name: c, amount: CATEGORY_MONTHLY[c][lastIdx], color: CATEGORY_COLORS[c] }));
+  const total = cats.reduce((s, c) => s + c.amount, 0);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Spending by category</span>
+      <div className="category-list">
+        {cats.map((c) => (
+          <div className="category-row" key={c.name}>
+            <div className="category-top"><span className="category-name">{c.name}</span><span className="category-amount">{formatMoney(c.amount)}</span></div>
+            <div className="category-track"><div className="category-fill" style={{ width: (c.amount / total) * 100 + "%", background: c.color }} /></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function GoalsCard() {
+  const pct = Math.round((SAVINGS_GOAL.current / SAVINGS_GOAL.target) * 100);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Savings goal</span>
+      <div className="summary-amounts">
+        <span className="summary-spent">{formatMoney(SAVINGS_GOAL.current)}</span>
+        <span className="summary-target">of {formatMoney(SAVINGS_GOAL.target)} · {SAVINGS_GOAL.label}</span>
+      </div>
+      <div className="progress-track"><div className="progress-fill goal-fill" style={{ width: pct + "%" }} /></div>
+      <p className="summary-note">{pct}% there · {SAVINGS_GOAL.months} months to go</p>
+    </div>
+  );
+}
+function TrendsCard() {
+  const max = Math.max(...TREND_SPEND);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Spending trend, last 6 months</span>
+      <div className="trend-chart">
+        {TREND_MONTHS.map((m, i) => (
+          <div className="trend-bar-col" key={m}>
+            <div className="trend-bar-wrap">
+              <div className="trend-bar" style={{ height: (TREND_SPEND[i] / max) * 100 + "%" }} />
+            </div>
+            <span className="trend-bar-label">{m}</span>
+          </div>
+        ))}
+      </div>
+      <p className="summary-note">Total spend per month · {formatMoney(TREND_SPEND[TREND_SPEND.length - 1])} last month</p>
+    </div>
+  );
+}
+
+function CashFlowCard() {
+  const max = Math.max(...TREND_INCOME);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Income vs outgoings</span>
+      <div className="trend-chart">
+        {TREND_MONTHS.map((m, i) => (
+          <div className="trend-bar-col" key={m}>
+            <div className="trend-bar-wrap dual">
+              <div className="trend-bar income-bar" style={{ height: (TREND_INCOME[i] / max) * 100 + "%" }} />
+              <div className="trend-bar spend-bar" style={{ height: (TREND_SPEND[i] / max) * 100 + "%" }} />
+            </div>
+            <span className="trend-bar-label">{m}</span>
+          </div>
+        ))}
+      </div>
+      <div className="legend-row">
+        <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Income</span>
+        <span className="legend-item"><span className="legend-dot" style={{ background: "#4f8cff" }} />Outgoings</span>
+      </div>
+      <p className="summary-note">Net last month: {formatMoney(TREND_INCOME[TREND_INCOME.length - 1] - TREND_SPEND[TREND_SPEND.length - 1])}</p>
+    </div>
+  );
+}
+
+function BillsCard() {
+  const total = BILLS.reduce((s, b) => s + b.amount, 0);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Bills & subscriptions</span>
+      <div className="tx-list">
+        {BILLS.map((b) => (
+          <div className="tx-row" key={b.name}>
+            <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} · due {b.due}</span></div>
+            <span className="tx-amount">{formatMoney(-b.amount)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="summary-note">Total recurring: {formatMoney(total)} / month</p>
+    </div>
+  );
+}
+
+function BankAccountsCard({ banks }) {
+  const list = banks && banks.length > 0 ? banks : ["No banks linked yet"];
+  const dummyBalances = [4820, 1250, 3100, 640, 2200];
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Bank accounts</span>
+      <div className="tx-list">
+        {list.map((b, i) => (
+          <div className="tx-row" key={b}>
+            <div className="tx-info"><span className="tx-name">{b}</span><span className="tx-category">Current account</span></div>
+            {banks && banks.length > 0 && <span className="tx-amount tx-positive">{formatMoney(dummyBalances[i % dummyBalances.length])}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MerchantsCard() {
+  const max = Math.max(...MERCHANTS.map((m) => m.amount));
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Top merchants</span>
+      <div className="category-list">
+        {MERCHANTS.map((m) => (
+          <div className="category-row" key={m.name}>
+            <div className="category-top"><span className="category-name">{m.name}</span><span className="category-amount">{formatMoney(m.amount)}</span></div>
+            <div className="category-track"><div className="category-fill" style={{ width: (m.amount / max) * 100 + "%", background: "#4f8cff" }} /></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InsightsCard() {
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Insights</span>
+      <div className="insight-list">
+        {INSIGHTS.map((ins, i) => (
+          <div className={"insight-row insight-" + ins.type} key={i}>
+            <span className="insight-icon">{ins.type === "warning" ? "!" : ins.type === "positive" ? "✓" : "i"}</span>
+            <span>{ins.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text }) {
+  return (
+    <div className="glass-card dash-card empty-state">
+      <div className="empty-icon">◇</div>
+      <p className="empty-text">{text || "Nothing to show yet — upload a statement to get started."}</p>
+    </div>
+  );
+}
+
+function MainContent({ view, targets, banks, hasData }) {
+  if (view === "overview") return hasData ? (<><SummaryCard targets={targets} /><TransactionFeed limit={5} /></>) : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
+  if (view === "breakdown") return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "goals") return <GoalsCard />;
+  if (view === "transactions") return hasData ? <TransactionFeed /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
+  if (view === "trends") return hasData ? <TrendsCard /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
+  if (view === "cashflow") return hasData ? <CashFlowCard /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
+  if (view === "bills") return hasData ? <BillsCard /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+  if (view === "accounts") return <BankAccountsCard banks={banks} />;
+  if (view === "merchants") return hasData ? <MerchantsCard /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
+  if (view === "insights") return hasData ? <InsightsCard /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+  return null;
+}
+function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout }) {
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [view, setView] = useState("overview");
+  return (
+    <div className="app-shell stage-fade">
+      {showExtraBanner && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onLogout={onLogout} />
+      <div className="body-row">
+        <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
+        <SidePanel open={panelOpen} active={view} setActive={(v) => { setView(v); setPanelOpen(false); }} />
+        <div className="main-content"><MainContent view={view} targets={targets} banks={banks} hasData={hasData} /></div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Settings ---------------- */
+
+function SettingsScreen({ name, banks, targets, onBack, onOpenLegal, pushToast, onLogout }) {
+  const [displayName, setDisplayName] = useState(name);
+  const [email, setEmail] = useState("");
+  const [notifBudget, setNotifBudget] = useState(true);
+  const [notifWeekly, setNotifWeekly] = useState(false);
+  const categories = Object.keys(targets || {});
+
+  return (
+    <div className="app-shell stage-fade">
+      <div className="topbar">
+        <div className="topbar-left">
+          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
+          <div className="brand">Settings</div>
+        </div>
+      </div>
+
+      <div className="settings-body">
+        <div className="dash-card settings-section">
+          <span className="card-label">Profile</span>
+          <div className="field-group" style={{ marginTop: 14 }}>
+            <label className="field-label">Name</label>
+            <input className="glass-input" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          </div>
+          <div className="field-group">
+            <label className="field-label">Email</label>
+            <input className="glass-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <button className="link-btn inline" style={{ marginTop: 4 }}>Change password</button>
+        </div>
+
+        <div className="dash-card settings-section">
+          <span className="card-label">Linked banks</span>
+          <div className="settings-bank-list">
+            {(banks && banks.length > 0 ? banks : ["No banks linked yet"]).map((b) => (
+              <div className="settings-bank-row" key={b}>
+                <span>{b}</span>
+                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => pushToast("Bank removed", "info")}>Remove</button>}
+              </div>
+            ))}
+          </div>
+          <button className="link-btn inline" style={{ marginTop: 10 }}>+ Add another bank</button>
+        </div>
+
+        <div className="dash-card settings-section">
+          <span className="card-label">Monthly targets</span>
+          <div className="settings-bank-list">
+            {categories.length > 0 ? categories.map((c) => (
+              <div className="settings-bank-row" key={c}>
+                <span>{c}</span>
+                <span>{formatMoney(targets[c])}</span>
+              </div>
+            )) : <p className="subtitle" style={{ margin: 0 }}>No targets set yet.</p>}
+          </div>
+        </div>
+
+        <div className="dash-card settings-section">
+          <span className="card-label">Notifications</span>
+          <div className="toggle-row">
+            <span>Budget overspend alerts</span>
+            <button className={"switch " + (notifBudget ? "switch-on" : "")} onClick={() => setNotifBudget((v) => !v)}>
+              <span className="switch-knob" />
+            </button>
+          </div>
+          <div className="toggle-row">
+            <span>Weekly spending summary</span>
+            <button className={"switch " + (notifWeekly ? "switch-on" : "")} onClick={() => setNotifWeekly((v) => !v)}>
+              <span className="switch-knob" />
+            </button>
+          </div>
+        </div>
+
+        <button className="glass-btn danger" onClick={onLogout}>Log out</button>
+
+        <div className="settings-legal-row">
+          <button className="link-btn inline" onClick={() => onOpenLegal("privacy")}>Privacy Policy</button>
+          <span className="settings-legal-sep">·</span>
+          <button className="link-btn inline" onClick={() => onOpenLegal("terms")}>Terms of Service</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- App shell / router ---------------- */
+
+function App() {
+  const [stage, setStage] = useState("landing");
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [userId, setUserId] = useState(null);
+  const [name, setName] = useState("");
+  const [banks, setBanks] = useState([]);
+  const [targets, setTargets] = useState({});
+  const [balances, setBalances] = useState({});
+  const [uploadedFiles, setUploadedFiles] = useState({});
+  const [extraProfile, setExtraProfile] = useState(null);
+  const [showExtraBanner, setShowExtraBanner] = useState(false);
+  const [legalTab, setLegalTab] = useState("privacy");
+  const [returnStage, setReturnStage] = useState("welcome");
+  const [toasts, setToasts] = useState([]);
+
+  const pushToast = (message, type) => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2600);
+  };
+
+  const hasData = Object.values(uploadedFiles).some((arr) => arr && arr.length > 0);
+
+  useEffect(() => {
+    supabaseClient.auth.getSession().then(async ({ data }) => {
+      const session = data?.session;
+      if (session?.user) {
+        const uid = session.user.id;
+        setUserId(uid);
+        const profile = await fetchProfile(uid);
+        if (profile?.name) {
+          const bankRows = await fetchBanks(uid);
+          const targetObj = await fetchTargets(uid);
+          setName(profile.name);
+          setBanks(bankRows.map((b) => b.bank_name));
+          setTargets(targetObj);
+          setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
+          setStage("dashboard");
+        } else {
+          setStage("onboarding");
+        }
+      }
+      setCheckingSession(false);
+    });
+  }, []);
+
+  const openLegal = (tab, from) => { setLegalTab(tab); setReturnStage(from); setStage("legal"); };
+  const skipToHomepage = () => {
+    setName("Shezaad");
+    setBanks(["HSBC", "Emirates NBD"]);
+    setTargets(Object.fromEntries(Object.keys(CATEGORY_MONTHLY).map((c) => [c, CATEGORY_MONTHLY[c][CATEGORY_MONTHLY[c].length - 1]])));
+    setUploadedFiles({ HSBC: [{ name: "dummy.pdf", size: 1000, id: "dummy" }] });
+    setStage("dashboard");
+  };
+  const handleLogout = async () => {
+    await supabaseClient.auth.signOut();
+    setUserId(null); setName(""); setBanks([]); setTargets({}); setUploadedFiles({});
+    pushToast("Logged out", "info");
+    setStage("landing");
+  };
+
+  if (checkingSession) return null;
+
+  let content;
+  if (stage === "landing") {
+    content = (
+      <LandingScreen
+        onSignup={() => { setReturnStage("landing"); setStage("signup"); }}
+        onLogin={() => { setReturnStage("landing"); setStage("login"); }}
+        onSkip={skipToHomepage}
+      />
+    );
+  } else if (stage === "welcome") {
+    content = (
+      <WelcomeScreen
+        onChoose={(mode) => { setReturnStage("welcome"); setStage(mode === "signup" ? "signup" : "login"); }}
+        onSkip={skipToHomepage}
+        onOpenLegal={(tab) => openLegal(tab, "welcome")}
+      />
+    );
+  } else if (stage === "legal") {
+    content = <LegalScreen initialTab={legalTab} onBack={() => setStage(returnStage)} />;
+  } else if (stage === "login" || stage === "signup") {
+    content = (
+      <AuthScreen
+        initialMode={stage}
+        onError={(msg, type) => pushToast(msg, type || "error")}
+        onDone={async (mode, uid, profile) => {
+          setUserId(uid);
+          if (mode === "login") {
+            if (profile?.name) {
+              const bankRows = await fetchBanks(uid);
+              const targetObj = await fetchTargets(uid);
+              setName(profile.name);
+              setBanks(bankRows.map((b) => b.bank_name));
+              setTargets(targetObj);
+              setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
+              setStage("dashboard");
+            } else {
+              setStage("onboarding");
+            }
+          } else {
+            setStage("onboarding");
+          }
+        }}
+        onOpenLegal={(tab) => openLegal(tab, stage)}
+      />
+    );
+  } else if (stage === "onboarding") {
+    content = <OnboardingScreen userId={userId} pushToast={pushToast} onDone={(d) => { setName(d.name); setBanks(d.banks); setStage("upload"); }} />;
+  } else if (stage === "upload") {
+    content = (
+      <UploadScreen
+        banks={banks}
+        userId={userId}
+        pushToast={pushToast}
+        onDone={(files, bal) => { setUploadedFiles(files); setBalances(bal); setStage("processing"); }}
+      />
+    );
+  } else if (stage === "processing") {
+    content = <ProcessingScreen onDone={() => setStage("breakdown")} />;
+  } else if (stage === "breakdown") {
+    content = <MonthlyBreakdownScreen onDone={() => setStage("targets")} />;
+  } else if (stage === "targets") {
+    content = <TargetSettingScreen userId={userId} pushToast={pushToast} onDone={(t) => { setTargets(t); setShowExtraBanner(true); setStage("dashboard"); }} />;
+  } else if (stage === "extraQuestions") {
+    content = (
+      <ExtraQuestionsScreen
+        userId={userId}
+        pushToast={pushToast}
+        onDone={(data) => { setExtraProfile(data); setShowExtraBanner(false); setStage("dashboard"); }}
+        onSkip={() => { setShowExtraBanner(false); setStage("dashboard"); }}
+      />
+    );
+  } else if (stage === "settings") {
+    content = (
+      <SettingsScreen
+        name={name} banks={banks} targets={targets}
+        pushToast={pushToast}
+        onBack={() => setStage("dashboard")}
+        onOpenLegal={(tab) => openLegal(tab, "settings")}
+        onLogout={handleLogout}
+      />
+    );
+  } else {
+    content = (
+      <DashboardScreen
+        name={name}
+        targets={targets}
+        banks={banks}
+        hasData={hasData}
+        onOpenSettings={() => setStage("settings")}
+        showExtraBanner={showExtraBanner}
+        onCompleteExtra={() => setStage("extraQuestions")}
+        onDismissExtra={() => setShowExtraBanner(false)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  return (
+    <>
+      {content}
+      <ToastContainer toasts={toasts} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+<style>
+  * { box-sizing: border-box; }
+  body { background: #0b1224; }
+
+  .page {
+    position: relative; min-height: 100vh; width: 100%;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+    background: linear-gradient(160deg, #0b1224 0%, #101a35 45%, #191035 100%);
+    padding: 24px;
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; z-index: 0; }
+  .blob1 { width: 420px; height: 420px; background: radial-gradient(circle at 30% 30%, #4f8cff, transparent 70%); top: -100px; left: -80px; animation: float1 16s ease-in-out infinite; }
+  .blob2 { width: 380px; height: 380px; background: radial-gradient(circle at 60% 40%, #b56bff, transparent 70%); bottom: -120px; right: -60px; animation: float2 20s ease-in-out infinite; }
+  .blob3 { width: 320px; height: 320px; background: radial-gradient(circle at 50% 50%, #ff8bd6, transparent 70%); top: 40%; left: 60%; animation: float3 18s ease-in-out infinite; }
+  @keyframes float1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(40px, 60px); } }
+  @keyframes float2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-50px, -30px); } }
+  @keyframes float3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-30px, 40px) scale(1.08); } }
+
+  .glass-card {
+    position: relative; z-index: 1; width: 100%;
+    background: rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 32px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    padding: 32px 28px;
+    display: flex; flex-direction: column;
+    transition: max-width 0.35s ease, min-height 0.35s ease;
+  }
+  .glass-card.size-sm { max-width: 380px; min-height: 300px; }
+  .glass-card.size-md { max-width: 420px; min-height: 420px; }
+  .glass-card.size-lg { max-width: 460px; min-height: 500px; }
+  .auth-card { max-width: 400px; }
+  .upload-card { max-width: 480px; max-height: 88vh; overflow-y: auto; }
+  .processing-card { max-width: 400px; align-items: center; text-align: center; }
+  .breakdown-screen-card { max-width: 640px; }
+  .target-card { max-width: 460px; max-height: 88vh; overflow-y: auto; }
+
+  .progress-dots { display: flex; gap: 6px; margin-bottom: 28px; }
+  .dot { height: 5px; flex: 1; border-radius: 3px; background: rgba(255, 255, 255, 0.18); transition: background 0.3s ease; }
+  .dot-active { background: linear-gradient(90deg, #4f8cff, #b56bff); }
+
+  .step { flex: 1; display: flex; flex-direction: column; }
+  .brand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #4f8cff, #b56bff); }
+  .brand-name { color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+
+  .title { color: #fff; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px; line-height: 1.3; }
+  .subtitle { color: rgba(255, 255, 255, 0.6); font-size: 14px; margin: 0 0 20px; }
+
+  .field-group { margin-bottom: 14px; }
+  .field-label { display: block; color: rgba(255,255,255,0.55); font-size: 12px; font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .glass-input {
+    width: 100%; padding: 14px 16px; font-size: 16px; color: #fff;
+    background: rgba(255, 255, 255, 0.10); border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 16px; outline: none; backdrop-filter: blur(10px); margin-top: 4px;
+  }
+  .glass-input::placeholder { color: rgba(255,255,255,0.35); }
+  .glass-input:focus { border-color: rgba(79, 140, 255, 0.7); box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.25); }
+
+  .link-btn { background: none; border: none; color: #8fb4ff; font-size: 13px; font-weight: 500; cursor: pointer; padding: 0; text-align: right; margin-bottom: 18px; align-self: flex-end; font-family: inherit; }
+  .link-btn:hover { text-decoration: underline; }
+  .link-btn.inline { display: inline; margin: 0; font-size: 13px; }
+  .switch-row { margin-top: 18px; text-align: center; color: rgba(255,255,255,0.55); font-size: 13px; }
+
+  .bank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow-y: auto; max-height: 340px; padding-right: 2px; }
+  .chip {
+    font-family: inherit; font-size: 14px; font-weight: 500; color: #fff;
+    background: rgba(255, 255, 255, 0.08); border: 1.5px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px; padding: 12px 14px; text-align: left; cursor: pointer;
+    transition: all 0.18s ease; backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .chip:hover { background: rgba(255, 255, 255, 0.14); }
+  .chip-selected {
+    background: linear-gradient(135deg, #4f8cff, #7f6bff);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(79,140,255,0.4), 0 4px 16px rgba(79,140,255,0.5);
+    font-weight: 700;
+  }
+  .check-badge {
+    display: flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(255,255,255,0.95); color: #4f6cff;
+    font-size: 11px; font-weight: 900; flex-shrink: 0;
+  }
+  .goal-wrap { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; max-height: 340px; }
+  .goal-chip { border-radius: 999px; padding: 10px 16px; }
+
+  .segmented { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .segment {
+    font-family: inherit; font-size: 15px; font-weight: 500; color: #fff;
+    background: rgba(255, 255, 255, 0.08); border: 1.5px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px; padding: 16px; text-align: left; cursor: pointer;
+    transition: all 0.18s ease; backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .segment:hover { background: rgba(255, 255, 255, 0.14); }
+  .segment-active {
+    background: linear-gradient(135deg, #4f8cff, #7f6bff);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(79,140,255,0.4), 0 4px 16px rgba(79,140,255,0.5);
+    font-weight: 700;
+  }
+
+  .nav-row { display: flex; gap: 12px; margin-top: 24px; }
+  .glass-btn { flex: 1; font-family: inherit; font-size: 16px; font-weight: 600; padding: 15px; border-radius: 18px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.22); transition: all 0.18s ease; }
+  .glass-btn.primary { color: #fff; background: linear-gradient(135deg, #4f8cff, #7f6bff); box-shadow: 0 6px 20px rgba(79,140,255,0.35); }
+  .glass-btn.primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+  .glass-btn.primary:not(:disabled):hover { filter: brightness(1.08); }
+  .glass-btn.ghost { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); flex: 0 0 130px; }
+  .glass-btn.ghost:hover { background: rgba(255,255,255,0.12); }
+
+  .dropzone { border: 1.5px dashed rgba(255,255,255,0.28); border-radius: 20px; padding: 32px 20px; text-align: center; cursor: pointer; transition: all 0.18s ease; background: rgba(255,255,255,0.04); }
+  .dropzone:hover, .dropzone-active { background: rgba(79,140,255,0.10); border-color: rgba(79,140,255,0.6); }
+  .dropzone-compact { padding: 16px; }
+  .dropzone-text { color: rgba(255,255,255,0.6); font-size: 13px; margin: 0; }
+  .file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .file-row { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px; }
+  .file-info { display: flex; flex-direction: column; overflow: hidden; }
+  .file-name { color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  .file-size { color: rgba(255,255,255,0.45); font-size: 11px; }
+  .file-remove { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px; }
+  .file-remove:hover { color: #ff8b8b; }
+
+  .bank-upload-list { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; }
+  .bank-upload-block { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 14px; }
+  .bank-upload-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .bank-upload-name { color: #fff; font-size: 14px; font-weight: 600; }
+  .bank-upload-count { color: rgba(255,255,255,0.45); font-size: 12px; }
+  .count-good { color: #4fe0c0; }
+  .balance-row { display: flex; gap: 10px; margin-top: 8px; padding: 0 2px; }
+  .balance-field { flex: 1; display: flex; flex-direction: column; }
+
+  /* processing */
+  .spinner {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.15); border-top-color: #4f8cff;
+    animation: spin 0.9s linear infinite; margin: 8px auto 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* month table */
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  .month-table { width: 100%; border-collapse: collapse; min-width: 420px; }
+  .month-table th, .month-table td { text-align: right; padding: 10px 12px; font-size: 13px; color: #fff; }
+  .month-table thead th { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.14); font-weight: 600; }
+  .row-label-head { text-align: left !important; }
+  .row-label { text-align: left; color: #fff; font-weight: 500; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .month-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .totals-row td { font-weight: 700; border-top: 1px solid rgba(255,255,255,0.18); }
+  .income-row td { color: #4fe0c0; }
+  .net-row td { font-weight: 700; border-top: 1px solid rgba(255,255,255,0.18); }
+  .net-positive { color: #4fe0c0; }
+  .net-negative { color: #ff8b8b; }
+
+  /* targets */
+  .target-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  .target-row { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 10px 14px; }
+  .target-label { color: #fff; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .target-input-wrap { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 6px 10px; }
+  .target-currency { color: rgba(255,255,255,0.5); font-size: 13px; }
+  .target-input { width: 70px; background: none; border: none; color: #fff; font-size: 14px; font-family: inherit; outline: none; text-align: right; }
+  .target-total-row { display: flex; justify-content: space-between; margin-top: 16px; padding: 12px 14px; background: rgba(79,140,255,0.12); border-radius: 14px; color: #fff; font-size: 14px; font-weight: 600; }
+  .target-total-amount { color: #8fb4ff; }
+
+  /* dashboard */
+  .app-shell { min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 10; }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; }
+  .hamburger, .hamburger::before, .hamburger::after { display: block; width: 18px; height: 2px; background: #fff; border-radius: 2px; position: relative; }
+  .hamburger::before, .hamburger::after { content: ""; position: absolute; }
+  .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
+  .brand { color: #fff; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .avatar-wrap { position: relative; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4f8cff, #b56bff); color: #fff; font-size: 14px; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .avatar-menu { position: absolute; top: 44px; right: 0; background: rgba(30, 30, 45, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .menu-item { font-family: inherit; text-align: left; background: none; border: none; color: #fff; font-size: 14px; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
+  .menu-item:hover { background: rgba(255,255,255,0.1); }
+  .body-row { display: flex; }
+  .side-panel { width: 0; overflow: hidden; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); }
+  .side-panel-open { width: 220px; padding: 20px 14px; }
+  .side-panel-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; padding: 0 8px; white-space: nowrap; }
+  .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
+  .side-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .side-item-active { background: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3)); color: #fff; }
+  .main-content { flex: 1; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 640px; }
+  .dash-card { background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 24px; padding: 22px; max-width: none; }
+  .card-label { color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  .pace-good { background: rgba(79, 224, 192, 0.18); color: #4fe0c0; }
+  .pace-over { background: rgba(255, 139, 139, 0.18); color: #ff8b8b; }
+  .summary-amounts { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }
+  .summary-spent { color: #fff; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .summary-target { color: rgba(255,255,255,0.5); font-size: 13px; }
+  .progress-track { position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: visible; margin-top: 18px; }
+  .progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #4f8cff, #b56bff); transition: width 0.4s ease; }
+  .goal-fill { background: linear-gradient(90deg, #4fe0c0, #4f8cff); }
+  .progress-marker { position: absolute; top: -3px; width: 2px; height: 14px; background: rgba(255,255,255,0.6); }
+  .summary-note { color: rgba(255,255,255,0.45); font-size: 12px; margin: 10px 0 0; text-align: center; }
+  .tx-list { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .tx-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-info { display: flex; flex-direction: column; }
+  .tx-name { color: #fff; font-size: 14px; font-weight: 500; }
+  .tx-category { color: rgba(255,255,255,0.45); font-size: 12px; }
+  .tx-amount { color: #fff; font-size: 14px; font-weight: 600; }
+  .tx-positive { color: #4fe0c0; }
+  .category-list { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .category-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .category-name { color: #fff; font-size: 14px; font-weight: 500; }
+  .category-amount { color: rgba(255,255,255,0.6); font-size: 13px; }
+  .category-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .category-fill { height: 100%; border-radius: 3px; }
+
+  /* settings */
+  .back-btn { color: #fff; font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
+  .settings-body { max-width: 560px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .settings-section { max-width: none; }
+  .settings-bank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .settings-bank-row { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 14px; color: #fff; font-size: 14px; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; color: #fff; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .toggle-row:last-child { border-bottom: none; }
+  .switch { width: 42px; height: 24px; border-radius: 999px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; position: relative; padding: 0; }
+  .switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; display: block; }
+  .switch-on { background: linear-gradient(135deg, #4f8cff, #7f6bff); }
+  .switch-on .switch-knob { transform: translateX(18px); }
+  .glass-btn.danger { color: #ff8b8b; background: rgba(255,139,139,0.1); border-color: rgba(255,139,139,0.3); }
+  .glass-btn.danger:hover { background: rgba(255,139,139,0.18); }
+  .skip-btn {
+    margin-top: 14px; width: 100%; background: none; border: 1px dashed rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.5); font-family: inherit; font-size: 12px; padding: 8px;
+    border-radius: 12px; cursor: pointer;
+  }
+  .skip-btn:hover { color: #fff; border-color: rgba(255,255,255,0.45); }
+
+  /* welcome */
+  .welcome-card { max-width: 380px; text-align: center; }
+  .welcome-btn-col { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+  .welcome-ghost { flex: none; }
+  .legal-note { color: rgba(255,255,255,0.4); font-size: 12px; margin: 16px 0 4px; text-align: center; }
+  .legal-note .link-btn.inline { color: #8fb4ff; }
+
+  /* legal screen */
+  .legal-card { max-width: 520px; max-height: 80vh; }
+  .legal-tabs { display: flex; gap: 8px; margin: 6px 0 4px; }
+  .legal-tab { flex: 1; font-family: inherit; font-size: 13px; font-weight: 600; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.6); cursor: pointer; }
+  .legal-tab-active { background: linear-gradient(135deg, rgba(79,140,255,0.4), rgba(181,107,255,0.4)); color: #fff; border-color: rgba(255,255,255,0.4); }
+  .test-banner { color: #ffb84f; font-size: 11px; background: rgba(255,184,79,0.12); border: 1px solid rgba(255,184,79,0.3); border-radius: 10px; padding: 8px 10px; margin: 10px 0; }
+  .legal-scroll { overflow-y: auto; margin-top: 6px; padding-right: 4px; }
+  .legal-section { margin-bottom: 16px; }
+  .legal-heading { color: #fff; font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+  .legal-body { color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.5; margin: 0; }
+
+  /* extra info banner */
+  .extra-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: linear-gradient(135deg, rgba(79,140,255,0.25), rgba(181,107,255,0.25));
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    color: #fff; font-size: 13px; padding: 10px 20px;
+  }
+  .extra-banner-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .extra-banner-btn {
+    font-family: inherit; font-size: 12px; font-weight: 600; color: #fff;
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px; padding: 6px 12px; cursor: pointer;
+  }
+  .extra-banner-btn:hover { background: rgba(255,255,255,0.28); }
+  .extra-banner-x { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px; }
+
+  /* settings legal links */
+  .settings-legal-row { text-align: center; margin-top: 4px; color: rgba(255,255,255,0.4); font-size: 12px; }
+  .settings-legal-sep { margin: 0 8px; }
+
+  .side-panel-backdrop { display: none; }
+
+  /* ---------------- mobile responsiveness ---------------- */
+  @media (max-width: 640px) {
+    .page { padding: 14px; }
+    .glass-card { padding: 22px 18px; border-radius: 24px; }
+    .glass-card.size-sm { min-height: 260px; }
+    .glass-card.size-md { min-height: 380px; }
+    .glass-card.size-lg { min-height: 460px; }
+    .title { font-size: 19px; }
+    .subtitle { font-size: 13px; }
+
+    .bank-grid { grid-template-columns: 1fr; max-height: 300px; }
+    .goal-wrap { max-height: 260px; }
+    .segment { padding: 14px; font-size: 14px; }
+    .chip { padding: 11px 13px; font-size: 13px; }
+
+    .nav-row { gap: 8px; }
+    .glass-btn { padding: 13px; font-size: 15px; }
+    .glass-btn.ghost { flex: 0 0 84px; font-size: 13px; padding: 13px 8px; }
+
+    .upload-card, .target-card { max-width: 100%; }
+    .breakdown-screen-card { max-width: 100%; padding: 22px 14px; }
+    .month-table th, .month-table td { padding: 8px 8px; font-size: 12px; }
+
+    .target-row { flex-wrap: wrap; gap: 8px; }
+    .target-total-row { font-size: 13px; }
+
+    /* dashboard */
+    .topbar { padding: 12px 14px; }
+    .brand { font-size: 15px; }
+    .main-content { padding: 16px; gap: 14px; }
+    .dash-card { padding: 16px; border-radius: 20px; }
+    .summary-spent { font-size: 24px; }
+    .tx-name { font-size: 13px; }
+    .tx-category { font-size: 11px; }
+    .trend-chart { height: 110px; gap: 6px; }
+    .insight-row { font-size: 12px; }
+
+    /* side panel becomes an overlay drawer instead of pushing content */
+    .side-panel {
+      position: fixed; top: 57px; left: 0; height: calc(100vh - 57px);
+      z-index: 16; box-shadow: 8px 0 24px rgba(0,0,0,0.4);
+      background: rgba(15, 15, 30, 0.85); backdrop-filter: blur(20px);
+    }
+    .side-panel-backdrop.backdrop-visible {
+      display: block; position: fixed; inset: 0; top: 57px;
+      background: rgba(0,0,0,0.5); z-index: 15;
+    }
+
+    /* settings */
+    .settings-body { padding: 18px 14px; }
+    .settings-bank-row { font-size: 13px; padding: 9px 12px; }
+  }
+
+  /* trend / cash flow bar charts */
+  .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; margin-top: 16px; }
+  .trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
+  .trend-bar-wrap { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+  .trend-bar { width: 60%; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #4f8cff, #7f6bff); transition: height 0.4s ease; }
+  .trend-bar-wrap.dual .trend-bar { width: 40%; }
+  .income-bar { background: linear-gradient(180deg, #4fe0c0, #2fae90); }
+  .spend-bar { background: linear-gradient(180deg, #4f8cff, #7f6bff); }
+  .trend-bar-label { color: rgba(255,255,255,0.45); font-size: 11px; }
+  .legend-row { display: flex; gap: 16px; margin-top: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.6); font-size: 12px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* insights */
+  .insight-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .insight-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; font-size: 13px; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+  .insight-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .insight-warning .insight-icon { background: rgba(255,139,139,0.2); color: #ff8b8b; }
+  .insight-positive .insight-icon { background: rgba(79,224,192,0.2); color: #4fe0c0; }
+  .insight-info .insight-icon { background: rgba(79,140,255,0.2); color: #8fb4ff; }
+
+  /* ---------------- landing page ---------------- */
+  .landing-page { position: relative; min-height: 100vh; overflow-x: hidden; }
+  .lp-wrap { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+  .lp-nav {
+    position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px; background: rgba(11,18,36,0.55); backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,255,255,0.08); position: sticky; top: 0;
+  }
+  .lp-nav-actions { display: flex; gap: 10px; }
+  .btn { font-family: inherit; font-weight: 600; cursor: pointer; border-radius: 14px; padding: 10px 18px; font-size: 14px; border: 1px solid rgba(255,255,255,0.22); transition: all 0.18s ease; }
+  .btn-primary { color: #fff; background: linear-gradient(135deg, #4f8cff, #7f6bff); box-shadow: 0 6px 20px rgba(79,140,255,0.35); border: none; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+  .btn-large { padding: 16px 32px; font-size: 16px; border-radius: 18px; }
+
+  .lp-hero { text-align: center; padding: 90px 24px 60px; position: relative; z-index: 1; }
+  .hero-eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8fb4ff; background: rgba(79,140,255,0.12); border: 1px solid rgba(79,140,255,0.3); padding: 6px 14px; border-radius: 999px; margin-bottom: 20px; }
+  .lp-hero h1 { font-size: 42px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.15; color: #fff; }
+  .lp-hero p { font-size: 17px; color: rgba(255,255,255,0.6); max-width: 520px; margin: 0 auto 32px; line-height: 1.5; }
+  .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  .lp-section { padding: 60px 24px; position: relative; z-index: 1; }
+  .section-head { text-align: center; max-width: 560px; margin: 0 auto 36px; }
+  .section-head h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 8px; color: #fff; }
+  .section-head p { color: rgba(255,255,255,0.55); font-size: 14px; margin: 0; }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .step-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 20px; padding: 24px; backdrop-filter: blur(16px); }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #4f8cff, #b56bff); font-weight: 700; font-size: 13px; margin-bottom: 12px; color: #fff; }
+  .step-card h3 { font-size: 15px; margin: 0 0 6px; color: #fff; }
+  .step-card p { font-size: 13px; color: rgba(255,255,255,0.55); margin: 0; line-height: 1.5; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .feature-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 20px; backdrop-filter: blur(14px); }
+  .feature-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(79,140,255,0.16); color: #8fb4ff; font-size: 16px; margin-bottom: 10px; }
+  .feature-card h3 { font-size: 14px; margin: 0 0 5px; color: #fff; }
+  .feature-card p { font-size: 12px; color: rgba(255,255,255,0.5); margin: 0; line-height: 1.5; }
+
+  .pricing { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 620px; margin: 0 auto; }
+  .price-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 22px; padding: 28px; text-align: center; backdrop-filter: blur(16px); }
+  .price-card.highlight { border-color: rgba(79,140,255,0.6); background: linear-gradient(160deg, rgba(79,140,255,0.14), rgba(181,107,255,0.1)); box-shadow: 0 8px 30px rgba(79,140,255,0.2); }
+  .price-tag { font-size: 12px; font-weight: 700; color: #8fb4ff; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .price-amount { font-size: 32px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+  .price-period { font-size: 13px; color: rgba(255,255,255,0.45); margin-bottom: 18px; }
+  .price-features { list-style: none; padding: 0; margin: 0 0 22px; text-align: left; }
+  .price-features li { font-size: 13px; color: rgba(255,255,255,0.65); padding: 6px 0; padding-left: 22px; position: relative; }
+  .price-features li::before { content: "✓"; position: absolute; left: 0; color: #4fe0c0; font-weight: 700; }
+
+  .lp-final-cta { text-align: center; padding: 70px 24px 90px; position: relative; z-index: 1; }
+  .lp-final-cta h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; color: #fff; }
+  .lp-final-cta p { color: rgba(255,255,255,0.55); margin: 0 0 24px; }
+
+  .lp-footer { position: relative; z-index: 1; text-align: center; padding: 22px; color: rgba(255,255,255,0.35); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+
+  @media (max-width: 720px) {
+    .lp-hero h1 { font-size: 30px; }
+    .steps, .features { grid-template-columns: 1fr; }
+    .pricing { grid-template-columns: 1fr; }
+  }
+
+  /* stage transitions */
+  .stage-fade { animation: stageFadeIn 0.35s ease; }
+  @keyframes stageFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* button loading spinner */
+  .btn-spinner {
+    display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff;
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* error states */
+  .dropzone-error { border-color: rgba(255,139,139,0.6); background: rgba(255,139,139,0.06); }
+  .error-text { color: #ff8b8b; font-size: 12px; margin: 6px 2px 0; }
+
+  /* empty states */
+  .empty-state { align-items: center; text-align: center; padding: 36px 22px; }
+  .empty-icon { font-size: 28px; color: rgba(255,255,255,0.3); margin-bottom: 10px; }
+  .empty-text { color: rgba(255,255,255,0.5); font-size: 13px; margin: 0; max-width: 280px; }
+
+  /* toasts */
+  .toast-stack {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  .toast {
+    padding: 10px 18px; border-radius: 14px; font-size: 13px; font-weight: 500; color: #fff;
+    background: rgba(20,20,35,0.9); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    animation: toastIn 0.25s ease;
+  }
+  .toast-success { border-color: rgba(79,224,192,0.4); }
+  .toast-error { border-color: rgba(255,139,139,0.4); }
+  .toast-info { border-color: rgba(255,255,255,0.2); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</body>
+</html>
