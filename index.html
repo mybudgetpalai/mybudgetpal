@@ -533,7 +533,7 @@ function OnboardingScreen({ onDone, userId, pushToast }) {
     if (step === ONBOARD_STEPS - 1) {
       setSubmitting(true);
       try {
-        await supabaseClient.from("profiles").update({ name: name.trim() }).eq("id", userId);
+        await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim() });
         await supabaseClient.from("banks").insert(banks.map((b) => ({ user_id: userId, bank_name: b })));
       } catch (e) {
         pushToast("Couldn't save — check your connection", "error");
