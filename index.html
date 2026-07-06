@@ -164,6 +164,41 @@ function formatSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
+function parseCSVLine(line) {
+  const out = [];
+  let cur = "", inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; continue; }
+    if (ch === "," && !inQuotes) { out.push(cur.trim()); cur = ""; continue; }
+    cur += ch;
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function parseStatementCSV(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) throw new Error("empty");
+  const header = parseCSVLine(lines[0]).map((h) => h.toLowerCase());
+  const dateIdx = header.findIndex((h) => h.includes("date"));
+  const descIdx = header.findIndex((h) => h.includes("desc") || h.includes("name") || h.includes("merchant"));
+  const catIdx = header.findIndex((h) => h.includes("categ"));
+  const amtIdx = header.findIndex((h) => h.includes("amount"));
+  if (dateIdx === -1 || descIdx === -1 || amtIdx === -1) throw new Error("headers");
+
+  return lines.slice(1).map((line) => {
+    const cols = parseCSVLine(line);
+    const amount = Number(cols[amtIdx].replace(/[^0-9.\-]/g, ""));
+    return {
+      date: cols[dateIdx] || "",
+      name: cols[descIdx] || "",
+      category: catIdx !== -1 && cols[catIdx] ? cols[catIdx] : "Other",
+      amount: isNaN(amount) ? 0 : amount,
+    };
+  }).filter((t) => t.name);
+}
+
 /* ---------------- Landing (marketing) ---------------- */
 
 function LandingScreen({ onSignup, onLogin, onSkip }) {
@@ -319,6 +354,66 @@ function ToastContainer({ toasts }) {
       {toasts.map((t) => (
         <div key={t.id} className={"toast toast-" + (t.type || "info")}>{t.message}</div>
       ))}
+    </div>
+  );
+}
+
+/* ---------------- Upload statement modal ---------------- */
+
+function UploadStatementModal({ onClose, onParsed, pushToast }) {
+  const [dragActive, setDragActive] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFile = (file) => {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      pushToast("Only CSV files are supported.", "error");
+      return;
+    }
+    setBusy(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = parseStatementCSV(reader.result);
+        if (!parsed.length) throw new Error("no rows");
+        setBusy(false);
+        pushToast(parsed.length + " transactions imported", "success");
+        onParsed(parsed);
+      } catch (e) {
+        setBusy(false);
+        pushToast("Couldn't read that file — check the format.", "error");
+      }
+    };
+    reader.onerror = () => { setBusy(false); pushToast("Couldn't read that file.", "error"); };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragActive(false);
+    if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="brand-row" style={{ marginBottom: 12, justifyContent: "space-between" }}>
+          <span className="brand-name">Upload statement</span>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "#fff" }}>×</button>
+        </div>
+        <p className="subtitle">Upload a CSV bank statement to see it feed into your dashboard.</p>
+        <div
+          className={"dropzone " + (dragActive ? "dropzone-active" : "")}
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+        >
+          <p className="dropzone-text">{busy ? "Reading file…" : "Drag & drop a CSV here, or click to browse"}</p>
+          <input ref={inputRef} type="file" accept=".csv" style={{ display: "none" }}
+            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+        </div>
+        <p className="summary-note" style={{ marginTop: 14 }}>Expected columns: Date, Description, Category, Amount</p>
+      </div>
     </div>
   );
 }
@@ -966,7 +1061,7 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onLogout }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onLogout, onOpenUpload }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initial = (name[0] || "?").toUpperCase();
   return (
@@ -975,7 +1070,9 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onLogout }) {
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
         <div className="brand">{APP_NAME}</div>
       </div>
-      <div className="avatar-wrap">
+      <div className="topbar-right">
+        <button className="btn btn-ghost upload-statement-btn" onClick={onOpenUpload}>Upload statement</button>
+        <div className="avatar-wrap">
         <button className="avatar" onClick={() => setMenuOpen((v) => !v)}>{initial}</button>
         {menuOpen && (
           <div className="avatar-menu">
@@ -983,6 +1080,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onLogout }) {
             <button className="menu-item" onClick={onLogout}>Log out</button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -997,9 +1095,11 @@ function SidePanel({ open, active, setActive }) {
     </div>
   );
 }
-function SummaryCard({ targets }) {
+function SummaryCard({ targets, transactions }) {
   const lastIdx = MONTH_LABELS.length - 1;
-  const spent = Object.keys(CATEGORY_MONTHLY).reduce((s, c) => s + CATEGORY_MONTHLY[c][lastIdx], 0);
+  const spent = (transactions && transactions.length > 0)
+    ? transactions.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+    : Object.keys(CATEGORY_MONTHLY).reduce((s, c) => s + CATEGORY_MONTHLY[c][lastIdx], 0);
   const target = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0) || 1;
   const pct = Math.min(100, Math.round((spent / target) * 100));
   const expectedPct = Math.round((DAYS_INTO_MONTH() / 30) * 100);
@@ -1024,8 +1124,9 @@ function SummaryCard({ targets }) {
 }
 function DAYS_INTO_MONTH() { return 10; }
 
-function TransactionFeed({ limit }) {
-  const list = limit ? TRANSACTIONS.slice(0, limit) : TRANSACTIONS;
+function TransactionFeed({ limit, transactions }) {
+  const source = (transactions && transactions.length > 0) ? transactions : TRANSACTIONS;
+  const list = limit ? source.slice(0, limit) : source;
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Recent transactions</span>
@@ -1209,10 +1310,10 @@ const OVERVIEW_WIDGETS = [
 ];
 const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "goals"];
 
-function renderOverviewWidget(key, { targets, banks, hasData }) {
+function renderOverviewWidget(key, { targets, banks, hasData, transactions }) {
   switch (key) {
-    case "summary": return hasData ? <SummaryCard targets={targets} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
-    case "transactions": return hasData ? <TransactionFeed limit={5} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
+    case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
+    case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
     case "breakdown": return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
     case "goals": return <GoalsCard />;
     case "trends": return hasData ? <TrendsCard /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
@@ -1225,7 +1326,7 @@ function renderOverviewWidget(key, { targets, banks, hasData }) {
   }
 }
 
-function OverviewSlot({ widgetKey, onChange, targets, banks, hasData }) {
+function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactions }) {
   return (
     <div className="overview-slot">
       <div className="overview-slot-head">
@@ -1234,29 +1335,29 @@ function OverviewSlot({ widgetKey, onChange, targets, banks, hasData }) {
         </select>
       </div>
       <div className="overview-slot-body">
-        {renderOverviewWidget(widgetKey, { targets, banks, hasData })}
+        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions })}
       </div>
     </div>
   );
 }
 
-function OverviewGrid({ targets, banks, hasData }) {
+function OverviewGrid({ targets, banks, hasData, transactions }) {
   const [slots, setSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
   const updateSlot = (i, key) => setSlots((prev) => prev.map((s, idx) => (idx === i ? key : s)));
   return (
     <div className="overview-grid">
       {slots.map((key, i) => (
-        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} />
+        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} />
       ))}
     </div>
   );
 }
 
-function MainContent({ view, targets, banks, hasData }) {
-  if (view === "overview") return <OverviewGrid targets={targets} banks={banks} hasData={hasData} />;
+function MainContent({ view, targets, banks, hasData, transactions }) {
+  if (view === "overview") return <OverviewGrid targets={targets} banks={banks} hasData={hasData} transactions={transactions} />;
   if (view === "breakdown") return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard />;
-  if (view === "transactions") return hasData ? <TransactionFeed /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
+  if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "cashflow") return hasData ? <CashFlowCard /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
   if (view === "bills") return hasData ? <BillsCard /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
@@ -1265,18 +1366,26 @@ function MainContent({ view, targets, banks, hasData }) {
   if (view === "insights") return hasData ? <InsightsCard /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState("overview");
+  const [uploadOpen, setUploadOpen] = useState(false);
   return (
     <div className="app-shell stage-fade">
       {showExtraBanner && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onLogout={onLogout} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} />
-        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} /></div>
+        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} /></div>
       </div>
+      {uploadOpen && (
+        <UploadStatementModal
+          onClose={() => setUploadOpen(false)}
+          pushToast={pushToast}
+          onParsed={(list) => { onAddTransactions(list); setUploadOpen(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -1377,6 +1486,7 @@ function App() {
   const [targets, setTargets] = useState({});
   const [balances, setBalances] = useState({});
   const [uploadedFiles, setUploadedFiles] = useState({});
+  const [customTransactions, setCustomTransactions] = useState([]);
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
   const [legalTab, setLegalTab] = useState("privacy");
@@ -1389,7 +1499,7 @@ function App() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2600);
   };
 
-  const hasData = Object.values(uploadedFiles).some((arr) => arr && arr.length > 0);
+  const hasData = Object.values(uploadedFiles).some((arr) => arr && arr.length > 0) || customTransactions.length > 0;
 
   useEffect(() => {
     supabaseClient.auth.getSession().then(async ({ data }) => {
@@ -1524,6 +1634,9 @@ function App() {
         onCompleteExtra={() => setStage("extraQuestions")}
         onDismissExtra={() => setShowExtraBanner(false)}
         onLogout={handleLogout}
+        transactions={customTransactions}
+        onAddTransactions={(list) => setCustomTransactions((prev) => [...list, ...prev])}
+        pushToast={pushToast}
       />
     );
   }
@@ -1718,6 +1831,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .hamburger::before, .hamburger::after { content: ""; position: absolute; }
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
   .brand { color: #fff; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; }
   .avatar-wrap { position: relative; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4f8cff, #b56bff); color: #fff; font-size: 14px; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .avatar-menu { position: absolute; top: 44px; right: 0; background: rgba(30, 30, 45, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
@@ -1858,6 +1973,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
     /* dashboard */
     .topbar { padding: 12px 14px; }
+    .topbar-right { gap: 8px; }
+    .upload-statement-btn { padding: 8px 10px; font-size: 12px; }
     .brand { font-size: 15px; }
     .main-content { padding: 16px; gap: 14px; }
     .dash-card { padding: 16px; border-radius: 20px; }
@@ -1993,6 +2110,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .empty-text { color: rgba(255,255,255,0.5); font-size: 13px; margin: 0; max-width: 280px; }
 
   /* toasts */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200; background: rgba(6, 10, 22, 0.6);
+    backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-card { max-width: 420px; }
+
   .toast-stack {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center;
