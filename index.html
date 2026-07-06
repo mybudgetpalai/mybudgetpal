@@ -1398,12 +1398,18 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner
 
 /* ---------------- Settings ---------------- */
 
-function SettingsScreen({ name, banks, targets, onBack, onOpenLegal, pushToast, onLogout }) {
+function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
   const [notifWeekly, setNotifWeekly] = useState(false);
   const categories = Object.keys(targets || {});
+
+  const saveName = async () => {
+    if (displayName.trim() === name || !displayName.trim()) return;
+    await onSaveName(displayName.trim());
+    pushToast("Name saved", "success");
+  };
 
   return (
     <div className="app-shell stage-fade">
@@ -1419,7 +1425,7 @@ function SettingsScreen({ name, banks, targets, onBack, onOpenLegal, pushToast, 
           <span className="card-label">Profile</span>
           <div className="field-group" style={{ marginTop: 14 }}>
             <label className="field-label">Name</label>
-            <input className="glass-input" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <input className="glass-input" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} onBlur={saveName} />
           </div>
           <div className="field-group">
             <label className="field-label">Email</label>
@@ -1434,7 +1440,7 @@ function SettingsScreen({ name, banks, targets, onBack, onOpenLegal, pushToast, 
             {(banks && banks.length > 0 ? banks : ["No banks linked yet"]).map((b) => (
               <div className="settings-bank-row" key={b}>
                 <span>{b}</span>
-                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => pushToast("Bank removed", "info")}>Remove</button>}
+                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => onRemoveBank(b)}>Remove</button>}
               </div>
             ))}
           </div>
@@ -1537,12 +1543,63 @@ function App() {
   }, []);
 
   const openLegal = (tab, from) => { setLegalTab(tab); setReturnStage(from); setStage("legal"); };
-  const skipToHomepage = () => {
-    setName("Shezaad");
-    setBanks(["HSBC", "Emirates NBD"]);
-    setTargets(Object.fromEntries(Object.keys(CATEGORY_MONTHLY).map((c) => [c, CATEGORY_MONTHLY[c][CATEGORY_MONTHLY[c].length - 1]])));
-    setUploadedFiles({ HSBC: [{ name: "dummy.pdf", size: 1000, id: "dummy" }] });
-    setStage("dashboard");
+
+  const DEV_EMAIL = "dev@mybudgetpal.test";
+  const DEV_PASSWORD = "DevAccount123!";
+
+  const skipToHomepage = async () => {
+    setCheckingSession(true);
+    try {
+      let signIn = await supabaseClient.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
+      if (signIn.error) {
+        const signUp = await supabaseClient.auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
+        if (signUp.error) { pushToast("Dev login failed: " + signUp.error.message, "error"); setCheckingSession(false); return; }
+        signIn = await supabaseClient.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
+      }
+      const uid = signIn.data.user.id;
+      setUserId(uid);
+
+      let profile = await fetchProfile(uid);
+      if (!profile?.name) {
+        await supabaseClient.from("profiles").update({ name: "Shezaad" }).eq("id", uid);
+        await supabaseClient.from("banks").insert([
+          { user_id: uid, bank_name: "HSBC" },
+          { user_id: uid, bank_name: "Emirates NBD" },
+        ]);
+        const rows = Object.keys(CATEGORY_MONTHLY).map((c) => ({
+          user_id: uid, category: c, monthly_target: CATEGORY_MONTHLY[c][CATEGORY_MONTHLY[c].length - 1],
+        }));
+        await supabaseClient.from("targets").insert(rows);
+      }
+
+      const bankRows = await fetchBanks(uid);
+      const targetObj = await fetchTargets(uid);
+      profile = await fetchProfile(uid);
+      setName(profile?.name || "Shezaad");
+      setBanks(bankRows.map((b) => b.bank_name));
+      setTargets(targetObj);
+      setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
+      setStage("dashboard");
+    } catch (e) {
+      pushToast("Dev login failed — check connection", "error");
+    }
+    setCheckingSession(false);
+  };
+  const handleSaveName = async (newName) => {
+    setName(newName);
+    if (userId) {
+      try { await supabaseClient.from("profiles").update({ name: newName }).eq("id", userId); }
+      catch (e) { pushToast("Couldn't save name", "error"); }
+    }
+  };
+  const handleRemoveBank = async (bankName) => {
+    setBanks((prev) => prev.filter((b) => b !== bankName));
+    setUploadedFiles((prev) => { const next = { ...prev }; delete next[bankName]; return next; });
+    if (userId) {
+      try { await supabaseClient.from("banks").delete().eq("user_id", userId).eq("bank_name", bankName); }
+      catch (e) { pushToast("Couldn't remove bank", "error"); }
+    }
+    pushToast("Bank removed", "info");
   };
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
@@ -1627,11 +1684,13 @@ function App() {
   } else if (stage === "settings") {
     content = (
       <SettingsScreen
-        name={name} banks={banks} targets={targets}
+        name={name} banks={banks} targets={targets} userId={userId}
         pushToast={pushToast}
         onBack={() => setStage("dashboard")}
         onOpenLegal={(tab) => openLegal(tab, "settings")}
         onLogout={handleLogout}
+        onSaveName={handleSaveName}
+        onRemoveBank={handleRemoveBank}
       />
     );
   } else {
