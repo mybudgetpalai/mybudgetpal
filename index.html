@@ -10,9 +10,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   html, body { margin: 0; padding: 0; }
   #root { min-height: 100vh; }
@@ -1195,8 +1192,65 @@ function EmptyState({ text }) {
   );
 }
 
+const OVERVIEW_WIDGETS = [
+  { key: "summary", label: "Monthly Summary" },
+  { key: "transactions", label: "Recent Transactions" },
+  { key: "breakdown", label: "Spending Breakdown" },
+  { key: "goals", label: "Savings Goal" },
+  { key: "trends", label: "Spending Trend" },
+  { key: "cashflow", label: "Cash Flow" },
+  { key: "bills", label: "Bills & Subscriptions" },
+  { key: "accounts", label: "Bank Accounts" },
+  { key: "merchants", label: "Top Merchants" },
+  { key: "insights", label: "Insights" },
+];
+const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "goals"];
+
+function renderOverviewWidget(key, { targets, banks, hasData }) {
+  switch (key) {
+    case "summary": return hasData ? <SummaryCard targets={targets} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
+    case "transactions": return hasData ? <TransactionFeed limit={5} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
+    case "breakdown": return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+    case "goals": return <GoalsCard />;
+    case "trends": return hasData ? <TrendsCard /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
+    case "cashflow": return hasData ? <CashFlowCard /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
+    case "bills": return hasData ? <BillsCard /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+    case "accounts": return <BankAccountsCard banks={banks} />;
+    case "merchants": return hasData ? <MerchantsCard /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
+    case "insights": return hasData ? <InsightsCard /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+    default: return null;
+  }
+}
+
+function OverviewSlot({ widgetKey, onChange, targets, banks, hasData }) {
+  return (
+    <div className="overview-slot">
+      <div className="overview-slot-head">
+        <select className="slot-select" value={widgetKey} onChange={(e) => onChange(e.target.value)}>
+          {OVERVIEW_WIDGETS.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
+        </select>
+      </div>
+      <div className="overview-slot-body">
+        {renderOverviewWidget(widgetKey, { targets, banks, hasData })}
+      </div>
+    </div>
+  );
+}
+
+function OverviewGrid({ targets, banks, hasData }) {
+  const [slots, setSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
+  const updateSlot = (i, key) => setSlots((prev) => prev.map((s, idx) => (idx === i ? key : s)));
+  return (
+    <div className="overview-grid">
+      {slots.map((key, i) => (
+        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} />
+      ))}
+    </div>
+  );
+}
+
 function MainContent({ view, targets, banks, hasData }) {
-  if (view === "overview") return hasData ? (<><SummaryCard targets={targets} /><TransactionFeed limit={5} /></>) : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
+  if (view === "overview") return <OverviewGrid targets={targets} banks={banks} hasData={hasData} />;
   if (view === "breakdown") return hasData ? <BreakdownCard /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard />;
   if (view === "transactions") return hasData ? <TransactionFeed /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -1217,8 +1271,8 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onLogout={onLogout} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={view} setActive={(v) => { setView(v); setPanelOpen(false); }} />
-        <div className="main-content"><MainContent view={view} targets={targets} banks={banks} hasData={hasData} /></div>
+        <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} />
+        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} /></div>
       </div>
     </div>
   );
@@ -1484,12 +1538,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
 <style>
   * { box-sizing: border-box; }
-  body { background: #0b1224; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  body { background: #0b1224; }
 
   .page {
     position: relative; min-height: 100vh; width: 100%;
     display: flex; align-items: center; justify-content: center; overflow: hidden;
-    font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
     background: linear-gradient(160deg, #0b1224 0%, #101a35 45%, #191035 100%);
     padding: 24px;
   }
@@ -1653,7 +1707,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .target-total-amount { color: #8fb4ff; }
 
   /* dashboard */
-  .app-shell { min-height: 100vh; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  .app-shell { min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; }
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 10; }
   .topbar-left { display: flex; align-items: center; gap: 14px; }
   .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; }
@@ -1674,6 +1728,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
   .side-item-active { background: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3)); color: #fff; }
   .main-content { flex: 1; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: 640px; }
+  .main-content-wide { max-width: 860px; }
+  .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .overview-slot { border: 1.5px dashed rgba(255,255,255,0.28); border-radius: 22px; padding: 14px; background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 10px; transition: border-color 0.18s ease; }
+  .overview-slot:hover { border-color: rgba(255,255,255,0.45); }
+  .overview-slot-head { display: flex; justify-content: flex-end; }
+  .slot-select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.22); color: #fff; font-family: inherit; font-size: 12px; font-weight: 500; padding: 6px 10px; border-radius: 10px; cursor: pointer; outline: none; }
+  .slot-select option { background: #171727; color: #fff; }
+  .overview-slot-body { display: flex; flex-direction: column; }
+  .overview-slot-body .dash-card { border-style: solid; }
   .dash-card { background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 24px; padding: 22px; max-width: none; }
   .card-label { color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
   .summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -1800,6 +1863,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .tx-category { font-size: 11px; }
     .trend-chart { height: 110px; gap: 6px; }
     .insight-row { font-size: 12px; }
+    .overview-grid { grid-template-columns: 1fr; }
 
     /* side panel becomes an overlay drawer instead of pushing content */
     .side-panel {
@@ -1856,7 +1920,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   .lp-hero { text-align: center; padding: 90px 24px 60px; position: relative; z-index: 1; }
   .hero-eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8fb4ff; background: rgba(79,140,255,0.12); border: 1px solid rgba(79,140,255,0.3); padding: 6px 14px; border-radius: 999px; margin-bottom: 20px; }
-  .lp-hero h1 { font-size: 56px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.15; color: #fff; }
+  .lp-hero h1 { font-size: 42px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.15; color: #fff; }
   .lp-hero p { font-size: 17px; color: rgba(255,255,255,0.6); max-width: 520px; margin: 0 auto 32px; line-height: 1.5; }
   .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
@@ -1897,7 +1961,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lp-footer { position: relative; z-index: 1; text-align: center; padding: 22px; color: rgba(255,255,255,0.35); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
 
   @media (max-width: 720px) {
-    .lp-hero h1 { font-size: 36px; }
+    .lp-hero h1 { font-size: 30px; }
     .steps, .features { grid-template-columns: 1fr; }
     .pricing { grid-template-columns: 1fr; }
   }
