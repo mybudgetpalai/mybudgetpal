@@ -10,6 +10,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   html, body { margin: 0; padding: 0; }
   #root { min-height: 100vh; }
@@ -1538,12 +1541,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
 <style>
   * { box-sizing: border-box; }
-  body { background: #0b1224; }
+  body { background: #0b1224; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
 
   .page {
     position: relative; min-height: 100vh; width: 100%;
     display: flex; align-items: center; justify-content: center; overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+    font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     background: linear-gradient(160deg, #0b1224 0%, #101a35 45%, #191035 100%);
     padding: 24px;
   }
@@ -1707,7 +1710,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .target-total-amount { color: #8fb4ff; }
 
   /* dashboard */
-  .app-shell { min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; }
+  .app-shell { min-height: 100vh; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 10; }
   .topbar-left { display: flex; align-items: center; gap: 14px; }
   .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; }
@@ -1920,7 +1923,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   .lp-hero { text-align: center; padding: 90px 24px 60px; position: relative; z-index: 1; }
   .hero-eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #8fb4ff; background: rgba(79,140,255,0.12); border: 1px solid rgba(79,140,255,0.3); padding: 6px 14px; border-radius: 999px; margin-bottom: 20px; }
-  .lp-hero h1 { font-size: 42px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.15; color: #fff; }
+  .lp-hero h1 { font-size: 56px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.15; color: #fff; }
   .lp-hero p { font-size: 17px; color: rgba(255,255,255,0.6); max-width: 520px; margin: 0 auto 32px; line-height: 1.5; }
   .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
@@ -1961,7 +1964,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lp-footer { position: relative; z-index: 1; text-align: center; padding: 22px; color: rgba(255,255,255,0.35); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
 
   @media (max-width: 720px) {
-    .lp-hero h1 { font-size: 30px; }
+    .lp-hero h1 { font-size: 36px; }
     .steps, .features { grid-template-columns: 1fr; }
     .pricing { grid-template-columns: 1fr; }
   }
