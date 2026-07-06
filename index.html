@@ -757,12 +757,9 @@ function OnboardingScreen({ onDone, userId, pushToast }) {
   const next = async () => {
     if (step === ONBOARD_STEPS - 1) {
       setSubmitting(true);
-      try {
-        await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim() });
-        await supabaseClient.from("banks").insert(banks.map((b) => ({ user_id: userId, bank_name: b })));
-      } catch (e) {
-        pushToast("Couldn't save — check your connection", "error");
-      }
+      const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim() });
+      const { error: bErr } = await supabaseClient.from("banks").insert(banks.map((b) => ({ user_id: userId, bank_name: b })));
+      if (pErr || bErr) pushToast("Couldn't save your profile: " + (pErr || bErr).message, "error");
       setSubmitting(false);
       onDone({ name: name.trim(), banks });
     }
@@ -1252,9 +1249,9 @@ function ExtraQuestionsScreen({ onDone, onSkip, pushToast, userId }) {
   const handleSave = async () => {
     setSubmitting(true);
     try {
-      await supabaseClient.from("profiles").update({
-        occupation, salary_range: salary, employment_type: employment,
-      }).eq("id", userId);
+      await supabaseClient.from("profiles").upsert({
+        id: userId, occupation, salary_range: salary, employment_type: employment,
+      });
       pushToast("Saved", "success");
     } catch (e) {
       pushToast("Couldn't save", "error");
@@ -1947,7 +1944,7 @@ function App() {
 
       let profile = await fetchProfile(uid);
       if (!profile?.name) {
-        await supabaseClient.from("profiles").update({ name: "Shezaad" }).eq("id", uid);
+        await supabaseClient.from("profiles").upsert({ id: uid, name: "Shezaad" });
         await supabaseClient.from("banks").insert([
           { user_id: uid, bank_name: "HSBC" },
           { user_id: uid, bank_name: "Emirates NBD" },
@@ -1977,14 +1974,14 @@ function App() {
   const handleSaveName = async (newName) => {
     setName(newName);
     if (userId) {
-      try { await supabaseClient.from("profiles").update({ name: newName }).eq("id", userId); }
+      try { await supabaseClient.from("profiles").upsert({ id: userId, name: newName }); }
       catch (e) { pushToast("Couldn't save name", "error"); }
     }
   };
   const handleChangeOverviewSlots = (newSlots) => {
     setOverviewSlots(newSlots);
     if (userId) {
-      supabaseClient.from("profiles").update({ overview_layout: newSlots }).eq("id", userId).then(() => {});
+      supabaseClient.from("profiles").upsert({ id: userId, overview_layout: newSlots }).then(() => {});
     }
   };
   const handleSaveTargets = async (newTargets) => {
