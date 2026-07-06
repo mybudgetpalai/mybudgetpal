@@ -10,6 +10,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   html, body { margin: 0; padding: 0; }
   #root { min-height: 100vh; }
@@ -322,7 +325,7 @@ function ToastContainer({ toasts }) {
 
 /* ---------------- Auth ---------------- */
 
-function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack }) {
+function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError }) {
   const [mode, setMode] = useState(initialMode || "login");
   const [submitting, setSubmitting] = useState(false);
   const [email, setEmail] = useState("");
@@ -339,14 +342,7 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
     <div className="page stage-fade">
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card auth-card">
-        <div className="brand-row auth-brand-row">
-          <button className="text-back-btn" onClick={onBack} aria-label="Back">
-            <span className="text-back-arrow">←</span> Back
-          </button>
-          <div className="brand-row" style={{ marginBottom: 0 }}>
-            <div className="brand-dot" /><span className="brand-name">{APP_NAME}</span>
-          </div>
-        </div>
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
         {isForgot ? (
           <><h1 className="title">Reset your password</h1><p className="subtitle">We'll send a reset link to your email.</p></>
         ) : (
@@ -1421,7 +1417,6 @@ function App() {
           }
         }}
         onOpenLegal={(tab) => openLegal(tab, stage)}
-        onBack={() => setStage(returnStage)}
       />
     );
   } else if (stage === "onboarding") {
@@ -1494,7 +1489,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .page {
     position: relative; min-height: 100vh; width: 100%;
     display: flex; align-items: center; justify-content: center; overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+    font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     background: linear-gradient(160deg, #0b1224 0%, #101a35 45%, #191035 100%);
     padding: 24px;
   }
@@ -1658,7 +1653,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .target-total-amount { color: #8fb4ff; }
 
   /* dashboard */
-  .app-shell { min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; }
+  .app-shell { min-height: 100vh; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 10; }
   .topbar-left { display: flex; align-items: center; gap: 14px; }
   .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; }
@@ -1710,16 +1705,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* settings */
   .back-btn { color: #fff; font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
-  .auth-brand-row { justify-content: space-between; }
-  .text-back-btn {
-    display: flex; align-items: center; gap: 6px; font-family: inherit;
-    color: rgba(255,255,255,0.85); font-size: 14px; font-weight: 600;
-    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22);
-    border-radius: 12px; padding: 8px 14px; cursor: pointer; backdrop-filter: blur(8px);
-    transition: background 0.18s ease;
-  }
-  .text-back-btn:hover { background: rgba(255,255,255,0.18); }
-  .text-back-arrow { font-size: 15px; line-height: 1; }
   .settings-body { max-width: 560px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px; }
   .settings-section { max-width: none; }
   .settings-bank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
