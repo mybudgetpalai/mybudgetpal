@@ -1872,19 +1872,32 @@ function SummaryCard({ targets, transactions }) {
       ? "At this rate you'll spend ~" + formatMoney(projected) + " — " + formatMoney(projected - target) + " over target"
       : "At this rate you'll spend ~" + formatMoney(projected) + " — " + formatMoney(target - projected) + " under target")
     : null;
+  const overspent = spent > target;
+  const filledPct = Math.min(100, pct);
+  const R = 70, CIRC = 2 * Math.PI * R;
+  const ringColor = overspent ? "#ff8b8b" : "#4f8cff";
   return (
     <div className="glass-card dash-card">
       <div className="summary-head">
         <span className="card-label">This month</span>
         <span className={"pace-badge " + (overPace ? "pace-over" : "pace-good")}>{overPace ? "Over pace" : "On track"}</span>
       </div>
-      <div className="summary-amounts">
+      <div className="budget-ring-wrap">
+        <svg className="budget-ring" viewBox="0 0 160 160">
+          <circle cx="80" cy="80" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="14" />
+          <circle cx="80" cy="80" r={R} fill="none" stroke={ringColor} strokeWidth="14" strokeLinecap="round"
+            strokeDasharray={CIRC} strokeDashoffset={CIRC - CIRC * (filledPct / 100)} transform="rotate(-90 80 80)"
+            style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+        </svg>
+        <div className="budget-ring-center">
+          <span className="budget-ring-pct" style={overspent ? { color: "#ff8b8b" } : null}>{pct}%</span>
+          <span className="budget-ring-sub">of budget</span>
+        </div>
+      </div>
+      {overspent && <div className="overspend-alert">🚨 Over budget — {formatMoney(spent - target)} over your {formatMoney(target)} target</div>}
+      <div className="summary-amounts" style={{ justifyContent: "center" }}>
         <span className="summary-spent">{formatMoney(spent)}</span>
         <span className="summary-target">of {formatMoney(target)} target</span>
-      </div>
-      <div className="progress-track">
-        <div className="progress-fill" style={{ width: pct + "%" }} />
-        <div className="progress-marker" style={{ left: expectedPct + "%" }} />
       </div>
       <p className="summary-note">{pct}% of budget used</p>
       {paceNote && <p className={"summary-note pace-note " + (overPace ? "pace-note-over" : "pace-note-under")}>{paceNote}</p>}
@@ -1925,24 +1938,29 @@ function BreakdownCard({ transactions, targets }) {
   const monthKey = latestMonthKey(txs);
   const isCurrentMonth = monthKey === currentMonthKey();
   const byCat = spendByCategoryForMonth(txs, monthKey);
-  const cats = Object.entries(byCat).map(([name, amount]) => ({ name, amount, color: catColor(name) })).sort((a, b) => b.amount - a.amount);
-  const total = cats.reduce((s, c) => s + c.amount, 0) || 1;
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Spending by category</span>
-      <div className="category-list">
-        {cats.map((c) => {
-          const catTarget = targets && Number(targets[c.name]) > 0 ? Number(targets[c.name]) : null;
-          const catProjected = isCurrentMonth ? projectMonthEnd(c.amount) : null;
-          const showPace = catTarget !== null && catProjected !== null;
-          const over = showPace && catProjected > catTarget;
+      <div className="category-list breakdown-scroll">
+        {TX_CATEGORIES.map((name) => {
+          const amount = byCat[name] || 0;
+          const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
+          const color = catColor(name);
+          const overBudget = budget > 0 && amount > budget;
+          const fillPct = budget > 0 ? Math.min(100, (amount / budget) * 100) : (amount > 0 ? 100 : 0);
+          const projected = isCurrentMonth ? projectMonthEnd(amount) : null;
+          const showPace = budget > 0 && projected !== null;
+          const paceOver = showPace && projected > budget;
           return (
-            <div className="category-row" key={c.name}>
-              <div className="category-top"><span className="category-name">{c.name}</span><span className="category-amount">{formatMoney(c.amount)}</span></div>
-              <div className="category-track"><div className="category-fill" style={{ width: (c.amount / total) * 100 + "%", background: c.color }} /></div>
+            <div className="category-row" key={name}>
+              <div className="category-top">
+                <span className="category-name"><span className="cat-dot" style={{ background: color }} />{name}</span>
+                <span className="category-amount">{formatMoney(amount)}{budget > 0 ? " / " + formatMoney(budget) : ""}</span>
+              </div>
+              <div className="category-track"><div className="category-fill" style={{ width: fillPct + "%", background: overBudget ? "#ff8b8b" : color }} /></div>
               {showPace && (
-                <div className={"category-pace " + (over ? "pace-note-over" : "pace-note-under")}>
-                  Target {formatMoney(catTarget)} · on pace for ~{formatMoney(catProjected)} ({over ? formatMoney(catProjected - catTarget) + " over" : formatMoney(catTarget - catProjected) + " under"})
+                <div className={"category-pace " + (paceOver ? "pace-note-over" : "pace-note-under")}>
+                  On pace for ~{formatMoney(projected)} ({paceOver ? formatMoney(projected - budget) + " over" : formatMoney(budget - projected) + " under"})
                 </div>
               )}
             </div>
@@ -2229,7 +2247,7 @@ function InsightsCard({ transactions, targets }) {
       <div className="insight-list">
         {insights.map((ins, i) => (
           <div className={"insight-row insight-" + ins.type} key={i}>
-            <span className="insight-icon">{ins.type === "warning" ? "!" : ins.type === "positive" ? "✓" : "i"}</span>
+            <span className="insight-icon">{ins.type === "warning" ? "🚨" : ins.type === "positive" ? "👍" : "ℹ"}</span>
             <span>{ins.text}</span>
           </div>
         ))}
@@ -3635,6 +3653,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .tour-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.2); }
   .tour-dot-on { background: linear-gradient(135deg, #4f8cff, #b56bff); }
   .tour-next { width: 100%; }
+
+  /* ---- budget ring (monthly summary) ---- */
+  .budget-ring-wrap { position: relative; display: flex; justify-content: center; align-items: center; margin: 10px 0 4px; }
+  .budget-ring { width: 150px; height: 150px; }
+  .budget-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .budget-ring-pct { color: #fff; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .budget-ring-sub { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px; }
+  .overspend-alert { background: rgba(255,139,139,0.15); border: 1px solid rgba(255,139,139,0.4); color: #ff8b8b; font-size: 12px; font-weight: 600; border-radius: 12px; padding: 8px 12px; text-align: center; margin: 6px 0 2px; }
+  .category-name .cat-dot { display: inline-block; margin-right: 6px; vertical-align: middle; }
+  .breakdown-scroll { flex: 1; overflow-y: auto; min-height: 0; }
 
 </style>
 </body>
