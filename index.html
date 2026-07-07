@@ -30,7 +30,7 @@ const SUPABASE_KEY = "sb_publishable_M6NKJyabkWYkzYoEMPgoaA_Pw8x53Vg";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function fetchProfile(userId) {
-  const { data } = await supabaseClient.from("profiles").select("*").eq("id", userId).single();
+  const { data } = await supabaseClient.from("profiles").select("*").eq("id", userId).maybeSingle();
   return data;
 }
 async function fetchBanks(userId) {
@@ -1041,7 +1041,13 @@ function OnboardingScreen({ onDone, userId, pushToast }) {
       setSubmitting(true);
       const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim() });
       const { error: bErr } = await supabaseClient.from("banks").insert(banks.map((b) => ({ user_id: userId, bank_name: b })));
-      if (pErr || bErr) pushToast("Couldn't save your profile: " + (pErr || bErr).message, "error");
+      const check = await fetchProfile(userId);
+      if (pErr || bErr || !check?.name) {
+        const msg = (pErr || bErr)?.message || "your profile didn't save (profiles table permissions)";
+        pushToast("Couldn't save: " + msg, "error");
+        setSubmitting(false);
+        return;
+      }
       setSubmitting(false);
       onDone({ name: name.trim(), banks });
     }
@@ -2417,7 +2423,9 @@ function App() {
   };
 
   useEffect(() => {
-    supabaseClient.auth.getSession().then(async ({ data }) => {
+    (async () => {
+     try {
+      const { data } = await supabaseClient.auth.getSession();
       const session = data?.session;
       if (session?.user) {
         const { data: userCheck, error: userErr } = await supabaseClient.auth.getUser();
@@ -2450,7 +2458,11 @@ function App() {
         }
       }
       setCheckingSession(false);
-    });
+     } catch (e) {
+       console.error("Session restore failed:", e);
+       setCheckingSession(false);
+     }
+    })();
   }, []);
 
   const openLegal = (tab, from) => { setLegalTab(tab); setReturnStage(from); setStage("legal"); };
