@@ -2004,11 +2004,13 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
   const list = views || VIEWS;
   return (
     <div className={"side-panel " + (open ? "side-panel-open" : "")}>
-      <div className="side-panel-label">Views</div>
+      <div className="side-panel-label-row">
+        <span className="side-panel-label">Views</span>
+        {onCustomise && <button className="side-edit-views" onClick={onCustomise} aria-label="Customise menu" title="Customise menu">✎</button>}
+      </div>
       {list.map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
       ))}
-      {onCustomise && <button className="side-customise-btn" onClick={onCustomise}>⚙ Customise menu</button>}
       {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
     </div>
   );
@@ -2097,7 +2099,7 @@ function DAYS_INTO_MONTH() { return new Date().getDate(); }
 
 function CategoryEditor({ value, onChange }) {
   const [open, setOpen] = useState(false);
-  if (!open) return (<span className="cat-view">{value} <button className="edit-link" onClick={() => setOpen(true)}>Edit</button></span>);
+  if (!open) return (<span className="cat-view"><span className="cat-dot" style={{ background: catColor(value) }} />{value} <button className="edit-link" onClick={() => setOpen(true)}>Edit</button></span>);
   return (
     <select className="cat-select" autoFocus value={value} onBlur={() => setOpen(false)}
       onChange={(e) => { onChange(e.target.value); setOpen(false); }}>
@@ -2259,10 +2261,10 @@ function BreakdownPage({ transactions, targets }) {
                     <div className="category-top">
                       <span className="category-name">
                         <span className="cat-dot" style={{ background: color }} />{name}
-                        {shareLabel && <span className="bd-share">&middot; {shareLabel}</span>}
+                        {shareLabel && <span className={"bd-share" + (over ? " bd-share-over" : "")}>&middot; {shareLabel}</span>}
                         <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
                       </span>
-                      <span className="category-amount bd-amt">{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
+                      <span className={"category-amount bd-amt" + (over ? " bd-amt-over" : "")}>{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
                     </div>
                     <div className={"category-track" + (over ? " bd-track-over" : "")}><div className="category-fill" style={{ width: fillPct + "%", background: color }} /></div>
                   </div>
@@ -2362,9 +2364,9 @@ function BreakdownCard({ transactions, targets }) {
               <div className="category-top">
                 <span className="category-name">
                   <span className="cat-dot" style={{ background: color }} />{name}
-                  {shareLabel && <span className="bd-share">&middot; {shareLabel}</span>}
+                  {shareLabel && <span className={"bd-share" + (over ? " bd-share-over" : "")}>&middot; {shareLabel}</span>}
                 </span>
-                <span className="category-amount bd-amt">{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
+                <span className={"category-amount bd-amt" + (over ? " bd-amt-over" : "")}>{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
               </div>
               <div className={"category-track" + (over ? " bd-track-over" : "")}><div className="category-fill" style={{ width: fillPct + "%", background: color }} /></div>
             </div>
@@ -3067,15 +3069,15 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
     <div className="app-shell stage-fade">
       <div className="topbar">
         <div className="topbar-left">
-          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">\u2190</button>
+          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
           <div className="brand">Category Mapping</div>
         </div>
       </div>
       <div className="settings-body">
         <div className="dash-card settings-section">
           <span className="card-label">Merchant categories</span>
-          <p className="subtitle" style={{ margin: "8px 0 0" }}>Change a merchant\u2019s category and it updates every transaction with that name \u2014 and applies to future uploads.</p>
-          <input className="glass-input" style={{ marginTop: 12 }} placeholder="Search merchant name\u2026" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <p className="subtitle" style={{ margin: "8px 0 0" }}>Change a merchant’s category and it updates every transaction with that name — and applies to future uploads.</p>
+          <input className="glass-input" style={{ marginTop: 12 }} placeholder="Search merchant name…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <p className="mapping-count">{rows.length} unique merchant{rows.length !== 1 ? "s" : ""}</p>
           <div className="mapping-list">
             {rows.length === 0 ? (
@@ -4079,7 +4081,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-reset-btn { margin-top: auto; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #ff8b8b; background: rgba(255,139,139,0.1); border: 1px solid rgba(255,139,139,0.35); border-radius: 12px; padding: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .side-reset-btn:hover { background: rgba(255,139,139,0.2); }
   .side-panel-open { width: 220px; padding: 20px 14px; }
-  .side-panel-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; padding: 0 8px; white-space: nowrap; }
+  .side-panel-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 8px; }
+  .side-panel-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .side-edit-views { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; }
+  .side-edit-views:hover { color: #8fb4ff; background: rgba(255,255,255,0.08); }
   .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
   .side-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
   .side-item-active { background: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3)); color: #fff; }
@@ -4150,7 +4155,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .bd-headline { color: #fff; font-size: 30px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
-  .bd-month-select { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .bd-month-select { background-color: rgba(79,140,255,0.12); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238fb4ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; color: #fff; border: 1px solid rgba(79,140,255,0.45); border-radius: 10px; padding: 8px 32px 8px 12px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; transition: background-color 0.15s, border-color 0.15s; }
+  .bd-month-select:hover { background-color: rgba(79,140,255,0.22); border-color: rgba(79,140,255,0.7); }
   .bd-month-select option { color: #111; }
   .bd-list { margin-top: 16px; gap: 10px; }
   .bd-list .category-name { font-size: 15px; }
@@ -4163,6 +4169,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-cat-row:hover { background: rgba(255,255,255,0.04); }
   .bd-cat-row.bd-open { background: rgba(255,255,255,0.05); }
   .bd-amt { color: #fff; font-weight: 600; }
+  .bd-amt-over { color: #ff8b8b; }
+  .bd-share-over { color: #ff8b8b; font-weight: 600; }
   .bd-share { color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 400; margin-left: 6px; }
   .bd-chev { font-size: 14px; color: rgba(255,255,255,0.4); margin-left: 5px; transition: transform 0.2s; vertical-align: middle; }
   .bd-chev-open { transform: rotate(180deg); }
@@ -4251,7 +4259,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-panel-backdrop { display: none; }
 
   /* category mapping */
-  .cat-view { display: inline-flex; align-items: center; gap: 6px; }
+  .cat-view { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255,255,255,0.9); flex-shrink: 0; white-space: nowrap; }
   .edit-link { background: none; border: none; color: #8fb4ff; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; text-transform: uppercase; letter-spacing: 0.03em; }
   .edit-link:hover { text-decoration: underline; }
   .cat-select { background: rgba(255,255,255,0.08); color: #8fb4ff; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; font-size: 12px; font-family: inherit; padding: 2px 6px; cursor: pointer; outline: none; max-width: 150px; }
