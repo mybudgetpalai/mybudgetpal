@@ -1020,7 +1020,7 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError }) {
 
 /* ---------------- Onboarding ---------------- */
 
-function OnboardingScreen({ onDone, userId, pushToast }) {
+function OnboardingScreen({ onDone, userId, pushToast, onLogout }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [banks, setBanks] = useState([]);
@@ -1149,6 +1149,7 @@ function OnboardingScreen({ onDone, userId, pushToast }) {
             {submitting ? <span className="btn-spinner" /> : step === ONBOARD_STEPS - 1 ? "Finish" : "Continue"}
           </button>
         </div>
+        <button className="onboard-escape" onClick={onLogout} disabled={submitting}>Log out / start over</button>
       </div>
     </div>
   );
@@ -2657,7 +2658,7 @@ function App() {
       />
     );
   } else if (stage === "onboarding") {
-    content = <OnboardingScreen userId={userId} pushToast={pushToast} onDone={(d) => { setName(d.name); setBanks(d.banks); setStage("upload"); }} />;
+    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} onDone={(d) => { setName(d.name); setBanks(d.banks); setStage("upload"); }} />;
   } else if (stage === "upload") {
     content = (
       <UploadScreen
@@ -2999,6 +3000,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .switch-on .switch-knob { transform: translateX(18px); }
   .glass-btn.danger { color: #ff8b8b; background: rgba(255,139,139,0.1); border-color: rgba(255,139,139,0.3); }
   .glass-btn.danger:hover { background: rgba(255,139,139,0.18); }
+  .onboard-escape {
+    margin-top: 14px; width: 100%; background: none; border: none;
+    color: rgba(255,255,255,0.45); font-family: inherit; font-size: 13px;
+    cursor: pointer; padding: 6px;
+  }
+  .onboard-escape:hover { color: rgba(255,255,255,0.75); text-decoration: underline; }
+  .onboard-escape:disabled { opacity: 0.4; cursor: not-allowed; }
   .skip-btn {
     margin-top: 14px; width: 100%; background: none; border: 1px dashed rgba(255,255,255,0.25);
     color: rgba(255,255,255,0.5); font-family: inherit; font-size: 12px; padding: 8px;
