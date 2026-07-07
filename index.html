@@ -190,6 +190,53 @@ const CATEGORY_COLORS = {
   Shopping: "#ffb84f", Subscriptions: "#4fe0c0", Bills: "#ff8b8b",
   Income: "#4fe0c0", Uncategorized: "#9aa4b8", Other: "#9aa4b8",
 };
+const DEMO_CSV = `Date,Description,Amount
+2026-05-01,SALARY ACME LLC,3200.00
+2026-05-02,DEWA PAYMENT,-305.00
+2026-05-03,WAITROSE DUBAI MALL,-84.20
+2026-05-05,UBER TRIP HELP.UBER.COM,-18.50
+2026-05-08,CARREFOUR MOE,-112.40
+2026-05-10,NETFLIX.COM,-12.99
+2026-05-12,COSTA COFFEE JBR,-6.40
+2026-05-14,AMAZON.AE ORDER,-142.00
+2026-05-15,SPOTIFY AB,-9.99
+2026-05-18,TALABAT DUBAI,-32.75
+2026-05-20,FLOWER SHOP AL BARSHA,-60.00
+2026-05-22,ENOC PETROL 1044,-90.00
+2026-05-28,FITNESS FIRST,-45.00
+2026-06-01,SALARY ACME LLC,3200.00
+2026-06-02,DEWA PAYMENT,-310.00
+2026-06-04,WAITROSE DUBAI MALL,-91.10
+2026-06-06,UBER TRIP HELP.UBER.COM,-22.00
+2026-06-09,CARREFOUR MOE,-98.60
+2026-06-10,NETFLIX.COM,-12.99
+2026-06-12,SHAKE SHACK MOE,-58.00
+2026-06-15,SPOTIFY AB,-9.99
+2026-06-16,NOON.COM ORDER,-210.00
+2026-06-19,TALABAT DUBAI,-41.20
+2026-06-21,FLOWER SHOP AL BARSHA,-55.00
+2026-06-24,ENOC PETROL 1044,-85.00
+2026-06-28,FITNESS FIRST,-45.00
+2026-07-01,SALARY ACME LLC,3200.00
+2026-07-02,DEWA PAYMENT,-308.00
+2026-07-03,WAITROSE DUBAI MALL,-79.90
+2026-07-04,NETFLIX.COM,-12.99
+2026-07-05,UBER TRIP HELP.UBER.COM,-15.25
+2026-07-05,STARBUCKS DIFC,-8.20`;
+const DEMO_CAT_RULES = [
+  [/salary|payroll/i, "Income"],
+  [/dewa|etisalat|\bdu\b|utility|utilities|electric|water/i, "Bills"],
+  [/waitrose|carrefour|spinneys|grocer|supermarket/i, "Groceries"],
+  [/uber|careem|salik|enoc|adnoc|petrol|rta|taxi|metro/i, "Transport"],
+  [/netflix|spotify|fitness first|gym|prime video|subscription/i, "Subscriptions"],
+  [/costa|starbucks|shake shack|talabat|deliveroo|restaurant|coffee|cafe|dining/i, "Dining"],
+  [/amazon|noon|flower|mall|store|shop/i, "Shopping"],
+];
+function demoCategorize(name, amount) {
+  if (amount > 0) return "Income";
+  for (const [re, cat] of DEMO_CAT_RULES) if (re.test(name)) return cat;
+  return "Uncategorized";
+}
 
 const SAVINGS_GOAL = { label: "Emergency fund", target: 10000, current: 4200, months: 6 };
 
@@ -1282,7 +1329,7 @@ function BankUploadBlock({ bank, files, error, onAdd, onRemove }) {
   );
 }
 
-function UploadScreen({ banks, onDone, pushToast, userId, onBack }) {
+function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
   const [filesByBank, setFilesByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, []])));
   const [balanceByBank, setBalanceByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, { balance: "", date: "" }])));
   const [errorsByBank, setErrorsByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, null])));
@@ -1397,10 +1444,51 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack }) {
 
         <div className="nav-row">
           {onBack && <button className="glass-btn ghost" disabled={submitting} onClick={onBack}>Back</button>}
-          <button className="glass-btn ghost" disabled={submitting} onClick={() => handleContinue(true)}>Skip for now</button>
+          <button className="glass-btn ghost" disabled={submitting} onClick={() => (onSkip ? onSkip() : handleContinue(true))}>Skip for now</button>
           <button className="glass-btn primary" disabled={!allHaveAtLeastOne || submitting} onClick={() => handleContinue(false)}>
             {submitting ? <span className="btn-spinner" /> : "Continue"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoUploadScreen({ onUseDemo, onSkipEmpty, onBack }) {
+  const [over, setOver] = useState(false);
+  const [done, setDone] = useState(false);
+  const trigger = () => { if (done) return; setDone(true); setTimeout(onUseDemo, 500); };
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card upload-card">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        <h1 className="title">No statement handy? Try it with sample data</h1>
+        <p className="subtitle">Drag the file into the box (or just click it) and we'll run the full setup on a demo statement, so you can see exactly how everything works.</p>
+
+        <div className="demo-sim">
+          <div className={"demo-file" + (done ? " demo-file-gone" : "")}
+               draggable={!done}
+               onDragStart={(e) => { e.dataTransfer.setData("text/plain", "demo"); e.dataTransfer.effectAllowed = "copy"; }}
+               onClick={trigger}
+               title="Drag me into the box, or click">
+            <div className="demo-file-icon">📄</div>
+            <div className="demo-file-name">MyBudgetPal_Dummy_Statement.csv</div>
+            <div className="demo-file-hint">drag me → or click</div>
+          </div>
+          <div className="demo-arrow">→</div>
+          <div className={"demo-drop" + (over ? " demo-drop-over" : "") + (done ? " demo-drop-done" : "")}
+               onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+               onDragLeave={() => setOver(false)}
+               onDrop={(e) => { e.preventDefault(); setOver(false); trigger(); }}
+               onClick={trigger}>
+            {done ? "Got it ✓" : "Drop the file here"}
+          </div>
+        </div>
+
+        <div className="nav-row">
+          {onBack && <button className="glass-btn ghost" onClick={onBack}>Back</button>}
+          <button className="glass-btn ghost demo-skip-empty" onClick={onSkipEmpty}>Start empty instead</button>
         </div>
       </div>
     </div>
@@ -3014,7 +3102,7 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
-function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -3034,6 +3122,12 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
 
   return (
     <div className="app-shell stage-fade">
+      {usingDemo && !runTour && (
+        <div className="demo-reminder">
+          <span className="demo-reminder-text">📊 You’re exploring with <strong>sample data</strong> — these numbers aren’t yours yet.</span>
+          <button className="demo-reminder-btn" onClick={() => setUploadOpen(true)}>Add your real bank statement</button>
+        </div>
+      )}
       {showExtraBanner && !runTour && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
@@ -3239,6 +3333,7 @@ function App() {
   const [goals, setGoals] = useState([]);
   const [isDev, setIsDev] = useState(false);
   const [runTour, setRunTour] = useState(false);
+  const [usingDemo, setUsingDemo] = useState(false);
 
   const pushToast = (message, type) => {
     const id = Date.now() + Math.random();
@@ -3318,11 +3413,22 @@ function App() {
     pushToast("\u201C" + description + "\u201D \u2192 " + newCategory, "success");
   };
 
+  const startDemo = () => {
+    let parsed = [];
+    try { parsed = parseStatementCSV(DEMO_CSV).transactions; } catch (e) { parsed = []; }
+    const txs = parsed.map((t, i) => ({ ...t, id: "sample-" + i, bank: "Sample Data", category: demoCategorize(t.name, t.amount) }));
+    setCustomTransactions(txs);
+    setUsingDemo(true);
+    setStage("processing");
+  };
+
   const handleAddTransactions = async (list, bankName, meta, fileName) => {
+    const base = usingDemo ? [] : customTransactions;
+    if (usingDemo) setUsingDemo(false);
     const overrideMap = {};
-    customTransactions.forEach((t) => { if (!(t.name in overrideMap)) overrideMap[t.name] = t.category; });
+    base.forEach((t) => { if (!(t.name in overrideMap)) overrideMap[t.name] = t.category; });
     list.forEach((t) => { const o = overrideMap[t.name]; if (o && o !== "Uncategorized") t.category = o; });
-    const { kept, skipped } = dedupeTransactions(list, customTransactions);
+    const { kept, skipped } = dedupeTransactions(list, base);
     let stmtRow = null;
     if (bankName && meta) {
       try {
@@ -3338,12 +3444,12 @@ function App() {
       try { saved = await saveTransactionsToDb(userId, bankName || null, kept, stmtRow ? stmtRow.id : null); }
       catch (e) { pushToast("Imported, but couldn't save to your account — run the transactions SQL setup", "error"); }
       saved.forEach((t) => { if (!t.bank) t.bank = bankName || null; });
-      setCustomTransactions((prev) => [...saved, ...prev]);
+      setCustomTransactions((prev) => [...saved, ...(usingDemo ? [] : prev)]);
       pushToast(kept.length + " transaction" + (kept.length !== 1 ? "s" : "") + " imported" + (skipped > 0 ? " · " + skipped + " duplicate" + (skipped !== 1 ? "s" : "") + " skipped" : ""), "success");
     } else {
       pushToast("All " + list.length + " transactions were already imported — nothing new added", "info");
     }
-    const allTx = [...(kept.length ? saved : []), ...customTransactions];
+    const allTx = [...(kept.length ? saved : []), ...base];
     const allStmts = stmtRow ? [...statements.filter((s) => s.id !== stmtRow.id), stmtRow] : statements;
     await runReconciliation(allStmts, allTx, bankName || null);
     if (kept.length) runAiFallback(saved);
@@ -3619,6 +3725,7 @@ function App() {
         userId={userId}
         pushToast={pushToast}
         onBack={() => setStage("onboarding")}
+        onSkip={() => setStage("demoUpload")}
         onDone={(files, bal, parsedTxs, newStatements) => {
           setUploadedFiles(files); setBalances(bal);
           const allTx = [...(parsedTxs || []), ...customTransactions];
@@ -3631,6 +3738,8 @@ function App() {
         }}
       />
     );
+  } else if (stage === "demoUpload") {
+    content = <DemoUploadScreen onUseDemo={startDemo} onSkipEmpty={() => setStage("processing")} onBack={() => setStage("upload")} />;
   } else if (stage === "processing") {
     content = <ProcessingScreen transactions={customTransactions} onDone={() => setStage("confirmCategory")} />;
   } else if (stage === "confirmCategory") {
@@ -3681,6 +3790,7 @@ function App() {
         onLogout={handleLogout}
         transactions={customTransactions}
         onAddTransactions={handleAddTransactions}
+        usingDemo={usingDemo}
         pushToast={pushToast}
         overviewSlots={overviewSlots}
         onChangeOverviewSlots={handleChangeOverviewSlots}
@@ -3751,6 +3861,32 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .glass-card.onboard-card { max-width: 460px; min-height: 480px; transition: none; }
   .glass-card.onboard-card .step { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .demo-badge { display: inline-block; margin-left: 10px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(79,140,255,0.18); color: #9bc0ff; border: 1px solid rgba(79,140,255,0.35); vertical-align: middle; }
+  .demo-sim { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0 8px; }
+  .demo-file { flex: 0 0 auto; width: 150px; padding: 16px 12px; border-radius: 16px; background: linear-gradient(135deg, rgba(79,140,255,0.18), rgba(181,107,255,0.18)); border: 1px solid rgba(255,255,255,0.2); text-align: center; cursor: grab; transition: transform 0.15s, opacity 0.4s; box-shadow: 0 6px 20px rgba(0,0,0,0.25); user-select: none; }
+  .demo-file:hover { transform: translateY(-3px) scale(1.02); }
+  .demo-file:active { cursor: grabbing; }
+  .demo-file-gone { opacity: 0; transform: scale(0.85); pointer-events: none; }
+  .demo-file-icon { font-size: 34px; line-height: 1; }
+  .demo-file-name { font-size: 11px; color: #fff; font-weight: 600; margin-top: 8px; word-break: break-word; }
+  .demo-file-hint { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 6px; }
+  .demo-arrow { font-size: 24px; color: rgba(255,255,255,0.45); flex: 0 0 auto; animation: demoNudge 1.4s ease-in-out infinite; }
+  @keyframes demoNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+  .demo-drop { flex: 1 1 auto; max-width: 220px; min-height: 96px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; border-radius: 16px; border: 2px dashed rgba(255,255,255,0.28); color: rgba(255,255,255,0.6); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.18s; }
+  .demo-drop-over { border-color: rgba(79,140,255,0.8); background: rgba(79,140,255,0.12); color: #fff; transform: scale(1.03); }
+  .demo-drop-done { border-style: solid; border-color: rgba(79,224,192,0.7); background: rgba(79,224,192,0.14); color: #4fe0c0; font-weight: 700; }
+  .demo-skip-empty { opacity: 0.85; }
+  .demo-reminder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 16px; padding: 11px 18px; background: linear-gradient(90deg, rgba(255,184,79,0.16), rgba(255,139,139,0.14)); border-bottom: 1px solid rgba(255,184,79,0.3); }
+  .demo-reminder-text { color: #ffd9a0; font-size: 13px; }
+  .demo-reminder-text strong { color: #ffb84f; }
+  .demo-reminder-btn { background: #ffb84f; color: #1a1205; border: none; border-radius: 999px; padding: 7px 16px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: transform 0.15s, filter 0.15s; }
+  .demo-reminder-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  @media (max-width: 560px) {
+    .demo-sim { flex-direction: column; }
+    .demo-arrow { transform: rotate(90deg); animation: demoNudgeV 1.4s ease-in-out infinite; }
+    @keyframes demoNudgeV { 0%,100% { transform: rotate(90deg) translateX(0); } 50% { transform: rotate(90deg) translateX(5px); } }
+    .demo-drop { max-width: 100%; width: 100%; }
+    .demo-file { width: 100%; }
+  }
   .auth-card { max-width: 400px; }
   .upload-card { max-width: 480px; max-height: 88vh; overflow-y: auto; }
   .processing-card { max-width: 400px; align-items: center; text-align: center; }
