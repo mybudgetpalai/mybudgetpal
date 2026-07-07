@@ -389,9 +389,10 @@ function parseStatementCSV(text) {
   const debitIdx = header.findIndex((h) => h.includes("debit") || h.includes("money out") || h.includes("withdraw") || h.includes("paid out"));
   const creditIdx = header.findIndex((h) => h.includes("credit") || h.includes("money in") || h.includes("deposit") || h.includes("paid in"));
   if (dateIdx === -1 || descIdx === -1 || (amtIdx === -1 && debitIdx === -1 && creditIdx === -1)) throw new Error("headers");
+  const balIdx = header.findIndex((h) => h.includes("balance"));
   const num = (v) => { const n = Number(String(v || "").replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; };
 
-  return lines.slice(1).map((line) => {
+  const rows = lines.slice(1).map((line) => {
     const cols = parseCSVLine(line);
     let amount = 0;
     if (amtIdx !== -1 && cols[amtIdx]) amount = num(cols[amtIdx]);
@@ -406,8 +407,21 @@ function parseStatementCSV(text) {
       name,
       category: catIdx !== -1 && cols[catIdx] ? cols[catIdx].trim() : categorizeByRules(name, amount),
       amount,
+      _bal: balIdx !== -1 && cols[balIdx] !== undefined && String(cols[balIdx]).trim() !== "" ? num(cols[balIdx]) : null,
     };
   }).filter((t) => t.name && t.amount !== 0);
+
+  /* Detect opening/closing from a running-balance column, if the CSV has one */
+  const meta = { opening: null, closing: null, periodStart: null, periodEnd: null };
+  const dated = rows.filter((r) => r.date && r._bal !== null);
+  if (dated.length >= 2) {
+    const sorted = [...dated].sort((a, b) => a.date.localeCompare(b.date));
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    meta.opening = Math.round((first._bal - first.amount) * 100) / 100;
+    meta.closing = last._bal;
+  }
+  rows.forEach((r) => { delete r._bal; });
+  return { transactions: rows, meta };
 }
 
 /* PDF text extraction (pdf.js, loaded on demand) */
@@ -447,11 +461,21 @@ async function aiParseStatementText(text) {
     body: { action: "parse", text: String(text).slice(0, 150000) },
   });
   if (error || !data || !Array.isArray(data.transactions)) throw new Error((error && error.message) || (data && data.error) || "AI parsing unavailable");
-  return data.transactions.map((t) => {
+  const txs = data.transactions.map((t) => {
     const amount = Number(t.amount) || 0;
     const name = String(t.description || "").trim();
     return { date: normalizeDate(t.date) || "", name, amount, category: categorizeByRules(name, amount) };
   }).filter((t) => t.name && t.amount !== 0);
+  const numOrNull = (v) => { const n = Number(v); return v === null || v === undefined || v === "" || isNaN(n) ? null : n; };
+  return {
+    transactions: txs,
+    meta: {
+      opening: numOrNull(data.opening_balance),
+      closing: numOrNull(data.closing_balance),
+      periodStart: normalizeDate(data.period_start) || null,
+      periodEnd: normalizeDate(data.period_end) || null,
+    },
+  };
 }
 async function aiCategorize(descriptions) {
   const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
@@ -461,16 +485,21 @@ async function aiCategorize(descriptions) {
   return data.categories;
 }
 
-/* One entry point: file -> transactions */
+/* One entry point: file -> { transactions, meta } */
 async function parseStatementFile(file) {
   const lower = file.name.toLowerCase();
-  if (lower.endsWith(".csv")) return parseStatementCSV(await file.text());
-  if (lower.endsWith(".pdf")) {
+  let result;
+  if (lower.endsWith(".csv")) result = parseStatementCSV(await file.text());
+  else if (lower.endsWith(".pdf")) {
     const text = await extractPdfText(file);
     if (!text.trim()) throw new Error("This PDF has no readable text (it may be a scanned image) — try a CSV export instead.");
-    return await aiParseStatementText(text);
-  }
-  throw new Error("Only PDF or CSV files are supported.");
+    result = await aiParseStatementText(text);
+  } else throw new Error("Only PDF or CSV files are supported.");
+  const meta = result.meta || { opening: null, closing: null, periodStart: null, periodEnd: null };
+  const dates = result.transactions.map((t) => t.date).filter(Boolean).sort();
+  if (!meta.periodStart && dates.length) meta.periodStart = dates[0];
+  if (!meta.periodEnd && dates.length) meta.periodEnd = dates[dates.length - 1];
+  return { transactions: result.transactions, meta };
 }
 
 /* Supabase persistence for transactions */
@@ -480,11 +509,12 @@ async function fetchTransactions(userId) {
   if (error) return [];
   return (data || []).map(rowToTx);
 }
-async function saveTransactionsToDb(userId, bankName, txs) {
+async function saveTransactionsToDb(userId, bankName, txs, statementId) {
   if (!userId || !txs.length) return txs;
   const rows = txs.map((t) => ({
     user_id: userId, bank_name: bankName || t.bank || null,
     tx_date: t.date || null, description: t.name, amount: t.amount, category: t.category,
+    statement_id: statementId || null,
   }));
   const { data, error } = await supabaseClient.from("transactions").insert(rows).select();
   if (error) throw error;
@@ -494,6 +524,121 @@ async function updateTransactionCategoriesInDb(idToCat) {
   await Promise.all(Object.entries(idToCat).map(([id, category]) =>
     supabaseClient.from("transactions").update({ category }).eq("id", id)
   ));
+}
+
+/* ---------------- Statements: persistence + reconciliation ---------------- */
+
+function rowToStmt(r) {
+  return {
+    id: r.id, bank: r.bank_name, fileName: r.file_name || "",
+    periodStart: r.period_start || null, periodEnd: r.period_end || null,
+    opening: r.opening_balance === null ? null : Number(r.opening_balance),
+    closing: r.closing_balance === null ? null : Number(r.closing_balance),
+    computed: r.computed_closing === null ? null : Number(r.computed_closing),
+    difference: r.difference === null ? null : Number(r.difference),
+    status: r.status || "unverified",
+  };
+}
+async function fetchStatements(userId) {
+  const { data, error } = await supabaseClient.from("statements").select("*").eq("user_id", userId).order("period_start", { ascending: true });
+  if (error) return [];
+  return (data || []).map(rowToStmt);
+}
+async function saveStatementToDb(userId, s) {
+  /* Re-uploading the same period for the same bank updates the existing row instead of duplicating it */
+  if (s.periodStart && s.periodEnd) {
+    const { data: existing } = await supabaseClient.from("statements").select("*")
+      .eq("user_id", userId).eq("bank_name", s.bank)
+      .eq("period_start", s.periodStart).eq("period_end", s.periodEnd).limit(1);
+    if (existing && existing.length) {
+      const upd = {};
+      if (s.opening !== null && s.opening !== undefined) upd.opening_balance = s.opening;
+      if (s.closing !== null && s.closing !== undefined) upd.closing_balance = s.closing;
+      if (s.fileName) upd.file_name = s.fileName;
+      if (Object.keys(upd).length) {
+        const { data: updated } = await supabaseClient.from("statements").update(upd).eq("id", existing[0].id).select().single();
+        return rowToStmt(updated || existing[0]);
+      }
+      return rowToStmt(existing[0]);
+    }
+  }
+  const { data, error } = await supabaseClient.from("statements").insert({
+    user_id: userId, bank_name: s.bank, file_name: s.fileName || null,
+    period_start: s.periodStart || null, period_end: s.periodEnd || null,
+    opening_balance: s.opening, closing_balance: s.closing,
+    computed_closing: null, difference: null, status: "unverified",
+  }).select().single();
+  if (error) throw error;
+  return rowToStmt(data);
+}
+
+/*
+ * Reconciliation: for every statement of a bank, computed closing =
+ * opening + sum of ALL stored transactions for that bank inside the period.
+ * Re-run after every upload, so a later "longer period" upload that fills a
+ * gap automatically flips an old mismatch to reconciled.
+ * Also chains statements: previous closing should equal next opening.
+ */
+function reconcileStatements(statements, transactions) {
+  const results = [];
+  statements.forEach((s) => {
+    if (s.opening === null || s.closing === null || !s.periodStart || !s.periodEnd) {
+      results.push({ ...s, computed: null, difference: null, status: "unverified" });
+      return;
+    }
+    const sum = transactions
+      .filter((t) => t.bank === s.bank && t.date && t.date >= s.periodStart && t.date <= s.periodEnd)
+      .reduce((a, t) => a + t.amount, 0);
+    const computed = Math.round((s.opening + sum) * 100) / 100;
+    const difference = Math.round((s.closing - computed) * 100) / 100;
+    results.push({ ...s, computed, difference, status: Math.abs(difference) <= 0.01 ? "reconciled" : "mismatch" });
+  });
+  return results;
+}
+function chainIssues(statements) {
+  const byBank = {};
+  statements.forEach((s) => { (byBank[s.bank] = byBank[s.bank] || []).push(s); });
+  const issues = [];
+  Object.entries(byBank).forEach(([bank, list]) => {
+    const sorted = [...list].filter((s) => s.periodStart).sort((a, b) => a.periodStart.localeCompare(b.periodStart));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1], cur = sorted[i];
+      if (prev.periodEnd && cur.periodStart) {
+        const gapDays = (new Date(cur.periodStart) - new Date(prev.periodEnd)) / 86400000;
+        if (gapDays > 3) issues.push({ bank, type: "gap", text: "Possible missing statement between " + prev.periodEnd + " and " + cur.periodStart });
+      }
+      if (prev.closing !== null && cur.opening !== null && Math.abs(prev.closing - cur.opening) > 0.01) {
+        issues.push({ bank, type: "chain", text: "Closing balance (" + formatMoney(prev.closing) + ") doesn't match next opening (" + formatMoney(cur.opening) + ")" });
+      }
+    }
+  });
+  return issues;
+}
+async function persistReconciliation(oldStatements, newStatements) {
+  const oldById = Object.fromEntries(oldStatements.map((s) => [s.id, s]));
+  await Promise.all(newStatements.map((s) => {
+    const o = oldById[s.id];
+    if (o && o.status === s.status && o.computed === s.computed && o.difference === s.difference) return Promise.resolve();
+    return supabaseClient.from("statements").update({ computed_closing: s.computed, difference: s.difference, status: s.status }).eq("id", s.id);
+  }));
+}
+
+/* Current balance per bank: anchor on the latest statement closing balance,
+   then roll forward any transactions dated after that statement. Falls back
+   to the onboarding starting balance if no statement has balances yet. */
+function computeBankBalance(bank, statements, transactions, bankRow) {
+  const withClosing = statements.filter((s) => s.bank === bank && s.closing !== null && s.periodEnd).sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
+  if (withClosing.length) {
+    const anchor = withClosing[withClosing.length - 1];
+    const after = transactions.filter((t) => t.bank === bank && t.date && t.date > anchor.periodEnd).reduce((a, t) => a + t.amount, 0);
+    return Math.round((anchor.closing + after) * 100) / 100;
+  }
+  if (bankRow && bankRow.starting_balance !== null && bankRow.starting_balance !== undefined) {
+    const from = bankRow.as_of_date || "";
+    const after = transactions.filter((t) => t.bank === bank && t.date && t.date >= from).reduce((a, t) => a + t.amount, 0);
+    return Math.round((Number(bankRow.starting_balance) + after) * 100) / 100;
+  }
+  return null;
 }
 
 /* ---------------- Landing (marketing) ---------------- */
@@ -662,12 +807,17 @@ function ToastContainer({ toasts }) {
 
 /* ---------------- Upload statement modal ---------------- */
 
-function UploadStatementModal({ onClose, onParsed, pushToast }) {
+function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
   const [dragActive, setDragActive] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [bank, setBank] = useState(banks && banks.length === 1 ? banks[0] : null);
+  const [pending, setPending] = useState(null); // { transactions, meta, fileName } awaiting manual balances
+  const [openingInput, setOpeningInput] = useState("");
+  const [closingInput, setClosingInput] = useState("");
   const inputRef = useRef(null);
 
   const handleFile = async (file) => {
+    if (!bank) { pushToast("Pick which bank this statement is from first", "error"); return; }
     const lower = file.name.toLowerCase();
     if (!lower.endsWith(".csv") && !lower.endsWith(".pdf")) {
       pushToast("Only PDF or CSV files are supported.", "error");
@@ -675,14 +825,29 @@ function UploadStatementModal({ onClose, onParsed, pushToast }) {
     }
     setBusy(lower.endsWith(".pdf") ? "AI is reading your PDF…" : "Reading file…");
     try {
-      const parsed = await parseStatementFile(file);
-      if (!parsed.length) throw new Error("no rows");
+      const { transactions, meta } = await parseStatementFile(file);
+      if (!transactions.length) throw new Error("no rows");
       setBusy(false);
-      onParsed(parsed);
+      if (meta.opening !== null && meta.closing !== null) {
+        onImport(transactions, bank, meta, file.name);
+      } else {
+        setOpeningInput(meta.opening !== null ? String(meta.opening) : "");
+        setClosingInput(meta.closing !== null ? String(meta.closing) : "");
+        setPending({ transactions, meta, fileName: file.name });
+      }
     } catch (e) {
       setBusy(false);
       pushToast(e.message || "Couldn't read that file — check the format.", "error");
     }
+  };
+
+  const finishPending = (withBalances) => {
+    const meta = { ...pending.meta };
+    if (withBalances) {
+      meta.opening = openingInput === "" ? null : Number(openingInput);
+      meta.closing = closingInput === "" ? null : Number(closingInput);
+    }
+    onImport(pending.transactions, bank, meta, pending.fileName);
   };
 
   const handleDrop = (e) => {
@@ -697,19 +862,64 @@ function UploadStatementModal({ onClose, onParsed, pushToast }) {
           <span className="brand-name">Upload statement</span>
           <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "#fff" }}>×</button>
         </div>
-        <p className="subtitle">Upload a PDF or CSV bank statement and it feeds straight into your dashboard.</p>
-        <div
-          className={"dropzone " + (dragActive ? "dropzone-active" : "")}
-          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-        >
-          <p className="dropzone-text">{busy ? busy : "Drag & drop a PDF or CSV here, or click to browse"}</p>
-          <input ref={inputRef} type="file" accept=".csv,.pdf" style={{ display: "none" }}
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-        </div>
-        <p className="summary-note" style={{ marginTop: 14 }}>CSV needs Date, Description and Amount (or Debit/Credit) columns. PDFs are read by AI.</p>
+
+        {!pending && (
+          <>
+            <p className="subtitle">Which bank is this statement from?</p>
+            <div className="modal-bank-row">
+              {(banks && banks.length ? banks : []).map((b) => (
+                <button key={b} className={"chip " + (bank === b ? "chip-selected" : "")} onClick={() => setBank(b)}>
+                  <span>{b}</span>
+                  {bank === b && <span className="check-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+            <div
+              className={"dropzone " + (dragActive ? "dropzone-active" : "") + (!bank ? " dropzone-disabled" : "")}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+              onClick={() => bank && inputRef.current?.click()}
+            >
+              <p className="dropzone-text">{busy ? busy : bank ? "Drag & drop a PDF or CSV here, or click to browse" : "Select a bank above to enable upload"}</p>
+              <input ref={inputRef} type="file" accept=".csv,.pdf" style={{ display: "none" }}
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+            </div>
+            <p className="summary-note" style={{ marginTop: 14 }}>CSV needs Date, Description and Amount (or Debit/Credit) columns. PDFs are read by AI.</p>
+          </>
+        )}
+
+        {pending && (
+          <>
+            <p className="subtitle">
+              We couldn't find the opening and closing balances on this statement
+              {pending.meta.periodStart ? " (" + pending.meta.periodStart + " → " + pending.meta.periodEnd + ")" : ""}.
+              Enter them so we can check nothing is missing.
+            </p>
+            <div className="balance-row" style={{ marginBottom: 6 }}>
+              <div className="balance-field">
+                <label className="field-label">Opening balance</label>
+                <div className="target-input-wrap" style={{ width: "100%" }}>
+                  <span className="target-currency">£</span>
+                  <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
+                    value={openingInput} onChange={(e) => setOpeningInput(e.target.value)} />
+                </div>
+              </div>
+              <div className="balance-field">
+                <label className="field-label">Closing balance</label>
+                <div className="target-input-wrap" style={{ width: "100%" }}>
+                  <span className="target-currency">£</span>
+                  <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
+                    value={closingInput} onChange={(e) => setClosingInput(e.target.value)} />
+                </div>
+              </div>
+            </div>
+            <div className="nav-row">
+              <button className="glass-btn ghost" onClick={() => finishPending(false)}>Skip check</button>
+              <button className="glass-btn primary" disabled={openingInput === "" || closingInput === ""} onClick={() => finishPending(true)}>Import & check</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1025,6 +1235,7 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
   const handleContinue = async (skip) => {
     setSubmitting(true);
     const allParsed = [];
+    const savedStatements = [];
     let totalSkipped = 0;
     for (const bank of banks) {
       const bal = balanceByBank[bank];
@@ -1043,10 +1254,20 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
           await supabaseClient.storage.from("statements").upload(path, f.rawFile);
         } catch (e) {}
         try {
-          const parsed = await parseStatementFile(f.rawFile);
+          const { transactions: parsed, meta } = await parseStatementFile(f.rawFile);
           parsed.forEach((t) => { t.bank = bank; });
           const { kept, skipped } = dedupeTransactions(parsed, allParsed);
           totalSkipped += skipped;
+          let stmtRow = null;
+          try {
+            stmtRow = await saveStatementToDb(userId, {
+              bank, fileName: f.name,
+              periodStart: meta.periodStart, periodEnd: meta.periodEnd,
+              opening: meta.opening, closing: meta.closing,
+            });
+            savedStatements.push(stmtRow);
+          } catch (e) {}
+          kept.forEach((t) => { t._stmtId = stmtRow ? stmtRow.id : null; });
           allParsed.push(...kept);
         } catch (e) {
           pushToast("Couldn't read " + f.name + " — " + (e.message || "check the format"), "error");
@@ -1055,12 +1276,19 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
     }
     let saved = allParsed;
     if (allParsed.length) {
-      try { saved = await saveTransactionsToDb(userId, null, allParsed); }
-      catch (e) { pushToast("Transactions parsed but couldn't be saved to your account", "error"); }
+      try {
+        saved = [];
+        const byStmt = {};
+        allParsed.forEach((t) => { (byStmt[t._stmtId || "none"] = byStmt[t._stmtId || "none"] || []).push(t); });
+        for (const [stmtId, group] of Object.entries(byStmt)) {
+          const rows = await saveTransactionsToDb(userId, null, group, stmtId === "none" ? null : stmtId);
+          saved.push(...rows);
+        }
+      } catch (e) { saved = allParsed; pushToast("Transactions parsed but couldn't be saved to your account", "error"); }
       pushToast(allParsed.length + " transaction" + (allParsed.length !== 1 ? "s" : "") + " imported" + (totalSkipped > 0 ? " · " + totalSkipped + " duplicate" + (totalSkipped !== 1 ? "s" : "") + " skipped" : ""), "success");
     }
     setSubmitting(false);
-    onDone(filesByBank, balanceByBank, saved);
+    onDone(filesByBank, balanceByBank, saved, savedStatements);
   };
 
   return (
@@ -1721,19 +1949,58 @@ function BillsCard({ transactions }) {
   );
 }
 
-function BankAccountsCard({ banks }) {
-  const list = banks && banks.length > 0 ? banks : ["No banks linked yet"];
-  const dummyBalances = [4820, 1250, 3100, 640, 2200];
+function BankAccountsCard({ banks, transactions, accountData }) {
+  const statements = (accountData && accountData.statements) || [];
+  const bankRows = (accountData && accountData.bankRows) || [];
+  const txs = transactions || [];
+  const list = banks && banks.length > 0 ? banks : [];
+  const issues = chainIssues(statements);
+
+  if (!list.length) {
+    return (
+      <div className="glass-card dash-card">
+        <span className="card-label">Bank accounts</span>
+        <div className="tx-list"><div className="tx-row"><div className="tx-info"><span className="tx-name">No banks linked yet</span></div></div></div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Bank accounts</span>
       <div className="tx-list">
-        {list.map((b, i) => (
-          <div className="tx-row" key={b}>
-            <div className="tx-info"><span className="tx-name">{b}</span><span className="tx-category">Current account</span></div>
-            {banks && banks.length > 0 && <span className="tx-amount tx-positive">{formatMoney(dummyBalances[i % dummyBalances.length])}</span>}
-          </div>
-        ))}
+        {list.map((b) => {
+          const row = bankRows.find((r) => r.bank_name === b);
+          const balance = computeBankBalance(b, statements, txs, row);
+          const bankStmts = statements.filter((s) => s.bank === b).sort((x, y) => (x.periodStart || "").localeCompare(y.periodStart || ""));
+          const bankIssues = issues.filter((i) => i.bank === b);
+          return (
+            <div className="account-block" key={b}>
+              <div className="tx-row" style={{ borderBottom: "none" }}>
+                <div className="tx-info">
+                  <span className="tx-name">{b}</span>
+                  <span className="tx-category">{balance !== null ? "Estimated balance from statements" : "Add balances to see an estimate"}</span>
+                </div>
+                {balance !== null && <span className={"tx-amount " + (balance >= 0 ? "tx-positive" : "")}>{formatMoney(balance)}</span>}
+              </div>
+              {bankStmts.length > 0 && (
+                <div className="stmt-list">
+                  {bankStmts.map((s) => (
+                    <div className="stmt-row" key={s.id}>
+                      <span className="stmt-period">{s.periodStart && s.periodEnd ? s.periodStart + " → " + s.periodEnd : (s.fileName || "Statement")}</span>
+                      {s.status === "reconciled" && <span className="stmt-badge stmt-ok">✓ Balances</span>}
+                      {s.status === "mismatch" && <span className="stmt-badge stmt-bad">⚠ Off by {formatMoney(Math.abs(s.difference))}</span>}
+                      {s.status === "unverified" && <span className="stmt-badge stmt-na">○ Unchecked</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {bankIssues.map((iss, i) => (
+                <div className="stmt-issue" key={i}>⚠ {iss.text}</div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1806,7 +2073,7 @@ const OVERVIEW_WIDGETS = [
 ];
 const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "goals"];
 
-function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi }) {
+function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
   switch (key) {
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -1815,7 +2082,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
     case "cashflow": return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
     case "bills": return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
-    case "accounts": return <BankAccountsCard banks={banks} />;
+    case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
     case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
     case "insights": return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
     default: return null;
@@ -1831,13 +2098,13 @@ function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactio
         </select>
       </div>
       <div className="overview-slot-body">
-        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi })}
+        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData })}
       </div>
     </div>
   );
 }
 
-function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transactions, goals, goalsApi }) {
+function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
   const updateSlot = (i, key) => onChangeSlots(slots.map((s, idx) => (idx === i ? key : s)));
   return (
     <div className="overview-grid">
@@ -1848,20 +2115,20 @@ function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transacti
   );
 }
 
-function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi }) {
-  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} />;
+function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData }) {
+  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />;
   if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "cashflow") return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
   if (view === "bills") return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
-  if (view === "accounts") return <BankAccountsCard banks={banks} />;
+  if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
   if (view === "merchants") return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -1872,13 +2139,14 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} />
-        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} /></div>
+        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} /></div>
       </div>
       {uploadOpen && (
         <UploadStatementModal
           onClose={() => setUploadOpen(false)}
           pushToast={pushToast}
-          onParsed={(list) => { onAddTransactions(list); setUploadOpen(false); }}
+          banks={banks}
+          onImport={(list, bank, meta, fileName) => { onAddTransactions(list, bank, meta, fileName); setUploadOpen(false); }}
         />
       )}
     </div>
@@ -2042,6 +2310,8 @@ function App() {
   const [balances, setBalances] = useState({});
   const [uploadedFiles, setUploadedFiles] = useState({});
   const [customTransactions, setCustomTransactions] = useState([]);
+  const [statements, setStatements] = useState([]);
+  const [bankRows, setBankRows] = useState([]);
   const [overviewSlots, setOverviewSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
@@ -2099,18 +2369,51 @@ function App() {
     },
   };
 
-  const handleAddTransactions = async (list, bankName) => {
+  /* After any upload, re-check every statement for the affected bank against
+     ALL stored transactions, persist statuses, and surface any problems. */
+  const runReconciliation = async (allStatements, allTransactions, focusBank) => {
+    const rechecked = reconcileStatements(allStatements, allTransactions);
+    try { await persistReconciliation(allStatements, rechecked); } catch (e) {}
+    setStatements(rechecked);
+    const focus = focusBank ? rechecked.filter((s) => s.bank === focusBank) : rechecked;
+    const mismatches = focus.filter((s) => s.status === "mismatch");
+    if (mismatches.length) {
+      const m = mismatches[mismatches.length - 1];
+      pushToast("⚠ " + m.bank + " statement doesn't balance — off by " + formatMoney(Math.abs(m.difference)) + ". Try uploading a statement covering a longer period to find what's missing.", "error");
+    } else if (focus.some((s) => s.status === "reconciled")) {
+      pushToast("Balances check out ✓", "success");
+    }
+    const issues = chainIssues(rechecked).filter((i) => !focusBank || i.bank === focusBank);
+    if (issues.length) pushToast("⚠ " + issues[0].bank + ": " + issues[0].text, "error");
+    return rechecked;
+  };
+
+  const handleAddTransactions = async (list, bankName, meta, fileName) => {
     const { kept, skipped } = dedupeTransactions(list, customTransactions);
-    if (!kept.length) {
-      pushToast("All " + list.length + " transactions were already imported — nothing new added", "info");
-      return;
+    let stmtRow = null;
+    if (bankName && meta) {
+      try {
+        stmtRow = await saveStatementToDb(userId, {
+          bank: bankName, fileName: fileName || null,
+          periodStart: meta.periodStart, periodEnd: meta.periodEnd,
+          opening: meta.opening, closing: meta.closing,
+        });
+      } catch (e) { pushToast("Couldn't record the statement — run the statements SQL setup", "error"); }
     }
     let saved = kept;
-    try { saved = await saveTransactionsToDb(userId, bankName || null, kept); }
-    catch (e) { pushToast("Imported, but couldn't save to your account — run the transactions SQL setup", "error"); }
-    setCustomTransactions((prev) => [...saved, ...prev]);
-    pushToast(kept.length + " transaction" + (kept.length !== 1 ? "s" : "") + " imported" + (skipped > 0 ? " · " + skipped + " duplicate" + (skipped !== 1 ? "s" : "") + " skipped" : ""), "success");
-    runAiFallback(saved);
+    if (kept.length) {
+      try { saved = await saveTransactionsToDb(userId, bankName || null, kept, stmtRow ? stmtRow.id : null); }
+      catch (e) { pushToast("Imported, but couldn't save to your account — run the transactions SQL setup", "error"); }
+      saved.forEach((t) => { if (!t.bank) t.bank = bankName || null; });
+      setCustomTransactions((prev) => [...saved, ...prev]);
+      pushToast(kept.length + " transaction" + (kept.length !== 1 ? "s" : "") + " imported" + (skipped > 0 ? " · " + skipped + " duplicate" + (skipped !== 1 ? "s" : "") + " skipped" : ""), "success");
+    } else {
+      pushToast("All " + list.length + " transactions were already imported — nothing new added", "info");
+    }
+    const allTx = [...(kept.length ? saved : []), ...customTransactions];
+    const allStmts = stmtRow ? [...statements.filter((s) => s.id !== stmtRow.id), stmtRow] : statements;
+    await runReconciliation(allStmts, allTx, bankName || null);
+    if (kept.length) runAiFallback(saved);
   };
 
   useEffect(() => {
@@ -2131,11 +2434,14 @@ function App() {
           const targetObj = await fetchTargets(uid);
           const txRows = await fetchTransactions(uid);
           const goalRows = await fetchGoals(uid);
+          const stmtRows = await fetchStatements(uid);
           setGoals(goalRows);
           setName(profile.name);
           setBanks(bankRows.map((b) => b.bank_name));
+          setBankRows(bankRows);
           setTargets(targetObj);
           setCustomTransactions(txRows);
+          setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
           setOverviewSlots(parseOverviewLayout(profile));
           setStage("dashboard");
@@ -2192,12 +2498,15 @@ function App() {
       const targetObj = await fetchTargets(uid);
       const txRows = await fetchTransactions(uid);
       const goalRows = await fetchGoals(uid);
+      const stmtRows = await fetchStatements(uid);
       setGoals(goalRows);
       profile = await fetchProfile(uid);
       setName(profile?.name || "Shezaad");
       setBanks(bankRows.map((b) => b.bank_name));
+      setBankRows(bankRows);
       setTargets(targetObj);
       setCustomTransactions(txRows);
+      setStatements(stmtRows);
       setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
       setOverviewSlots(parseOverviewLayout(profile));
       setStage("dashboard");
@@ -2239,7 +2548,7 @@ function App() {
   };
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
-    setUserId(null); setName(""); setBanks([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setCustomTransactions([]);
+    setUserId(null); setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setStatements([]);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
     setStage("landing");
@@ -2279,11 +2588,14 @@ function App() {
               const targetObj = await fetchTargets(uid);
               const txRows = await fetchTransactions(uid);
               const goalRows = await fetchGoals(uid);
+              const stmtRows = await fetchStatements(uid);
               setGoals(goalRows);
               setName(profile.name);
               setBanks(bankRows.map((b) => b.bank_name));
+              setBankRows(bankRows);
               setTargets(targetObj);
               setCustomTransactions(txRows);
+              setStatements(stmtRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
               setOverviewSlots(parseOverviewLayout(profile));
               setStage("dashboard");
@@ -2305,9 +2617,13 @@ function App() {
         banks={banks}
         userId={userId}
         pushToast={pushToast}
-        onDone={(files, bal, parsedTxs) => {
+        onDone={(files, bal, parsedTxs, newStatements) => {
           setUploadedFiles(files); setBalances(bal);
+          const allTx = [...(parsedTxs || []), ...customTransactions];
+          const allStmts = [...statements, ...(newStatements || [])];
           if (parsedTxs && parsedTxs.length) { setCustomTransactions((prev) => [...parsedTxs, ...prev]); runAiFallback(parsedTxs); }
+          if (newStatements && newStatements.length) runReconciliation(allStmts, allTx, null);
+          fetchBanks(userId).then((rows) => setBankRows(rows));
           setStage("processing");
         }}
       />
@@ -2359,6 +2675,7 @@ function App() {
         onChangeOverviewSlots={handleChangeOverviewSlots}
         goals={goals}
         goalsApi={goalsApi}
+        accountData={{ statements, bankRows }}
       />
     );
   }
@@ -2841,6 +3158,23 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* error states */
   .dropzone-error { border-color: rgba(255,139,139,0.6); background: rgba(255,139,139,0.06); }
   .error-text { color: #ff8b8b; font-size: 12px; margin: 6px 2px 0; }
+  .dropzone-disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* upload modal bank picker */
+  .modal-bank-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+  .modal-bank-row .chip { padding: 9px 13px; font-size: 13px; border-radius: 999px; }
+
+  /* bank accounts: statement history */
+  .account-block { padding: 8px 0 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .account-block:last-child { border-bottom: none; }
+  .stmt-list { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 0 4px; }
+  .stmt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; background: rgba(255,255,255,0.04); border-radius: 10px; }
+  .stmt-period { color: rgba(255,255,255,0.55); font-size: 12px; }
+  .stmt-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .stmt-ok { background: rgba(79,224,192,0.16); color: #4fe0c0; }
+  .stmt-bad { background: rgba(255,139,139,0.16); color: #ff8b8b; }
+  .stmt-na { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); }
+  .stmt-issue { color: #ffb84f; font-size: 12px; margin: 8px 4px 0; background: rgba(255,184,79,0.1); border: 1px solid rgba(255,184,79,0.25); border-radius: 10px; padding: 7px 10px; }
 
   /* empty states */
   .empty-state { align-items: center; text-align: center; padding: 36px 22px; }
