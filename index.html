@@ -80,6 +80,18 @@ function parseOverviewLayout(profile) {
   if (!Array.isArray(arr) || arr.length !== 4 || !arr.every((k) => valid.includes(k))) return DEFAULT_OVERVIEW_SLOTS;
   return arr;
 }
+function parseNavLayout(profile) {
+  const valid = VIEWS.map((v) => v.key);
+  const raw = profile?.nav_layout;
+  let arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : null);
+  if (!Array.isArray(arr) || !arr.length || !arr.includes("overview") || !arr.every((k) => valid.includes(k))) return valid;
+  return valid.filter((k) => arr.includes(k));
+}
+function parseBillExcludes(profile) {
+  const raw = profile?.bill_excludes;
+  let arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : null);
+  return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+}
 
 /* ---------------- shared data ---------------- */
 
@@ -110,13 +122,10 @@ const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "
 const VIEWS = [
   { key: "overview", label: "Overview" },
   { key: "breakdown", label: "Spending Breakdown" },
-  { key: "goals", label: "Goals Tracker" },
   { key: "transactions", label: "Transactions" },
   { key: "trends", label: "Trends" },
-  { key: "cashflow", label: "Cash Flow" },
   { key: "bills", label: "Bills & Subscriptions" },
   { key: "accounts", label: "Bank Accounts" },
-  { key: "merchants", label: "Merchants" },
   { key: "insights", label: "Insights" },
 ];
 
@@ -327,6 +336,9 @@ function dedupeTransactions(incoming, existing) {
 function currentMonthKey() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+function currentMonthName() {
+  return new Date().toLocaleString("en-US", { month: "long" });
 }
 function daysInCurrentMonth() {
   const d = new Date();
@@ -1859,14 +1871,49 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     </div>
   );
 }
-function SidePanel({ open, active, setActive, isDev, onResetDev }) {
+function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise }) {
+  const list = views || VIEWS;
   return (
     <div className={"side-panel " + (open ? "side-panel-open" : "")}>
       <div className="side-panel-label">Views</div>
-      {VIEWS.map((v) => (
+      {list.map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
       ))}
+      {onCustomise && <button className="side-customise-btn" onClick={onCustomise}>⚙ Customise menu</button>}
       {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
+    </div>
+  );
+}
+function CustomiseMenuModal({ current, onClose, onSave }) {
+  const [sel, setSel] = useState(current || VIEWS.map((v) => v.key));
+  const toggle = (key) => {
+    if (key === "overview") return;
+    setSel((s) => s.includes(key) ? s.filter((k) => k !== key) : [...s, key]);
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="brand-row" style={{ marginBottom: 12, justifyContent: "space-between" }}>
+          <span className="brand-name">Customise menu</span>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "#fff" }}>×</button>
+        </div>
+        <p className="subtitle" style={{ margin: "0 0 12px" }}>Choose which pages appear in your sidebar.</p>
+        <div className="customise-list">
+          {VIEWS.map((v) => {
+            const on = sel.includes(v.key);
+            const locked = v.key === "overview";
+            return (
+              <button key={v.key} className={"customise-row" + (on ? " customise-on" : "")} onClick={() => toggle(v.key)} disabled={locked}>
+                <span>{v.label}{locked ? " (always on)" : ""}</span>
+                <span className="customise-check">{on ? "✓" : ""}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="nav-row" style={{ marginTop: 14 }}>
+          <button className="glass-btn primary" onClick={() => { onSave(VIEWS.map((v) => v.key).filter((k) => sel.includes(k))); onClose(); }}>Save</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1938,7 +1985,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
       <div className="tx-list">
         {list.map((t, i) => (
           <div className="tx-row" key={i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(cat) => onRecategorize(t.name, cat)} />) : t.category} \u00B7 {formatTxDate(t.date)}</span></div>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(cat) => onRecategorize(t.name, cat)} />) : t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -1955,7 +2002,7 @@ function BreakdownCard({ transactions, targets }) {
     <div className="glass-card dash-card">
       <span className="card-label">Spending by category</span>
       <div className="category-list breakdown-scroll">
-        {TX_CATEGORIES.map((name) => {
+        {[...TX_CATEGORIES].sort((a, b) => (byCat[b] || 0) - (byCat[a] || 0)).map((name) => {
           const amount = byCat[name] || 0;
           const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
           const color = catColor(name);
@@ -2101,24 +2148,72 @@ function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
 }
 function TrendsCard({ transactions }) {
   const txs = transactions || [];
+  const [cat, setCat] = useState(TX_CATEGORIES[0]);
   const keys = lastNMonthKeys(latestMonthKey(txs), 6);
   const months = keys.map(monthLabelFromKey);
+  const income = keys.map((k) => Math.round(incomeForMonth(txs, k)));
   const spend = keys.map((k) => Math.round(spendForMonth(txs, k)));
-  const max = Math.max(...spend, 1);
+  const net = keys.map((k) => Math.round(incomeForMonth(txs, k) - spendForMonth(txs, k)));
+  const catSpend = keys.map((k) => Math.round(spendByCategoryForMonth(txs, k)[cat] || 0));
+  const flowMax = Math.max(...income, ...spend, 1);
+  const spendMax = Math.max(...spend, 1);
+  const catMax = Math.max(...catSpend, 1);
   return (
-    <div className="glass-card dash-card">
-      <span className="card-label">Spending trend, last 6 months</span>
-      <div className="trend-chart">
-        {months.map((m, i) => (
-          <div className="trend-bar-col" key={m + i}>
-            <div className="trend-bar-wrap">
-              <div className="trend-bar" style={{ height: (spend[i] / max) * 100 + "%" }} />
+    <div className="trends-wrap">
+      <div className="glass-card dash-card">
+        <span className="card-label">Net inflow / outflow</span>
+        <div className="trend-chart">
+          {months.map((m, i) => (
+            <div className="trend-bar-col" key={"f" + m + i}>
+              <div className="trend-bar-wrap dual">
+                <div className="trend-bar income-bar" style={{ height: (income[i] / flowMax) * 100 + "%" }} />
+                <div className="trend-bar spend-bar" style={{ height: (spend[i] / flowMax) * 100 + "%" }} />
+              </div>
+              <span className="trend-bar-label">{m}</span>
             </div>
-            <span className="trend-bar-label">{m}</span>
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="legend-row">
+          <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Money in</span>
+          <span className="legend-item"><span className="legend-dot" style={{ background: "#4f8cff" }} />Money out</span>
+        </div>
+        <p className="summary-note">Net last month: {formatMoney(net[net.length - 1])}</p>
       </div>
-      <p className="summary-note">Total spend per month · {formatMoney(spend[spend.length - 1])} last month</p>
+
+      <div className="glass-card dash-card">
+        <span className="card-label">Net spending, last 6 months</span>
+        <div className="trend-chart">
+          {months.map((m, i) => (
+            <div className="trend-bar-col" key={"s" + m + i}>
+              <div className="trend-bar-wrap">
+                <div className="trend-bar" style={{ height: (spend[i] / spendMax) * 100 + "%" }} />
+              </div>
+              <span className="trend-bar-label">{m}</span>
+            </div>
+          ))}
+        </div>
+        <p className="summary-note">Total spend per month {"\u00B7"} {formatMoney(spend[spend.length - 1])} last month</p>
+      </div>
+
+      <div className="glass-card dash-card">
+        <div className="summary-head">
+          <span className="card-label">Category trend</span>
+          <select className="slot-select trend-cat-select" value={cat} onChange={(e) => setCat(e.target.value)}>
+            {TX_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="trend-chart">
+          {months.map((m, i) => (
+            <div className="trend-bar-col" key={"c" + m + i}>
+              <div className="trend-bar-wrap">
+                <div className="trend-bar" style={{ height: (catSpend[i] / catMax) * 100 + "%", background: catColor(cat) }} />
+              </div>
+              <span className="trend-bar-label">{m}</span>
+            </div>
+          ))}
+        </div>
+        <p className="summary-note">{cat} {"\u00B7"} {formatMoney(catSpend[catSpend.length - 1])} last month</p>
+      </div>
     </div>
   );
 }
@@ -2153,22 +2248,44 @@ function CashFlowCard({ transactions }) {
   );
 }
 
-function BillsCard({ transactions }) {
-  const bills = detectRecurringBills(transactions || []);
-  if (!bills.length) return <EmptyState text="No recurring payments detected yet — they show up once the same payment appears in 2+ months." />;
+function BillsCard({ transactions, excludes, onToggleExclude, editable }) {
+  const [editing, setEditing] = useState(false);
+  const ex = excludes || [];
+  const detected = detectRecurringBills(transactions || []);
+  if (!detected.length) return <EmptyState text="No recurring payments detected yet — they show up once the same payment appears in 2+ months." />;
+  const bills = detected.filter((b) => !ex.includes(b.name));
+  const excluded = detected.filter((b) => ex.includes(b.name));
   const total = bills.reduce((s, b) => s + b.amount, 0);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Bills & subscriptions</span>
+      <div className="summary-head">
+        <span className="card-label">Bills & subscriptions</span>
+        {editable && <button className="link-btn inline" onClick={() => setEditing((v) => !v)}>{editing ? "Done" : "Edit"}</button>}
+      </div>
+      {editing && <p className="subtitle" style={{ margin: "0 0 8px" }}>Remove anything that isn't really a bill — it'll stop being counted here.</p>}
       <div className="tx-list">
         {bills.map((b) => (
           <div className="tx-row" key={b.name}>
-            <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} · due {b.due}</span></div>
-            <span className="tx-amount">{formatMoney(-b.amount)}</span>
+            <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} {"\u00B7"} due {b.due}</span></div>
+            <div className="bill-right">
+              <span className="tx-amount">{formatMoney(-b.amount)}</span>
+              {editing && <button className="bill-remove" onClick={() => onToggleExclude(b.name)}>Not a bill</button>}
+            </div>
           </div>
         ))}
       </div>
       <p className="summary-note">Total recurring: {formatMoney(total)} / month</p>
+      {editing && excluded.length > 0 && (
+        <div className="bill-excluded">
+          <span className="card-label" style={{ display: "block", margin: "14px 0 6px" }}>Not counted as bills</span>
+          {excluded.map((b) => (
+            <div className="tx-row" key={b.name}>
+              <div className="tx-info"><span className="tx-name">{b.name}</span></div>
+              <button className="link-btn inline" onClick={() => onToggleExclude(b.name)}>Restore</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2254,6 +2371,10 @@ function MerchantsCard({ transactions }) {
 function InsightsCard({ transactions, targets }) {
   const built = buildInsights(transactions || [], targets);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
+  const txs = transactions || [];
+  let merchants = topMerchantsFor(txs, latestMonthKey(txs), 5);
+  if (merchants.length < 3) merchants = topMerchantsFor(txs, null, 5);
+  const mMax = Math.max(...merchants.map((m) => m.amount), 1);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Insights</span>
@@ -2265,6 +2386,19 @@ function InsightsCard({ transactions, targets }) {
           </div>
         ))}
       </div>
+      {merchants.length > 0 && (
+        <div className="insights-merchants">
+          <span className="card-label" style={{ display: "block", margin: "18px 0 8px" }}>Top merchants</span>
+          <div className="category-list">
+            {merchants.map((m) => (
+              <div className="category-row" key={m.name}>
+                <div className="category-top"><span className="category-name">{m.name}</span><span className="category-amount">{formatMoney(m.amount)}</span></div>
+                <div className="category-track"><div className="category-fill" style={{ width: (m.amount / mMax) * 100 + "%", background: "#4f8cff" }} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2282,16 +2416,14 @@ const OVERVIEW_WIDGETS = [
   { key: "summary", label: "Monthly Summary" },
   { key: "transactions", label: "Recent Transactions" },
   { key: "breakdown", label: "Spending Breakdown" },
-  { key: "goals", label: "Savings Goal" },
   { key: "trends", label: "Spending Trend" },
-  { key: "cashflow", label: "Cash Flow" },
   { key: "bills", label: "Bills & Subscriptions" },
   { key: "accounts", label: "Bank Accounts" },
   { key: "merchants", label: "Top Merchants" },
   { key: "insights", label: "Insights" },
   { key: "empty", label: "➕ Empty slot" },
 ];
-const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "goals"];
+const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "insights"];
 const TOUR_DEFAULT_SLOTS = ["summary", "breakdown", "insights", "empty"];
 const TOUR_COPY = {
   summary: { title: "Monthly summary", body: "This shows how you're pacing against your budget for this month." },
@@ -2307,7 +2439,7 @@ const TOUR_COPY = {
   merchants: { title: "Top merchants", body: "Where your money goes most." },
 };
 
-function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
+function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
   switch (key) {
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -2315,7 +2447,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "goals": return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
     case "cashflow": return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
-    case "bills": return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+    case "bills": return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
     case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
     case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
     case "insights": return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
@@ -2324,7 +2456,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
   }
 }
 
-function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
+function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
   const revealed = !runTour || index <= tourStep;
   const active = runTour && index === tourStep;
   if (runTour && !revealed) {
@@ -2340,33 +2472,35 @@ function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, 
         </div>
       )}
       <div className="overview-slot-body">
-        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData })}
+        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes })}
       </div>
     </div>
   );
 }
 
-function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
+function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
   const updateSlot = (i, key) => onChangeSlots(slots.map((s, idx) => (idx === i ? key : s)));
   return (
     <div className="overview-grid">
       {slots.map((key, i) => (
-        <OverviewSlot key={i} index={i} runTour={runTour} tourStep={tourStep} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />
+        <OverviewSlot key={i} index={i} runTour={runTour} tourStep={tourStep} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} />
       ))}
     </div>
   );
 }
 
-function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep }) {
-  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />;
+function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude }) {
+  if (view === "overview") return (
+    <>
+      <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
+      <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} />
+    </>
+  );
   if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-  if (view === "goals") return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-  if (view === "cashflow") return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
-  if (view === "bills") return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+  if (view === "bills") return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} onToggleExclude={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
-  if (view === "merchants") return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
@@ -2414,13 +2548,16 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
     </div>
   );
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
+  const [customiseOpen, setCustomiseOpen] = useState(false);
 
-  const effectiveView = runTour ? "overview" : view;
+  const navKeys = navViews || VIEWS.map((v) => v.key);
+  const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
+  const effectiveView = runTour ? "overview" : (navKeys.includes(view) ? view : "overview");
   const stepKey = overviewSlots[tourStep] || "empty";
   const copy = TOUR_COPY[stepKey] || { title: "", body: "" };
   const advanceTour = () => { if (tourStep >= overviewSlots.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
@@ -2432,8 +2569,8 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} />
-        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}><MainContent view={effectiveView} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} /></div>
+        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
+        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -2445,6 +2582,9 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
           </div>
           <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= overviewSlots.length - 1 ? "Finish" : "Next"}</button>
         </div>
+      )}
+      {customiseOpen && (
+        <CustomiseMenuModal current={navKeys} onClose={() => setCustomiseOpen(false)} onSave={onChangeNavViews} />
       )}
       {uploadOpen && (
         <UploadStatementModal
@@ -2618,6 +2758,8 @@ function App() {
   const [statements, setStatements] = useState([]);
   const [bankRows, setBankRows] = useState([]);
   const [overviewSlots, setOverviewSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
+  const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
+  const [billExcludes, setBillExcludes] = useState([]);
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
   const [legalTab, setLegalTab] = useState("privacy");
@@ -2767,6 +2909,8 @@ function App() {
           setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
           setOverviewSlots(parseOverviewLayout(profile));
+          setNavViews(parseNavLayout(profile));
+          setBillExcludes(parseBillExcludes(profile));
           setStage("dashboard");
         } else {
           setStage("onboarding");
@@ -2837,6 +2981,8 @@ function App() {
       setStatements(stmtRows);
       setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
       setOverviewSlots(parseOverviewLayout(profile));
+      setNavViews(parseNavLayout(profile));
+      setBillExcludes(parseBillExcludes(profile));
       setStage("dashboard");
     } catch (e) {
       pushToast("Dev login failed — check connection", "error");
@@ -2855,6 +3001,17 @@ function App() {
     if (userId) {
       supabaseClient.from("profiles").upsert({ id: userId, overview_layout: newSlots }).then(() => {});
     }
+  };
+  const handleChangeNavViews = (newViews) => {
+    setNavViews(newViews);
+    if (userId) supabaseClient.from("profiles").upsert({ id: userId, nav_layout: newViews }).then(() => {}, () => {});
+  };
+  const handleToggleBillExclude = (name) => {
+    setBillExcludes((prev) => {
+      const next = prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name];
+      if (userId) supabaseClient.from("profiles").upsert({ id: userId, bill_excludes: next }).then(() => {}, () => {});
+      return next;
+    });
   };
   const handleSaveTargets = async (newTargets) => {
     const cleaned = Object.fromEntries(Object.entries(newTargets).map(([c, v]) => [c, Number(v) || 0]));
@@ -3052,6 +3209,10 @@ function App() {
         pushToast={pushToast}
         overviewSlots={overviewSlots}
         onChangeOverviewSlots={handleChangeOverviewSlots}
+        navViews={navViews}
+        onChangeNavViews={handleChangeNavViews}
+        billExcludes={billExcludes}
+        onToggleBillExclude={handleToggleBillExclude}
         goals={goals}
         goalsApi={goalsApi}
         accountData={{ statements, bankRows }}
@@ -3689,6 +3850,23 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .overspend-alert { background: rgba(255,139,139,0.15); border: 1px solid rgba(255,139,139,0.4); color: #ff8b8b; font-size: 12px; font-weight: 600; border-radius: 12px; padding: 8px 12px; text-align: center; margin: 6px 0 2px; }
   .category-name .cat-dot { display: inline-block; margin-right: 6px; vertical-align: middle; }
   .breakdown-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+
+  /* ---- added: greeting / trends / customise / bills-edit ---- */
+  .overview-greeting { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 2px 4px 16px; }
+  .trends-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .trend-cat-select { width: auto; min-width: 130px; }
+  .side-customise-btn { margin-top: 8px; width: 100%; text-align: left; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
+  .side-customise-btn:hover { background: rgba(255,255,255,0.12); }
+  .customise-list { display: flex; flex-direction: column; gap: 8px; }
+  .customise-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.85); font-size: 14px; font-weight: 600; cursor: pointer; }
+  .customise-row:disabled { opacity: 0.6; cursor: default; }
+  .customise-row.customise-on { border-color: rgba(79,140,255,0.7); background: rgba(79,140,255,0.15); color: #fff; }
+  .customise-check { color: #8fb4ff; font-weight: 700; }
+  .bill-right { display: flex; align-items: center; gap: 10px; }
+  .bill-remove { background: rgba(255,139,139,0.14); border: 1px solid rgba(255,139,139,0.4); color: #ff8b8b; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .bill-remove:hover { background: rgba(255,139,139,0.25); }
+  .bill-excluded { margin-top: 6px; opacity: 0.85; }
+  .insights-merchants { margin-top: 4px; }
 
 </style>
 </body>
