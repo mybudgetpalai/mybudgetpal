@@ -255,6 +255,41 @@ function spendByCategoryForMonth(txs, k) {
   return o;
 }
 function catColor(c) { return CATEGORY_COLORS[c] || "#9aa4b8"; }
+
+/* Deduplication: key = date + description + amount. Handles genuine same-day
+   identical transactions by only skipping as many copies as already exist. */
+function txKey(t) {
+  return (t.date || "") + "|" + (t.name || "").toLowerCase().replace(/\s+/g, " ").trim() + "|" + (Number(t.amount) || 0).toFixed(2);
+}
+function dedupeTransactions(incoming, existing) {
+  const existingCounts = {};
+  (existing || []).forEach((t) => { const k = txKey(t); existingCounts[k] = (existingCounts[k] || 0) + 1; });
+  const seen = {};
+  const kept = [];
+  let skipped = 0;
+  (incoming || []).forEach((t) => {
+    const k = txKey(t);
+    seen[k] = (seen[k] || 0) + 1;
+    if (seen[k] > (existingCounts[k] || 0)) kept.push(t);
+    else skipped++;
+  });
+  return { kept, skipped };
+}
+
+/* Pacing projection helpers */
+function currentMonthKey() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+function daysInCurrentMonth() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+function projectMonthEnd(spentSoFar) {
+  const day = new Date().getDate();
+  if (day <= 0) return spentSoFar;
+  return (spentSoFar / day) * daysInCurrentMonth();
+}
 function topMerchantsFor(txs, k, n) {
   const o = {};
   txs.filter((t) => t.amount < 0 && (!k || t.date.slice(0, 7) === k)).forEach((t) => { o[t.name] = (o[t.name] || 0) + Math.abs(t.amount); });
@@ -296,6 +331,11 @@ function buildInsights(txs, targets) {
   });
   const totalTarget = Object.values(targets || {}).reduce((s, v) => s + (Number(v) || 0), 0);
   const spent = spendForMonth(txs, cur);
+  if (totalTarget > 0 && cur === currentMonthKey()) {
+    const projected = projectMonthEnd(spent);
+    if (projected > totalTarget) out.unshift({ type: "warning", text: "At this rate you'll spend ~" + formatMoney(projected) + " this month — " + formatMoney(projected - totalTarget) + " over your target." });
+    else out.push({ type: "positive", text: "At this rate you'll finish ~" + formatMoney(totalTarget - projected) + " under your monthly target." });
+  }
   if (totalTarget > 0) {
     if (spent <= totalTarget) out.push({ type: "positive", text: "You've used " + Math.round((spent / totalTarget) * 100) + "% of your monthly target." });
     else out.push({ type: "warning", text: "You're " + formatMoney(spent - totalTarget) + " over your total monthly target." });
@@ -605,7 +645,6 @@ function UploadStatementModal({ onClose, onParsed, pushToast }) {
       const parsed = await parseStatementFile(file);
       if (!parsed.length) throw new Error("no rows");
       setBusy(false);
-      pushToast(parsed.length + " transactions imported", "success");
       onParsed(parsed);
     } catch (e) {
       setBusy(false);
@@ -953,6 +992,7 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
   const handleContinue = async (skip) => {
     setSubmitting(true);
     const allParsed = [];
+    let totalSkipped = 0;
     for (const bank of banks) {
       const bal = balanceByBank[bank];
       if (bal.balance || bal.date) {
@@ -972,7 +1012,9 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
         try {
           const parsed = await parseStatementFile(f.rawFile);
           parsed.forEach((t) => { t.bank = bank; });
-          allParsed.push(...parsed);
+          const { kept, skipped } = dedupeTransactions(parsed, allParsed);
+          totalSkipped += skipped;
+          allParsed.push(...kept);
         } catch (e) {
           pushToast("Couldn't read " + f.name + " — " + (e.message || "check the format"), "error");
         }
@@ -982,7 +1024,7 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
     if (allParsed.length) {
       try { saved = await saveTransactionsToDb(userId, null, allParsed); }
       catch (e) { pushToast("Transactions parsed but couldn't be saved to your account", "error"); }
-      pushToast(allParsed.length + " transactions imported", "success");
+      pushToast(allParsed.length + " transaction" + (allParsed.length !== 1 ? "s" : "") + " imported" + (totalSkipped > 0 ? " · " + totalSkipped + " duplicate" + (totalSkipped !== 1 ? "s" : "") + " skipped" : ""), "success");
     }
     setSubmitting(false);
     onDone(filesByBank, balanceByBank, saved);
@@ -1362,8 +1404,16 @@ function SummaryCard({ targets, transactions }) {
     : Object.keys(CATEGORY_MONTHLY).reduce((s, c) => s + CATEGORY_MONTHLY[c][lastIdx], 0);
   const target = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0) || 1;
   const pct = Math.min(100, Math.round((spent / target) * 100));
-  const expectedPct = Math.round((DAYS_INTO_MONTH() / 30) * 100);
-  const overPace = pct > expectedPct;
+  const expectedPct = Math.round((DAYS_INTO_MONTH() / daysInCurrentMonth()) * 100);
+  const dataMonth = (transactions && transactions.length > 0) ? latestMonthKey(transactions) : null;
+  const isCurrentMonth = dataMonth === currentMonthKey();
+  const projected = isCurrentMonth ? projectMonthEnd(spent) : null;
+  const overPace = projected !== null ? projected > target : pct > expectedPct;
+  const paceNote = projected !== null
+    ? (projected > target
+      ? "At this rate you'll spend ~" + formatMoney(projected) + " — " + formatMoney(projected - target) + " over target"
+      : "At this rate you'll spend ~" + formatMoney(projected) + " — " + formatMoney(target - projected) + " under target")
+    : null;
   return (
     <div className="glass-card dash-card">
       <div className="summary-head">
@@ -1379,6 +1429,7 @@ function SummaryCard({ targets, transactions }) {
         <div className="progress-marker" style={{ left: expectedPct + "%" }} />
       </div>
       <p className="summary-note">{pct}% of budget used</p>
+      {paceNote && <p className={"summary-note pace-note " + (overPace ? "pace-note-over" : "pace-note-under")}>{paceNote}</p>}
     </div>
   );
 }
@@ -1401,10 +1452,13 @@ function TransactionFeed({ limit, transactions }) {
     </div>
   );
 }
-function BreakdownCard({ transactions }) {
+function BreakdownCard({ transactions, targets }) {
   let cats;
+  let isCurrentMonth = false;
   if (transactions && transactions.length > 0) {
-    const byCat = spendByCategoryForMonth(transactions, latestMonthKey(transactions));
+    const monthKey = latestMonthKey(transactions);
+    isCurrentMonth = monthKey === currentMonthKey();
+    const byCat = spendByCategoryForMonth(transactions, monthKey);
     cats = Object.entries(byCat).map(([name, amount]) => ({ name, amount, color: catColor(name) })).sort((a, b) => b.amount - a.amount);
   } else {
     const lastIdx = MONTH_LABELS.length - 1;
@@ -1415,12 +1469,23 @@ function BreakdownCard({ transactions }) {
     <div className="glass-card dash-card">
       <span className="card-label">Spending by category</span>
       <div className="category-list">
-        {cats.map((c) => (
-          <div className="category-row" key={c.name}>
-            <div className="category-top"><span className="category-name">{c.name}</span><span className="category-amount">{formatMoney(c.amount)}</span></div>
-            <div className="category-track"><div className="category-fill" style={{ width: (c.amount / total) * 100 + "%", background: c.color }} /></div>
-          </div>
-        ))}
+        {cats.map((c) => {
+          const catTarget = targets && Number(targets[c.name]) > 0 ? Number(targets[c.name]) : null;
+          const catProjected = isCurrentMonth ? projectMonthEnd(c.amount) : null;
+          const showPace = catTarget !== null && catProjected !== null;
+          const over = showPace && catProjected > catTarget;
+          return (
+            <div className="category-row" key={c.name}>
+              <div className="category-top"><span className="category-name">{c.name}</span><span className="category-amount">{formatMoney(c.amount)}</span></div>
+              <div className="category-track"><div className="category-fill" style={{ width: (c.amount / total) * 100 + "%", background: c.color }} /></div>
+              {showPace && (
+                <div className={"category-pace " + (over ? "pace-note-over" : "pace-note-under")}>
+                  Target {formatMoney(catTarget)} · on pace for ~{formatMoney(catProjected)} ({over ? formatMoney(catProjected - catTarget) + " over" : formatMoney(catTarget - catProjected) + " under"})
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1610,7 +1675,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions }) {
   switch (key) {
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
-    case "breakdown": return hasData ? <BreakdownCard transactions={transactions} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+    case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
     case "goals": return <GoalsCard />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
     case "cashflow": return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
@@ -1650,7 +1715,7 @@ function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transacti
 
 function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots }) {
   if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} />;
-  if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
@@ -1875,10 +1940,16 @@ function App() {
   };
 
   const handleAddTransactions = async (list, bankName) => {
-    let saved = list;
-    try { saved = await saveTransactionsToDb(userId, bankName || null, list); }
+    const { kept, skipped } = dedupeTransactions(list, customTransactions);
+    if (!kept.length) {
+      pushToast("All " + list.length + " transactions were already imported — nothing new added", "info");
+      return;
+    }
+    let saved = kept;
+    try { saved = await saveTransactionsToDb(userId, bankName || null, kept); }
     catch (e) { pushToast("Imported, but couldn't save to your account — run the transactions SQL setup", "error"); }
     setCustomTransactions((prev) => [...saved, ...prev]);
+    pushToast(kept.length + " transaction" + (kept.length !== 1 ? "s" : "") + " imported" + (skipped > 0 ? " · " + skipped + " duplicate" + (skipped !== 1 ? "s" : "") + " skipped" : ""), "success");
     runAiFallback(saved);
   };
 
@@ -2350,6 +2421,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
   .pace-good { background: rgba(79, 224, 192, 0.18); color: #4fe0c0; }
   .pace-over { background: rgba(255, 139, 139, 0.18); color: #ff8b8b; }
+  .pace-note { margin-top: 6px; font-weight: 500; }
+  .pace-note-over { color: #ff8b8b; }
+  .pace-note-under { color: #4fe0c0; }
+  .category-pace { font-size: 11px; margin-top: 5px; }
   .summary-amounts { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }
   .summary-spent { color: #fff; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
   .summary-target { color: rgba(255,255,255,0.5); font-size: 13px; }
