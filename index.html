@@ -1667,13 +1667,14 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onLogout, onOpenUpload }) 
     </div>
   );
 }
-function SidePanel({ open, active, setActive }) {
+function SidePanel({ open, active, setActive, isDev, onResetDev }) {
   return (
     <div className={"side-panel " + (open ? "side-panel-open" : "")}>
       <div className="side-panel-label">Views</div>
       {VIEWS.map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
       ))}
+      {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
     </div>
   );
 }
@@ -2147,7 +2148,7 @@ function MainContent({ view, targets, banks, hasData, transactions, overviewSlot
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -2157,7 +2158,7 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} />
+        <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} />
         <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} /></div>
       </div>
       {uploadOpen && (
@@ -2338,6 +2339,7 @@ function App() {
   const [returnStage, setReturnStage] = useState("welcome");
   const [toasts, setToasts] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [isDev, setIsDev] = useState(false);
 
   const pushToast = (message, type) => {
     const id = Date.now() + Math.random();
@@ -2449,6 +2451,7 @@ function App() {
         }
         const uid = session.user.id;
         setUserId(uid);
+        setIsDev(session.user.email === DEV_EMAIL);
         const profile = await fetchProfile(uid);
         if (profile?.name) {
           const bankRows = await fetchBanks(uid);
@@ -2505,6 +2508,7 @@ function App() {
       }
       const uid = signIn.data.user.id;
       setUserId(uid);
+      setIsDev(true);
 
       let profile = await fetchProfile(uid);
       if (!profile?.name) {
@@ -2571,8 +2575,47 @@ function App() {
     }
     pushToast("Bank removed", "info");
   };
+  const resetDevAccount = async () => {
+    if (!userId) return;
+    setCheckingSession(true);
+    try {
+      await supabaseClient.from("transactions").delete().eq("user_id", userId);
+      await supabaseClient.from("targets").delete().eq("user_id", userId);
+      await supabaseClient.from("goals").delete().eq("user_id", userId);
+      await supabaseClient.from("statements").delete().eq("user_id", userId);
+      await supabaseClient.from("banks").delete().eq("user_id", userId);
+      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null });
+      try {
+        const { data: topLevel } = await supabaseClient.storage.from("statements").list(userId);
+        const toRemove = [];
+        for (const entry of (topLevel || [])) {
+          if (entry.id === null || entry.metadata == null) {
+            const { data: sub } = await supabaseClient.storage.from("statements").list(userId + "/" + entry.name);
+            (sub || []).forEach((fx) => toRemove.push(userId + "/" + entry.name + "/" + fx.name));
+          } else {
+            toRemove.push(userId + "/" + entry.name);
+          }
+        }
+        if (toRemove.length) await supabaseClient.storage.from("statements").remove(toRemove);
+      } catch (e) {}
+      setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({});
+      setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
+      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setExtraProfile(null); setShowExtraBanner(false);
+      pushToast("Dev account reset \u2014 starting fresh", "success");
+      setStage("onboarding");
+    } catch (e) {
+      pushToast("Reset failed \u2014 check connection", "error");
+    }
+    setCheckingSession(false);
+  };
+  const handleResetDev = () => {
+    if (window.confirm("Reset the dev account? This deletes all its data and restarts onboarding from scratch.")) {
+      resetDevAccount();
+    }
+  };
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
+    setIsDev(false);
     setUserId(null); setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setStatements([]);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
@@ -2701,6 +2744,8 @@ function App() {
         goals={goals}
         goalsApi={goalsApi}
         accountData={{ statements, bankRows }}
+        isDev={isDev}
+        onResetDev={handleResetDev}
       />
     );
   }
@@ -2906,7 +2951,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .menu-item { font-family: inherit; text-align: left; background: none; border: none; color: #fff; font-size: 14px; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
   .menu-item:hover { background: rgba(255,255,255,0.1); }
   .body-row { display: flex; }
-  .side-panel { width: 0; overflow: hidden; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); position: sticky; top: 65px; align-self: flex-start; z-index: 11; }
+  .side-panel { width: 0; overflow: hidden; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); position: sticky; top: 65px; align-self: flex-start; z-index: 11; display: flex; flex-direction: column; }
+  .side-reset-btn { margin-top: auto; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #ff8b8b; background: rgba(255,139,139,0.1); border: 1px solid rgba(255,139,139,0.35); border-radius: 12px; padding: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .side-reset-btn:hover { background: rgba(255,139,139,0.2); }
   .side-panel-open { width: 220px; padding: 20px 14px; }
   .side-panel-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; padding: 0 8px; white-space: nowrap; }
   .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
