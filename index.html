@@ -213,6 +213,7 @@ function parseCSVLine(line) {
 /* ---------------- Transaction parsing & categorization engine ---------------- */
 
 const TX_CATEGORIES = ["Groceries", "Dining", "Transport", "Shopping", "Subscriptions", "Bills"];
+const ALL_CATEGORIES = [...TX_CATEGORIES, "Income", "Other", "Uncategorized"];
 const CATEGORY_RULES = {
   Groceries: ["waitrose", "carrefour", "spinneys", "lulu", "choithram", "union coop", "west zone", "grandiose", "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "grocery", "supermarket", "hypermarket"],
   Dining: ["restaurant", "cafe", "caffe", "coffee", "costa", "starbucks", "mcdonald", "kfc", "burger", "pizza", "subway", "deliveroo", "talabat", "zomato", "uber eats", "grill", "bakery", "dunkin", "tim hortons", "nando", "shake shack", "five guys", "wagamama", "pret a manger"],
@@ -1644,7 +1645,7 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onLogout, onOpenUpload }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initial = (name[0] || "?").toUpperCase();
   return (
@@ -1660,6 +1661,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onLogout, onOpenUpload }) 
         {menuOpen && (
           <div className="avatar-menu">
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>Settings</button>
+            <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenMapping(); }}>Mapping</button>
             <button className="menu-item" onClick={onLogout}>Log out</button>
           </div>
         )}
@@ -1715,7 +1717,7 @@ function SummaryCard({ targets, transactions }) {
 }
 function DAYS_INTO_MONTH() { return new Date().getDate(); }
 
-function TransactionFeed({ limit, transactions }) {
+function TransactionFeed({ limit, transactions, onRecategorize }) {
   const source = transactions || [];
   const list = limit ? source.slice(0, limit) : source;
   return (
@@ -1724,7 +1726,7 @@ function TransactionFeed({ limit, transactions }) {
       <div className="tx-list">
         {list.map((t, i) => (
           <div className="tx-row" key={i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} · {formatTxDate(t.date)}</span></div>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<select className="cat-select" value={t.category} onChange={(e) => onRecategorize(t.name, e.target.value)}>{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select>) : t.category} · {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -2115,11 +2117,11 @@ function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transacti
   );
 }
 
-function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData }) {
+function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize }) {
   if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />;
   if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
-  if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
+  if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "cashflow") return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
   if (view === "bills") return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
@@ -2128,18 +2130,64 @@ function MainContent({ view, targets, banks, hasData, transactions, overviewSlot
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev }) {
+function MappingScreen({ transactions, onRecategorize, onBack }) {
+  const [query, setQuery] = useState("");
+  const map = {};
+  (transactions || []).forEach((t) => {
+    if (!map[t.name]) map[t.name] = { name: t.name, category: t.category, count: 0, total: 0 };
+    map[t.name].count += 1;
+    if (t.amount < 0) map[t.name].total += Math.abs(t.amount);
+  });
+  let rows = Object.values(map);
+  const q = query.trim().toLowerCase();
+  if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
+  rows.sort((a, b) => b.count - a.count);
+  return (
+    <div className="app-shell stage-fade">
+      <div className="topbar">
+        <div className="topbar-left">
+          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">\u2190</button>
+          <div className="brand">Category Mapping</div>
+        </div>
+      </div>
+      <div className="settings-body">
+        <div className="dash-card settings-section">
+          <span className="card-label">Merchant categories</span>
+          <p className="subtitle" style={{ margin: "8px 0 0" }}>Change a merchant\u2019s category and it updates every transaction with that name \u2014 and applies to future uploads.</p>
+          <input className="glass-input" style={{ marginTop: 12 }} placeholder="Search merchant name\u2026" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <p className="mapping-count">{rows.length} unique merchant{rows.length !== 1 ? "s" : ""}</p>
+          <div className="mapping-list">
+            {rows.length === 0 ? (
+              <p className="subtitle" style={{ margin: 0 }}>No merchants to show yet.</p>
+            ) : rows.map((r) => (
+              <div className="mapping-row" key={r.name}>
+                <div className="mapping-info">
+                  <span className="mapping-name">{r.name}</span>
+                  <span className="mapping-meta">{r.count} txn{r.count !== 1 ? "s" : ""}{r.total > 0 ? " \u00B7 " + formatMoney(r.total) : ""}</span>
+                </div>
+                <select className="cat-select mapping-select" value={r.category} onChange={(e) => onRecategorize(r.name, e.target.value)}>
+                  {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
   return (
     <div className="app-shell stage-fade">
       {showExtraBanner && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} />
-        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} /></div>
+        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} /></div>
       </div>
       {uploadOpen && (
         <UploadStatementModal
@@ -2389,7 +2437,20 @@ function App() {
     return rechecked;
   };
 
+  const recategorizeDescription = async (description, newCategory) => {
+    setCustomTransactions((prev) => prev.map((t) => (t.name === description ? { ...t, category: newCategory } : t)));
+    if (userId) {
+      try {
+        await supabaseClient.from("transactions").update({ category: newCategory }).eq("user_id", userId).eq("description", description);
+      } catch (e) { pushToast("Changed here, but couldn't save to your account", "error"); return; }
+    }
+    pushToast("\u201C" + description + "\u201D \u2192 " + newCategory, "success");
+  };
+
   const handleAddTransactions = async (list, bankName, meta, fileName) => {
+    const overrideMap = {};
+    customTransactions.forEach((t) => { if (!(t.name in overrideMap)) overrideMap[t.name] = t.category; });
+    list.forEach((t) => { const o = overrideMap[t.name]; if (o && o !== "Uncategorized") t.category = o; });
     const { kept, skipped } = dedupeTransactions(list, customTransactions);
     let stmtRow = null;
     if (bankName && meta) {
@@ -2691,6 +2752,8 @@ function App() {
         onSkip={() => { setShowExtraBanner(false); setStage("dashboard"); }}
       />
     );
+  } else if (stage === "mapping") {
+    content = <MappingScreen transactions={customTransactions} onRecategorize={recategorizeDescription} onBack={() => setStage("dashboard")} />;
   } else if (stage === "settings") {
     content = (
       <SettingsScreen
@@ -2712,6 +2775,8 @@ function App() {
         banks={banks}
         hasData={hasData}
         onOpenSettings={() => setStage("settings")}
+        onOpenMapping={() => setStage("mapping")}
+        onRecategorize={recategorizeDescription}
         showExtraBanner={showExtraBanner}
         onCompleteExtra={() => setStage("extraQuestions")}
         onDismissExtra={() => setShowExtraBanner(false)}
@@ -3053,6 +3118,19 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .settings-legal-sep { margin: 0 8px; }
 
   .side-panel-backdrop { display: none; }
+
+  /* category mapping */
+  .cat-select { background: rgba(255,255,255,0.08); color: #8fb4ff; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; font-size: 12px; font-family: inherit; padding: 2px 6px; cursor: pointer; outline: none; max-width: 150px; }
+  .cat-select:hover { background: rgba(79,140,255,0.18); }
+  .cat-select:focus { border-color: rgba(79,140,255,0.7); }
+  .cat-select option { color: #111; }
+  .mapping-count { color: rgba(255,255,255,0.4); font-size: 12px; margin: 12px 0 6px; }
+  .mapping-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; padding-right: 2px; }
+  .mapping-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 14px; }
+  .mapping-info { display: flex; flex-direction: column; overflow: hidden; }
+  .mapping-name { color: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .mapping-meta { color: rgba(255,255,255,0.45); font-size: 12px; }
+  .mapping-select { flex-shrink: 0; font-size: 13px; padding: 6px 8px; }
 
   /* ---------------- mobile responsiveness ---------------- */
   @media (max-width: 640px) {
