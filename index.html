@@ -1717,6 +1717,16 @@ function SummaryCard({ targets, transactions }) {
 }
 function DAYS_INTO_MONTH() { return new Date().getDate(); }
 
+function CategoryEditor({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  if (!open) return (<span className="cat-view">{value} <button className="edit-link" onClick={() => setOpen(true)}>Edit</button></span>);
+  return (
+    <select className="cat-select" autoFocus value={value} onBlur={() => setOpen(false)}
+      onChange={(e) => { onChange(e.target.value); setOpen(false); }}>
+      {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+    </select>
+  );
+}
 function TransactionFeed({ limit, transactions, onRecategorize }) {
   const source = transactions || [];
   const list = limit ? source.slice(0, limit) : source;
@@ -1726,7 +1736,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
       <div className="tx-list">
         {list.map((t, i) => (
           <div className="tx-row" key={i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<select className="cat-select" value={t.category} onChange={(e) => onRecategorize(t.name, e.target.value)}>{ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select>) : t.category} · {formatTxDate(t.date)}</span></div>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(cat) => onRecategorize(t.name, cat)} />) : t.category} \u00B7 {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -2165,9 +2175,7 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
                   <span className="mapping-name">{r.name}</span>
                   <span className="mapping-meta">{r.count} txn{r.count !== 1 ? "s" : ""}{r.total > 0 ? " \u00B7 " + formatMoney(r.total) : ""}</span>
                 </div>
-                <select className="cat-select mapping-select" value={r.category} onChange={(e) => onRecategorize(r.name, e.target.value)}>
-                  {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <CategoryEditor value={r.category} onChange={(cat) => onRecategorize(r.name, cat)} />
               </div>
             ))}
           </div>
@@ -3120,6 +3128,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-panel-backdrop { display: none; }
 
   /* category mapping */
+  .cat-view { display: inline-flex; align-items: center; gap: 6px; }
+  .edit-link { background: none; border: none; color: #8fb4ff; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; text-transform: uppercase; letter-spacing: 0.03em; }
+  .edit-link:hover { text-decoration: underline; }
   .cat-select { background: rgba(255,255,255,0.08); color: #8fb4ff; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; font-size: 12px; font-family: inherit; padding: 2px 6px; cursor: pointer; outline: none; max-width: 150px; }
   .cat-select:hover { background: rgba(79,140,255,0.18); }
   .cat-select:focus { border-color: rgba(79,140,255,0.7); }
