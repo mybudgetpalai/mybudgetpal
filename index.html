@@ -37,6 +37,31 @@ async function fetchBanks(userId) {
   const { data } = await supabaseClient.from("banks").select("*").eq("user_id", userId);
   return data || [];
 }
+function rowToGoal(r) { return { id: r.id, name: r.name, target: Number(r.target_amount) || 0, saved: Number(r.saved_amount) || 0, targetDate: r.target_date || null }; }
+async function fetchGoals(userId) {
+  const { data } = await supabaseClient.from("goals").select("*").eq("user_id", userId).order("created_at", { ascending: true });
+  return (data || []).map(rowToGoal);
+}
+async function addGoalToDb(userId, g) {
+  const { data, error } = await supabaseClient.from("goals").insert({
+    user_id: userId, name: g.name, target_amount: g.target, saved_amount: g.saved || 0, target_date: g.targetDate || null,
+  }).select().single();
+  if (error) throw error;
+  return rowToGoal(data);
+}
+async function updateGoalInDb(id, fields) {
+  const patch = {};
+  if (fields.saved !== undefined) patch.saved_amount = fields.saved;
+  if (fields.name !== undefined) patch.name = fields.name;
+  if (fields.target !== undefined) patch.target_amount = fields.target;
+  if (fields.targetDate !== undefined) patch.target_date = fields.targetDate;
+  const { error } = await supabaseClient.from("goals").update(patch).eq("id", id);
+  if (error) throw error;
+}
+async function deleteGoalFromDb(id) {
+  const { error } = await supabaseClient.from("goals").delete().eq("id", id);
+  if (error) throw error;
+}
 async function fetchTargets(userId) {
   const { data } = await supabaseClient.from("targets").select("*").eq("user_id", userId);
   const obj = {};
@@ -289,6 +314,14 @@ function projectMonthEnd(spentSoFar) {
   const day = new Date().getDate();
   if (day <= 0) return spentSoFar;
   return (spentSoFar / day) * daysInCurrentMonth();
+}
+function monthsUntil(dateStr) {
+  if (!dateStr) return null;
+  const now = new Date();
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d)) return null;
+  const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
+  return Math.max(0, months);
 }
 function topMerchantsFor(txs, k, n) {
   const o = {};
@@ -1490,17 +1523,119 @@ function BreakdownCard({ transactions, targets }) {
     </div>
   );
 }
-function GoalsCard() {
-  const pct = Math.round((SAVINGS_GOAL.current / SAVINGS_GOAL.target) * 100);
+function GoalModal({ onClose, onSave }) {
+  const [name, setName] = useState("");
+  const [target, setTarget] = useState("");
+  const [saved, setSaved] = useState("");
+  const [targetDate, setTargetDate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const canSave = name.trim().length > 0 && Number(target) > 0;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="brand-row" style={{ marginBottom: 12, justifyContent: "space-between" }}>
+          <span className="brand-name">New savings goal</span>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "#fff" }}>×</button>
+        </div>
+        <div className="field-group">
+          <label className="field-label">What are you saving for?</label>
+          <input className="glass-input" type="text" placeholder="e.g. Emergency fund" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="field-group">
+          <label className="field-label">Target amount</label>
+          <div className="target-input-wrap" style={{ width: "100%" }}>
+            <span className="target-currency">£</span>
+            <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="10000" value={target} onChange={(e) => setTarget(e.target.value)} />
+          </div>
+        </div>
+        <div className="field-group">
+          <label className="field-label">Saved so far (optional)</label>
+          <div className="target-input-wrap" style={{ width: "100%" }}>
+            <span className="target-currency">£</span>
+            <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="0" value={saved} onChange={(e) => setSaved(e.target.value)} />
+          </div>
+        </div>
+        <div className="field-group">
+          <label className="field-label">Target date (optional)</label>
+          <input className="glass-input" style={{ padding: "10px 12px", fontSize: 13 }} type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+        </div>
+        <div className="nav-row">
+          <button className="glass-btn primary" disabled={!canSave || busy} onClick={async () => {
+            setBusy(true);
+            await onSave({ name: name.trim(), target: Number(target), saved: Number(saved) || 0, targetDate: targetDate || null });
+            setBusy(false);
+          }}>
+            {busy ? <span className="btn-spinner" /> : "Add goal"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GoalRow({ goal, onUpdate, onDelete }) {
+  const [adding, setAdding] = useState(false);
+  const [addAmount, setAddAmount] = useState("");
+  const pct = goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
+  const remaining = Math.max(0, goal.target - goal.saved);
+  const months = monthsUntil(goal.targetDate);
+  const perMonth = months && months > 0 ? remaining / months : null;
+  const done = goal.saved >= goal.target && goal.target > 0;
+  return (
+    <div className="goal-row">
+      <div className="goal-row-head">
+        <span className="goal-name">{goal.name}</span>
+        <button className="file-remove" onClick={() => onDelete(goal.id)} aria-label="Delete goal">×</button>
+      </div>
+      <div className="summary-amounts" style={{ margin: "4px 0 10px" }}>
+        <span className="summary-spent" style={{ fontSize: 24 }}>{formatMoney(goal.saved)}</span>
+        <span className="summary-target">of {formatMoney(goal.target)}</span>
+      </div>
+      <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill goal-fill" style={{ width: pct + "%" }} /></div>
+      <p className="summary-note" style={{ textAlign: "left" }}>
+        {done ? "Goal reached 🎉" : pct + "% there · " + formatMoney(remaining) + " to go" +
+          (months !== null ? " · " + months + " month" + (months !== 1 ? "s" : "") + " left" : "") +
+          (perMonth !== null && !done ? " · save ~" + formatMoney(perMonth) + "/month to hit it" : "")}
+      </p>
+      {adding ? (
+        <div className="goal-add-row">
+          <div className="target-input-wrap" style={{ flex: 1 }}>
+            <span className="target-currency">£</span>
+            <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="Amount" value={addAmount} onChange={(e) => setAddAmount(e.target.value)} autoFocus />
+          </div>
+          <button className="glass-btn primary goal-add-btn" disabled={!(Number(addAmount) > 0)} onClick={() => {
+            onUpdate(goal.id, { saved: goal.saved + Number(addAmount) });
+            setAddAmount(""); setAdding(false);
+          }}>Add</button>
+          <button className="glass-btn ghost goal-add-btn" onClick={() => { setAdding(false); setAddAmount(""); }}>Cancel</button>
+        </div>
+      ) : (
+        !done && <button className="link-btn inline" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={() => setAdding(true)}>+ Add money</button>
+      )}
+    </div>
+  );
+}
+
+function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const list = goals || [];
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Savings goal</span>
-      <div className="summary-amounts">
-        <span className="summary-spent">{formatMoney(SAVINGS_GOAL.current)}</span>
-        <span className="summary-target">of {formatMoney(SAVINGS_GOAL.target)} · {SAVINGS_GOAL.label}</span>
+      <div className="summary-head">
+        <span className="card-label">Savings goals</span>
+        <button className="extra-banner-btn" onClick={() => setModalOpen(true)}>+ New goal</button>
       </div>
-      <div className="progress-track"><div className="progress-fill goal-fill" style={{ width: pct + "%" }} /></div>
-      <p className="summary-note">{pct}% there · {SAVINGS_GOAL.months} months to go</p>
+      {list.length === 0 ? (
+        <div className="empty-state" style={{ background: "none", border: "none", boxShadow: "none", padding: "26px 0 10px" }}>
+          <div className="empty-icon">◇</div>
+          <p className="empty-text">No goals yet — add your first savings goal and track your progress toward it.</p>
+        </div>
+      ) : (
+        <div className="goal-list">
+          {list.map((g) => <GoalRow key={g.id} goal={g} onUpdate={onUpdate} onDelete={onDelete} />)}
+        </div>
+      )}
+      {modalOpen && <GoalModal onClose={() => setModalOpen(false)} onSave={async (g) => { await onAdd(g); setModalOpen(false); }} />}
     </div>
   );
 }
@@ -1671,12 +1806,12 @@ const OVERVIEW_WIDGETS = [
 ];
 const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "goals"];
 
-function renderOverviewWidget(key, { targets, banks, hasData, transactions }) {
+function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi }) {
   switch (key) {
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
     case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-    case "goals": return <GoalsCard />;
+    case "goals": return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
     case "cashflow": return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
     case "bills": return hasData ? <BillsCard transactions={transactions} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
@@ -1687,7 +1822,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions }) {
   }
 }
 
-function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactions }) {
+function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactions, goals, goalsApi }) {
   return (
     <div className="overview-slot">
       <div className="overview-slot-head">
@@ -1696,27 +1831,27 @@ function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactio
         </select>
       </div>
       <div className="overview-slot-body">
-        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions })}
+        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi })}
       </div>
     </div>
   );
 }
 
-function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transactions }) {
+function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transactions, goals, goalsApi }) {
   const updateSlot = (i, key) => onChangeSlots(slots.map((s, idx) => (idx === i ? key : s)));
   return (
     <div className="overview-grid">
       {slots.map((key, i) => (
-        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} />
+        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} />
       ))}
     </div>
   );
 }
 
-function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots }) {
-  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} />;
+function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi }) {
+  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} />;
   if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-  if (view === "goals") return <GoalsCard />;
+  if (view === "goals") return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "cashflow") return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
@@ -1726,7 +1861,7 @@ function MainContent({ view, targets, banks, hasData, transactions, overviewSlot
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -1737,7 +1872,7 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, showExtraBanner
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} />
-        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} /></div>
+        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} /></div>
       </div>
       {uploadOpen && (
         <UploadStatementModal
@@ -1913,6 +2048,7 @@ function App() {
   const [legalTab, setLegalTab] = useState("privacy");
   const [returnStage, setReturnStage] = useState("welcome");
   const [toasts, setToasts] = useState([]);
+  const [goals, setGoals] = useState([]);
 
   const pushToast = (message, type) => {
     const id = Date.now() + Math.random();
@@ -1937,6 +2073,30 @@ function App() {
       if (Object.keys(idToCat).length) await updateTransactionCategoriesInDb(idToCat);
       pushToast("AI categorized " + Object.keys(idToCat).length + " transactions", "success");
     } catch (e) { /* stays Uncategorized if AI unavailable */ }
+  };
+
+  const goalsApi = {
+    add: async (g) => {
+      try {
+        const saved = await addGoalToDb(userId, g);
+        setGoals((prev) => [...prev, saved]);
+        pushToast("Goal added", "success");
+      } catch (e) {
+        setGoals((prev) => [...prev, { ...g, id: "local-" + Date.now() }]);
+        pushToast("Goal added here, but couldn't save to your account — run the goals SQL setup", "error");
+      }
+    },
+    update: async (id, fields) => {
+      setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...fields } : g)));
+      try { if (!String(id).startsWith("local-")) await updateGoalInDb(id, fields); }
+      catch (e) { pushToast("Couldn't save that change to your account", "error"); }
+    },
+    remove: async (id) => {
+      setGoals((prev) => prev.filter((g) => g.id !== id));
+      pushToast("Goal deleted", "info");
+      try { if (!String(id).startsWith("local-")) await deleteGoalFromDb(id); }
+      catch (e) {}
+    },
   };
 
   const handleAddTransactions = async (list, bankName) => {
@@ -1970,6 +2130,8 @@ function App() {
           const bankRows = await fetchBanks(uid);
           const targetObj = await fetchTargets(uid);
           const txRows = await fetchTransactions(uid);
+          const goalRows = await fetchGoals(uid);
+          setGoals(goalRows);
           setName(profile.name);
           setBanks(bankRows.map((b) => b.bank_name));
           setTargets(targetObj);
@@ -2029,6 +2191,8 @@ function App() {
       const bankRows = await fetchBanks(uid);
       const targetObj = await fetchTargets(uid);
       const txRows = await fetchTransactions(uid);
+      const goalRows = await fetchGoals(uid);
+      setGoals(goalRows);
       profile = await fetchProfile(uid);
       setName(profile?.name || "Shezaad");
       setBanks(bankRows.map((b) => b.bank_name));
@@ -2075,7 +2239,7 @@ function App() {
   };
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
-    setUserId(null); setName(""); setBanks([]); setTargets({}); setUploadedFiles({}); setCustomTransactions([]);
+    setUserId(null); setName(""); setBanks([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setCustomTransactions([]);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
     setStage("landing");
@@ -2114,6 +2278,8 @@ function App() {
               const bankRows = await fetchBanks(uid);
               const targetObj = await fetchTargets(uid);
               const txRows = await fetchTransactions(uid);
+              const goalRows = await fetchGoals(uid);
+              setGoals(goalRows);
               setName(profile.name);
               setBanks(bankRows.map((b) => b.bank_name));
               setTargets(targetObj);
@@ -2191,6 +2357,8 @@ function App() {
         pushToast={pushToast}
         overviewSlots={overviewSlots}
         onChangeOverviewSlots={handleChangeOverviewSlots}
+        goals={goals}
+        goalsApi={goalsApi}
       />
     );
   }
@@ -2685,6 +2853,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px;
   }
   .modal-card { max-width: 420px; }
+
+  /* goals */
+  .goal-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+  .goal-row { display: flex; flex-direction: column; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 14px 16px; }
+  .goal-row-head { display: flex; align-items: center; justify-content: space-between; }
+  .goal-name { color: #fff; font-size: 14px; font-weight: 600; }
+  .goal-add-row { display: flex; gap: 8px; margin-top: 12px; align-items: stretch; }
+  .goal-add-btn { flex: 0 0 auto; padding: 8px 16px; font-size: 13px; border-radius: 12px; }
 
   .toast-stack {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
