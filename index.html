@@ -3104,7 +3104,7 @@ function MainContent({ view, name, targets, banks, hasData, transactions, overvi
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
-function MappingScreen({ transactions, onRecategorize, onBack }) {
+function MappingScreen({ transactions, onRecategorize, onBack, theme }) {
   const [query, setQuery] = useState("");
   const map = {};
   (transactions || []).forEach((t) => {
@@ -3117,7 +3117,7 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
   if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
   rows.sort((a, b) => b.count - a.count);
   return (
-    <div className="app-shell stage-fade">
+    <div className="app-shell stage-fade" data-theme={theme || "midnight"}>
       <div className="topbar">
         <div className="topbar-left">
           <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
@@ -3175,7 +3175,7 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
-function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -3194,7 +3194,7 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
   const viewHasData = demoActive ? true : hasData;
 
   return (
-    <div className="app-shell stage-fade">
+    <div className="app-shell stage-fade" data-theme={theme || "midnight"}>
       {usingDemo && !runTour && (
         <div className="demo-reminder">
           <span className="demo-reminder-text">📊 You’re exploring with <strong>sample data</strong> — these numbers aren’t yours yet.</span>
@@ -3237,7 +3237,14 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
 
 /* ---------------- Settings ---------------- */
 
-function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets }) {
+const THEMES = [
+  { key: "midnight", label: "Midnight", preview: "linear-gradient(135deg,#4f8cff,#7f6bff)" },
+  { key: "ocean", label: "Ocean", preview: "linear-gradient(135deg,#22d3ee,#0891b2)" },
+  { key: "sunset", label: "Sunset", preview: "linear-gradient(135deg,#ff8c42,#ff5e93)" },
+  { key: "forest", label: "Forest", preview: "linear-gradient(135deg,#34d399,#059669)" },
+  { key: "rose", label: "Rose", preview: "linear-gradient(135deg,#f472b6,#a855f7)" },
+];
+function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
@@ -3276,7 +3283,7 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
   };
 
   return (
-    <div className="app-shell stage-fade">
+    <div className="app-shell stage-fade" data-theme={theme || "midnight"}>
       <div className="topbar">
         <div className="topbar-left">
           <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
@@ -3285,6 +3292,19 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
       </div>
 
       <div className="settings-body">
+        <div className="dash-card settings-section">
+          <span className="card-label">App theme</span>
+          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Changes the accent colour of your dashboard. Only you see it — it doesn't affect the public site.</p>
+          <div className="theme-grid">
+            {THEMES.map((t) => (
+              <button key={t.key} className={"theme-swatch" + ((theme || "midnight") === t.key ? " theme-swatch-active" : "")} onClick={() => onChangeTheme(t.key)}>
+                <span className="theme-chip" style={{ background: t.preview }} />
+                <span className="theme-name">{t.label}</span>
+                {(theme || "midnight") === t.key && <span className="theme-tick">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="dash-card settings-section">
           <span className="card-label">Profile</span>
           <div className="field-group" style={{ marginTop: 14 }}>
@@ -3405,6 +3425,7 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [goals, setGoals] = useState([]);
   const [isDev, setIsDev] = useState(false);
+  const [theme, setTheme] = useState("midnight");
   const [runTour, setRunTour] = useState(false);
   const [usingDemo, setUsingDemo] = useState(false);
 
@@ -3558,7 +3579,7 @@ function App() {
           setCustomTransactions(txRows);
           setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-          setOverviewSlots(parseOverviewLayout(profile));
+          setOverviewSlots(parseOverviewLayout(profile)); setTheme((profile && profile.theme) || "midnight");
           setNavViews(parseNavLayout(profile));
           setBillExcludes(parseBillExcludes(profile));
           setStage("dashboard");
@@ -3630,7 +3651,7 @@ function App() {
       setCustomTransactions(txRows);
       setStatements(stmtRows);
       setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-      setOverviewSlots(parseOverviewLayout(profile));
+      setOverviewSlots(parseOverviewLayout(profile)); setTheme((profile && profile.theme) || "midnight");
       setNavViews(parseNavLayout(profile));
       setBillExcludes(parseBillExcludes(profile));
       setStage("dashboard");
@@ -3650,6 +3671,12 @@ function App() {
     setOverviewSlots(newSlots);
     if (userId) {
       supabaseClient.from("profiles").upsert({ id: userId, overview_layout: newSlots }).then(() => {});
+    }
+  };
+  const handleChangeTheme = (t) => {
+    setTheme(t);
+    if (userId) {
+      supabaseClient.from("profiles").upsert({ id: userId, theme: t }).then(() => {});
     }
   };
   const handleChangeNavViews = (newViews) => {
@@ -3775,7 +3802,7 @@ function App() {
               setCustomTransactions(txRows);
               setStatements(stmtRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-              setOverviewSlots(parseOverviewLayout(profile));
+              setOverviewSlots(parseOverviewLayout(profile)); setTheme((profile && profile.theme) || "midnight");
               setNavViews(parseNavLayout(profile));
               setBillExcludes(parseBillExcludes(profile));
               setStage("dashboard");
@@ -3833,7 +3860,7 @@ function App() {
       />
     );
   } else if (stage === "mapping") {
-    content = <MappingScreen transactions={customTransactions} onRecategorize={recategorizeDescription} onBack={() => setStage("dashboard")} />;
+    content = <MappingScreen transactions={customTransactions} onRecategorize={recategorizeDescription} onBack={() => setStage("dashboard")} theme={theme} />;
   } else if (stage === "settings") {
     content = (
       <SettingsScreen
@@ -3845,6 +3872,8 @@ function App() {
         onSaveName={handleSaveName}
         onRemoveBank={handleRemoveBank}
         onSaveTargets={handleSaveTargets}
+        theme={theme}
+        onChangeTheme={handleChangeTheme}
       />
     );
   } else {
@@ -3879,6 +3908,7 @@ function App() {
         onResetDev={handleResetDev}
         runTour={runTour}
         onFinishTour={() => setRunTour(false)}
+        theme={theme}
       />
     );
   }
@@ -3896,6 +3926,41 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
 <style>
   * { box-sizing: border-box; }
+:root {
+    --grad-2: linear-gradient(135deg, #4f8cff, #7f6bff);
+    --grad-3: linear-gradient(135deg, #4f8cff, #b56bff);
+    --grad-nav: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3));
+    --accent-shadow: rgba(79,140,255,0.35);
+    --accent-solid: #4f8cff;
+  }
+  .app-shell[data-theme="ocean"] {
+    --grad-2: linear-gradient(135deg, #22d3ee, #0891b2);
+    --grad-3: linear-gradient(135deg, #22d3ee, #2563eb);
+    --grad-nav: linear-gradient(135deg, rgba(34,211,238,0.3), rgba(37,99,235,0.3));
+    --accent-shadow: rgba(34,211,238,0.35);
+    --accent-solid: #22d3ee;
+  }
+  .app-shell[data-theme="sunset"] {
+    --grad-2: linear-gradient(135deg, #ff8c42, #ff5e93);
+    --grad-3: linear-gradient(135deg, #ffb347, #ff5e93);
+    --grad-nav: linear-gradient(135deg, rgba(255,140,66,0.3), rgba(255,94,147,0.3));
+    --accent-shadow: rgba(255,140,66,0.35);
+    --accent-solid: #ff8c42;
+  }
+  .app-shell[data-theme="forest"] {
+    --grad-2: linear-gradient(135deg, #34d399, #059669);
+    --grad-3: linear-gradient(135deg, #34d399, #0ea5a4);
+    --grad-nav: linear-gradient(135deg, rgba(52,211,153,0.3), rgba(5,150,105,0.3));
+    --accent-shadow: rgba(52,211,153,0.35);
+    --accent-solid: #34d399;
+  }
+  .app-shell[data-theme="rose"] {
+    --grad-2: linear-gradient(135deg, #f472b6, #a855f7);
+    --grad-3: linear-gradient(135deg, #f472b6, #c026d3);
+    --grad-nav: linear-gradient(135deg, rgba(244,114,182,0.3), rgba(168,85,247,0.3));
+    --accent-shadow: rgba(244,114,182,0.35);
+    --accent-solid: #f472b6;
+  }
   body { background: #0b1224; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
 
   .page {
@@ -3987,7 +4052,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   .step { flex: 1; display: flex; flex-direction: column; }
   .brand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
-  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg, #4f8cff, #b56bff); }
+  .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--grad-3); }
   .brand-name { color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
 
   .title { color: #fff; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px; line-height: 1.3; }
@@ -4051,7 +4116,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   .nav-row { display: flex; gap: 12px; margin-top: 24px; }
   .glass-btn { flex: 1; font-family: inherit; font-size: 16px; font-weight: 600; padding: 15px; border-radius: 18px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.22); transition: all 0.18s ease; }
-  .glass-btn.primary { color: #fff; background: linear-gradient(135deg, #4f8cff, #7f6bff); box-shadow: 0 6px 20px rgba(79,140,255,0.35); }
+  .glass-btn.primary { color: #fff; background: var(--grad-2); box-shadow: 0 6px 20px var(--accent-shadow); }
   .glass-btn.primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
   .glass-btn.primary:not(:disabled):hover { filter: brightness(1.08); }
   .glass-btn.ghost { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); flex: 0 0 130px; }
@@ -4123,7 +4188,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .topbar-right { display: flex; align-items: center; gap: 12px; }
   .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; }
   .avatar-wrap { position: relative; }
-  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4f8cff, #b56bff); color: #fff; font-size: 14px; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: #fff; font-size: 14px; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .avatar-menu { position: absolute; top: 44px; right: 0; background: rgba(30, 30, 45, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
   .menu-item { font-family: inherit; text-align: left; background: none; border: none; color: #fff; font-size: 14px; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
   .menu-item:hover { background: rgba(255,255,255,0.1); }
@@ -4138,7 +4203,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-edit-views:hover { color: #8fb4ff; background: rgba(255,255,255,0.08); }
   .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
   .side-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
-  .side-item-active { background: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3)); color: #fff; }
+  .side-item-active { background: var(--grad-nav); color: #fff; }
   .main-content { flex: 1; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: none; }
   .main-content-wide { max-width: none; width: 100%; min-height: calc(100vh - 65px); padding: 20px 24px; overflow-y: auto; }
   .overview-grid { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(320px, auto); gap: 16px; }
@@ -4257,6 +4322,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* settings */
   .back-btn { color: #fff; font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
   .settings-body { max-width: 560px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .theme-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+  .theme-swatch { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 12px 14px; cursor: pointer; font-family: inherit; min-width: 84px; transition: all .15s ease; }
+  .theme-swatch:hover { background: rgba(255,255,255,0.09); }
+  .theme-swatch-active { border-color: #fff; }
+  .theme-chip { width: 44px; height: 44px; border-radius: 50%; }
+  .theme-name { color: #fff; font-size: 13px; font-weight: 500; }
+  .theme-tick { position: absolute; top: 6px; right: 8px; color: #fff; font-size: 12px; font-weight: 700; }
+
   .settings-section { max-width: none; }
   .settings-section-head { display: flex; align-items: center; justify-content: space-between; }
   .settings-bank-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
@@ -4265,7 +4338,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .toggle-row:last-child { border-bottom: none; }
   .switch { width: 42px; height: 24px; border-radius: 999px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; position: relative; padding: 0; }
   .switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; display: block; }
-  .switch-on { background: linear-gradient(135deg, #4f8cff, #7f6bff); }
+  .switch-on { background: var(--grad-2); }
   .switch-on .switch-knob { transform: translateX(18px); }
   .glass-btn.danger { color: #ff8b8b; background: rgba(255,139,139,0.1); border-color: rgba(255,139,139,0.3); }
   .glass-btn.danger:hover { background: rgba(255,139,139,0.18); }
