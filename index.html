@@ -3026,7 +3026,6 @@ const TOUR_COPY = {
   insights: { title: "Insights", body: "We surface notable changes here — a category creeping up, or a goal you're ahead on." },
   empty: { title: "Make it yours", body: "This slot is all yours. When the tour ends, pick any widget from the menu to build your dashboard your way." },
   transactions: { title: "Recent transactions", body: "A quick look at your latest activity." },
-  goals: { title: "Savings goal", body: "Track progress toward a savings goal." },
   trends: { title: "Spending trend", body: "How your spending moves month to month." },
   bills: { title: "Bills & subscriptions", body: "Your recurring payments in one place." },
   accounts: { title: "Bank accounts", body: "Estimated balances across your accounts." },
@@ -3038,7 +3037,6 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
     case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-    case "goals": return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
     case "bills": return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
     case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
