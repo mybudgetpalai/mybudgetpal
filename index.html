@@ -2031,7 +2031,9 @@ function BreakdownPage({ transactions, targets }) {
   }, [txs]);
   const [monthKey, setMonthKey] = useState(monthsWithData[0] || latestMonthKey(txs));
   const [openCat, setOpenCat] = useState(null);
+  const [compareTargets, setCompareTargets] = useState(false);
   const activeKey = monthsWithData.includes(monthKey) ? monthKey : (monthsWithData[0] || monthKey);
+  const isCurrentMonth = activeKey === currentMonthKey();
 
   const byCat = spendByCategoryForMonth(txs, activeKey);
   const prevKey = addMonths(activeKey, -1);
@@ -2043,6 +2045,7 @@ function BreakdownPage({ transactions, targets }) {
 
   const cats = Object.keys(byCat).filter((c) => byCat[c] > 0).sort((a, b) => byCat[b] - byCat[a]);
   const total = cats.reduce((s, c) => s + byCat[c], 0);
+  const topAmount = cats.length ? byCat[cats[0]] : 0;
   const prevTotal = Object.values(byCatPrev).reduce((s, v) => s + v, 0);
   const totalDiff = total - prevTotal;
   const totalPct = prevTotal > 0 ? Math.round((totalDiff / prevTotal) * 100) : null;
@@ -2053,16 +2056,19 @@ function BreakdownPage({ transactions, targets }) {
     .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
     .slice(0, 4);
 
+  const spentTitle = isCurrentMonth ? "You've spent so far in " + monthLabelFromKey(activeKey) : "You spent in " + monthLabelFromKey(activeKey);
+  const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
+
   return (
     <div className="bd-page">
       <div className="glass-card dash-card bd-box">
         <div className="bd-header">
           <div>
-            <span className="card-label">You spent in {monthLabelFromKey(activeKey)}</span>
+            <span className="card-label">{spentTitle}</span>
             <div className="bd-headline">{formatMoney(total)}</div>
             {totalPct !== null && totalDiff !== 0 && (
               <div className={"bd-total-delta " + (totalDiff > 0 ? "delta-up" : "delta-down")}>
-                {totalDiff > 0 ? "\u25b2" : "\u25bc"}{Math.abs(totalPct)}% \u00b7 {formatMoney(Math.abs(totalDiff))} {totalDiff > 0 ? "more" : "less"} than {monthLabelFromKey(prevKey)}
+                {totalDiff > 0 ? "\u25B2" : "\u25BC"}{Math.abs(totalPct)}% &middot; {formatMoney(Math.abs(totalDiff))} {totalDiff > 0 ? "more" : "less"} than {monthLabelFromKey(prevKey)}
               </div>
             )}
             {totalDiff === 0 && prevTotal > 0 && <div className="bd-total-delta delta-flat">About the same as {monthLabelFromKey(prevKey)}</div>}
@@ -2073,67 +2079,90 @@ function BreakdownPage({ transactions, targets }) {
         </div>
       </div>
 
-      <div className="glass-card dash-card bd-box">
-        <span className="bd-box-title">Where your money went</span>
-        <div className="category-list bd-list">
-          {cats.map((name) => {
-            const amount = byCat[name];
-            const color = catColor(name);
-            const sharePct = total > 0 ? Math.round((amount / total) * 100) : 0;
-            const isOpen = openCat === name;
-            const catTxs = txs
-              .filter((t) => t.amount < 0 && t.category === name && t.date.slice(0, 7) === activeKey)
-              .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-            return (
-              <div className="bd-cat" key={name}>
-                <div className={"bd-cat-row" + (isOpen ? " bd-open" : "")} onClick={() => setOpenCat(isOpen ? null : name)}>
-                  <div className="category-top">
-                    <span className="category-name">
-                      <span className="cat-dot" style={{ background: color }} />{name}
-                      <span className="bd-share">\u00b7 {sharePct}%</span>
-                      <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
-                    </span>
-                    <span className="category-amount bd-amt">{formatMoney(amount)}</span>
-                  </div>
-                  <div className="category-track"><div className="category-fill" style={{ width: (total > 0 ? Math.max(4, (amount / byCat[cats[0]]) * 100) : 0) + "%", background: color }} /></div>
-                </div>
-                {isOpen && (
-                  <div className="bd-tx-list">
-                    {catTxs.length === 0 ? (
-                      <div className="bd-tx-empty">No transactions.</div>
-                    ) : catTxs.map((t, i) => (
-                      <div className="bd-tx-row" key={t.id || i}>
-                        <span className="bd-tx-name">{t.name}<span className="bd-tx-date"> \u00b7 {formatTxDate(t.date)}</span></span>
-                        <span className="bd-tx-amt">{formatMoney(Math.abs(t.amount))}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {movers.length > 0 && (
-        <div className="glass-card dash-card bd-box">
-          <span className="bd-box-title">Biggest changes vs usual</span>
-          <div className="bd-movers">
-            {movers.map((m) => {
-              const up = m.diff > 0;
-              const pctv = Math.abs(Math.round((m.diff / m.avg) * 100));
+      <div className="bd-row">
+        <div className="glass-card dash-card bd-box bd-box-where">
+          <div className="bd-box-head">
+            <span className="bd-box-title">{whereTitle}</span>
+            <label className="bd-check">
+              <input type="checkbox" checked={compareTargets} onChange={(e) => setCompareTargets(e.target.checked)} />
+              <span>Compare to targets</span>
+            </label>
+          </div>
+          <div className="category-list bd-list">
+            {cats.map((name) => {
+              const amount = byCat[name];
+              const color = catColor(name);
+              const sharePct = total > 0 ? Math.round((amount / total) * 100) : 0;
+              const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
+              const isOpen = openCat === name;
+              let fillPct, fillColor, amtLabel, noTarget = false;
+              if (compareTargets) {
+                if (budget > 0) {
+                  const over = amount > budget;
+                  fillPct = Math.min(100, (amount / budget) * 100);
+                  fillColor = over ? "#ff8b8b" : color;
+                  amtLabel = formatMoney(amount) + " / " + formatMoney(budget);
+                } else {
+                  fillPct = 0; fillColor = color; amtLabel = formatMoney(amount); noTarget = true;
+                }
+              } else {
+                fillPct = topAmount > 0 ? Math.max(4, (amount / topAmount) * 100) : 0;
+                fillColor = color; amtLabel = formatMoney(amount);
+              }
+              const catTxs = txs
+                .filter((t) => t.amount < 0 && t.category === name && t.date.slice(0, 7) === activeKey)
+                .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
               return (
-                <div className="bd-mover" key={m.name}>
-                  <span className="category-name"><span className="cat-dot" style={{ background: catColor(m.name) }} />{m.name}</span>
-                  <span className={"bd-mover-delta " + (up ? "delta-up" : "delta-down")}>
-                    {up ? "\u25b2" : "\u25bc"} {pctv}% {up ? "higher" : "lower"} \u00b7 {formatMoney(Math.abs(m.diff))} {up ? "more" : "less"} than usual
-                  </span>
+                <div className="bd-cat" key={name}>
+                  <div className={"bd-cat-row" + (isOpen ? " bd-open" : "")} onClick={() => setOpenCat(isOpen ? null : name)}>
+                    <div className="category-top">
+                      <span className="category-name">
+                        <span className="cat-dot" style={{ background: color }} />{name}
+                        <span className="bd-share">&middot; {sharePct}%</span>
+                        <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
+                      </span>
+                      <span className="category-amount bd-amt">{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
+                    </div>
+                    <div className="category-track"><div className="category-fill" style={{ width: fillPct + "%", background: fillColor }} /></div>
+                  </div>
+                  {isOpen && (
+                    <div className="bd-tx-list">
+                      {catTxs.length === 0 ? (
+                        <div className="bd-tx-empty">No transactions.</div>
+                      ) : catTxs.map((t, i) => (
+                        <div className="bd-tx-row" key={t.id || i}>
+                          <span className="bd-tx-name">{t.name}<span className="bd-tx-date"> &middot; {formatTxDate(t.date)}</span></span>
+                          <span className="bd-tx-amt">{formatMoney(Math.abs(t.amount))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
-      )}
+
+        {movers.length > 0 && (
+          <div className="glass-card dash-card bd-box bd-box-trend">
+            <span className="bd-box-title">Trend analysis</span>
+            <div className="bd-movers">
+              {movers.map((m) => {
+                const up = m.diff > 0;
+                const pctv = Math.abs(Math.round((m.diff / m.avg) * 100));
+                return (
+                  <div className="bd-mover" key={m.name}>
+                    <span className="category-name"><span className="cat-dot" style={{ background: catColor(m.name) }} />{m.name}</span>
+                    <span className={"bd-mover-delta " + (up ? "delta-up" : "delta-down")}>
+                      {up ? "\u25B2" : "\u25BC"} {pctv}% {up ? "higher" : "lower"} &middot; {formatMoney(Math.abs(m.diff))} {up ? "more" : "less"} than usual
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -3846,6 +3875,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
   .bd-box { max-width: none; }
   .bd-box-title { color: #fff; font-size: 15px; font-weight: 600; display: block; margin-bottom: 4px; }
+  .bd-row { display: flex; gap: 16px; align-items: flex-start; }
+  .bd-box-where { flex: 1 1 58%; min-width: 280px; }
+  .bd-box-trend { flex: 1 1 34%; min-width: 240px; }
+  .bd-box-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bd-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.7); cursor: pointer; user-select: none; }
+  .bd-check input { width: 15px; height: 15px; accent-color: #4f8cff; cursor: pointer; }
+  .bd-notarget { color: rgba(255,255,255,0.35); font-weight: 400; font-size: 12px; }
   .bd-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .bd-headline { color: #fff; font-size: 30px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
@@ -3872,6 +3908,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-movers { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
   .bd-mover { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
   .bd-mover-delta { font-size: 13px; font-weight: 500; }
+
+  @media (max-width: 720px) { .bd-row { flex-direction: column; } .bd-box-where, .bd-box-trend { flex: 1 1 auto; width: 100%; min-width: 0; } }
 
   /* settings */
   .back-btn { color: #fff; font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
