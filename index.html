@@ -73,6 +73,13 @@ async function fetchTargets(userId, monthKey) {
   if (months.length) { obj = pick(months[months.length - 1]); if (Object.keys(obj).length) return obj; }
   const legacy = {}; rows.filter((r) => !r.month).forEach((r) => { legacy[r.category] = r.monthly_target; }); return legacy;
 }
+async function fetchAllTargets(userId) {
+  const { data } = await supabaseClient.from("targets").select("*").eq("user_id", userId);
+  const rows = data || [];
+  const map = {};
+  rows.forEach((r) => { const k = r.month || null; if (!k) return; (map[k] = map[k] || {})[r.category] = r.monthly_target; });
+  return map;
+}
 function parseOverviewLayout(profile) {
   const valid = OVERVIEW_WIDGETS.map((w) => w.key);
   const raw = profile?.overview_layout;
@@ -122,6 +129,8 @@ const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "
 const VIEWS = [
   { key: "overview", label: "Overview" },
   { key: "breakdown", label: "Spending Breakdown" },
+  { key: "monthlyreview", label: "Monthly Review" },
+  { key: "longterm", label: "Long-Term Plan" },
   { key: "transactions", label: "Transactions" },
   { key: "trends", label: "Trends" },
   { key: "bills", label: "Bills & Subscriptions" },
@@ -339,6 +348,27 @@ function currentMonthKey() {
 }
 function currentMonthName() {
   return new Date().toLocaleString("en-US", { month: "long" });
+}
+function completedMonthsWithData(txs) {
+  const set = new Set((txs || []).filter((t) => t.date).map((t) => t.date.slice(0, 7)));
+  return [...set].filter((k) => k < currentMonthKey()).sort();
+}
+function typicalIncome(txs, uptoKey) {
+  const keys = [...new Set((txs || []).filter((t) => t.date).map((t) => t.date.slice(0, 7)))].filter((k) => !uptoKey || k <= uptoKey).sort();
+  const vals = keys.map((k) => incomeForMonth(txs, k)).filter((v) => v > 0);
+  if (!vals.length) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+function totalEstimatedBalance(banks, accountData, txs) {
+  const statements = (accountData && accountData.statements) || [];
+  const bankRows = (accountData && accountData.bankRows) || [];
+  let total = 0, any = false;
+  (banks || []).forEach((b) => {
+    const row = bankRows.find((r) => r.bank_name === b);
+    const bal = computeBankBalance(b, statements, txs, row);
+    if (bal !== null) { total += bal; any = true; }
+  });
+  return any ? total : null;
 }
 function daysInCurrentMonth() {
   const d = new Date();
@@ -2403,6 +2433,205 @@ function InsightsCard({ transactions, targets }) {
   );
 }
 
+function MonthlyReviewCard({ transactions, allTargets }) {
+  const txs = transactions || [];
+  const done = completedMonthsWithData(txs);
+  const [monthKey, setMonthKey] = useState(done.length ? done[done.length - 1] : currentMonthKey());
+  if (!done.length) return <EmptyState text="Your monthly review appears once a month has finished. Upload statements covering a completed month to see how you did versus your plan." />;
+  const budgets = (allTargets && allTargets[monthKey]) || {};
+  const hasBudget = TX_CATEGORIES.some((c) => Number(budgets[c]) > 0);
+  const byCat = spendByCategoryForMonth(txs, monthKey);
+  const actualSpend = Math.round(spendForMonth(txs, monthKey));
+  const actualIncome = Math.round(incomeForMonth(txs, monthKey));
+  const plannedSpend = Math.round(TX_CATEGORIES.reduce((s, c) => s + (Number(budgets[c]) || 0), 0));
+  let plannedIncome = Math.round(typicalIncome(txs, addMonths(monthKey, -1)));
+  if (!plannedIncome) plannedIncome = actualIncome;
+  const actualNet = actualIncome - actualSpend;
+  const plannedNet = plannedIncome - plannedSpend;
+  const label = monthLabelFromKey(monthKey) + " " + monthKey.slice(0, 4);
+  const spendDiff = actualSpend - plannedSpend;
+  const incomeDiff = actualIncome - plannedIncome;
+  const netDiff = actualNet - plannedNet;
+
+  return (
+    <div className="review-wrap">
+      <div className="glass-card dash-card">
+        <div className="summary-head">
+          <span className="card-label">Monthly review</span>
+          <select className="slot-select" value={monthKey} onChange={(e) => setMonthKey(e.target.value)}>
+            {done.slice().reverse().map((k) => <option key={k} value={k}>{monthLabelFromKey(k) + " " + k.slice(0, 4)}</option>)}
+          </select>
+        </div>
+        <p className="subtitle" style={{ margin: "2px 0 14px" }}>How {label} actually turned out, next to what you planned.</p>
+        <div className="review-cards">
+          <div className={"review-tile " + (spendDiff <= 0 ? "rt-good" : "rt-bad")}>
+            <span className="rt-label">You spent</span>
+            <span className="rt-actual">{formatMoney(actualSpend)}</span>
+            <span className="rt-planned">planned {hasBudget ? formatMoney(plannedSpend) : "\u2014"}</span>
+            {hasBudget && <span className="rt-verdict">{spendDiff <= 0 ? formatMoney(-spendDiff) + " under budget \ud83c\udf89" : formatMoney(spendDiff) + " over budget"}</span>}
+          </div>
+          <div className={"review-tile " + (incomeDiff >= 0 ? "rt-good" : "rt-bad")}>
+            <span className="rt-label">You earned</span>
+            <span className="rt-actual">{formatMoney(actualIncome)}</span>
+            <span className="rt-planned">typical {formatMoney(plannedIncome)}</span>
+            <span className="rt-verdict">{incomeDiff >= 0 ? formatMoney(incomeDiff) + " more than usual" : formatMoney(-incomeDiff) + " less than usual"}</span>
+          </div>
+          <div className={"review-tile " + (netDiff >= 0 ? "rt-good" : "rt-bad")}>
+            <span className="rt-label">Left over</span>
+            <span className="rt-actual">{formatMoney(actualNet)}</span>
+            <span className="rt-planned">planned {hasBudget ? formatMoney(plannedNet) : "\u2014"}</span>
+            {hasBudget && <span className="rt-verdict">{netDiff >= 0 ? formatMoney(netDiff) + " better than plan" : formatMoney(-netDiff) + " worse than plan"}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-card dash-card">
+        <span className="card-label">By category</span>
+        {!hasBudget ? (
+          <p className="subtitle" style={{ margin: "10px 0 0" }}>You didn't set budgets for {label}, so there's nothing to compare against. Set budgets in Settings to unlock the full review.</p>
+        ) : (
+          <div className="review-table">
+            <div className="review-row review-head">
+              <span>Category</span><span>Planned</span><span>Actual</span><span>Difference</span>
+            </div>
+            {TX_CATEGORIES.map((c) => {
+              const b = Number(budgets[c]) || 0;
+              const a = Math.round(byCat[c] || 0);
+              const d = a - b;
+              const over = d > 0;
+              return (
+                <div className="review-row" key={c}>
+                  <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
+                  <span>{formatMoney(b)}</span>
+                  <span>{formatMoney(a)}</span>
+                  <span className={over ? "rv-over" : "rv-under"}>{b === 0 ? "\u2014" : (over ? "+" + formatMoney(d) + " over" : formatMoney(-d) + " under")}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LongTermPlanCard({ transactions, allTargets, banks, accountData }) {
+  const txs = transactions || [];
+  const past = completedMonthsWithData(txs);
+  const [horizon, setHorizon] = useState(6);
+  if (!past.length) return <EmptyState text="Your long-term plan appears once we have at least one finished month. Upload a few months of statements and set budgets to project where you're heading." />;
+
+  const balNow = totalEstimatedBalance(banks, accountData, txs);
+  const haveBalance = balNow !== null;
+  const plannedIncome = Math.round(typicalIncome(txs, null)) || 0;
+  const latestBudget = (() => {
+    const keys = allTargets ? Object.keys(allTargets).sort() : [];
+    for (let i = keys.length - 1; i >= 0; i--) { const t = TX_CATEGORIES.reduce((s, c) => s + (Number(allTargets[keys[i]][c]) || 0), 0); if (t > 0) return t; }
+    return null;
+  })();
+  const avgActualSpend = Math.round(past.map((k) => spendForMonth(txs, k)).reduce((a, b) => a + b, 0) / past.length);
+  const plannedSpendFor = (k) => {
+    const o = allTargets && allTargets[k];
+    if (o) { const t = TX_CATEGORIES.reduce((s, c) => s + (Number(o[c]) || 0), 0); if (t > 0) return t; }
+    return latestBudget != null ? latestBudget : avgActualSpend;
+  };
+
+  const curKey = currentMonthKey();
+  const future = [];
+  let fk = curKey;
+  for (let i = 0; i < horizon; i++) { future.push(fk); fk = addMonths(fk, 1); }
+
+  const pastRows = past.map((k) => {
+    const inc = Math.round(incomeForMonth(txs, k));
+    const out = Math.round(spendForMonth(txs, k));
+    return { key: k, type: "actual", inc, out, net: inc - out, plannedNet: plannedIncome - plannedSpendFor(k) };
+  });
+  const futureRows = future.map((k) => {
+    const out = Math.round(plannedSpendFor(k));
+    return { key: k, type: "forecast", inc: plannedIncome, out, net: plannedIncome - out, plannedNet: plannedIncome - out };
+  });
+
+  const sumPastNet = pastRows.reduce((s, r) => s + r.net, 0);
+  const startBal = (haveBalance ? balNow : 0) - sumPastNet;
+  let run = startBal;
+  const rows = [...pastRows, ...futureRows].map((r) => { run += r.net; return { ...r, bal: Math.round(run) }; });
+
+  const endBal = rows.length ? rows[rows.length - 1].bal : Math.round(startBal);
+  const sumPlannedNetAll = rows.reduce((s, r) => s + r.plannedNet, 0);
+  const originalEnd = Math.round(startBal + sumPlannedNetAll);
+  const ahead = endBal - originalEnd;
+  const lastFuture = future[future.length - 1];
+  const horizonLabel = monthLabelFromKey(lastFuture) + " " + lastFuture.slice(0, 4);
+  const word = haveBalance ? "balance" : "total saved";
+
+  const bals = rows.map((r) => r.bal);
+  const minB = Math.min(...bals, 0), maxB = Math.max(...bals, 1);
+  const span = (maxB - minB) || 1;
+
+  return (
+    <div className="review-wrap">
+      <div className="glass-card dash-card">
+        <div className="summary-head">
+          <span className="card-label">Long-term plan</span>
+          <select className="slot-select" value={horizon} onChange={(e) => setHorizon(Number(e.target.value))}>
+            <option value={3}>Next 3 months</option>
+            <option value={6}>Next 6 months</option>
+            <option value={12}>Next 12 months</option>
+          </select>
+        </div>
+        <div className="plan-headline">
+          <span className="plan-big">{formatMoney(endBal)}</span>
+          <span className="plan-sub">projected {word} by {horizonLabel}</span>
+        </div>
+        <div className={"plan-verdict " + (ahead >= 0 ? "rt-good" : "rt-bad")}>
+          {ahead >= 0
+            ? "You're about " + formatMoney(ahead) + " ahead of your original plan \u2014 keep it up!"
+            : "You're about " + formatMoney(-ahead) + " behind your original plan."}
+        </div>
+        <p className="subtitle" style={{ margin: "10px 0 0" }}>
+          This takes what you actually earned and spent each finished month, then assumes future months follow your budgets{plannedIncome ? " and your typical income" : ""}.{!haveBalance ? " Add your account balances in Settings to see this as a real balance instead of total saved." : ""}
+        </p>
+      </div>
+
+      <div className="glass-card dash-card">
+        <span className="card-label">Projected {word} over time</span>
+        <div className="trend-chart">
+          {rows.map((r) => (
+            <div className="trend-bar-col" key={r.key}>
+              <div className="trend-bar-wrap">
+                <div className={"trend-bar " + (r.type === "forecast" ? "plan-bar-forecast" : "plan-bar-actual")} style={{ height: (((r.bal - minB) / span) * 100) + "%" }} title={formatMoney(r.bal)} />
+              </div>
+              <span className="trend-bar-label">{monthLabelFromKey(r.key)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="legend-row">
+          <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Actual so far</span>
+          <span className="legend-item"><span className="legend-dot" style={{ background: "#4f8cff" }} />Forecast</span>
+        </div>
+      </div>
+
+      <div className="glass-card dash-card">
+        <span className="card-label">Month by month</span>
+        <div className="review-table plan-table">
+          <div className="review-row review-head plan-grid">
+            <span>Month</span><span>In</span><span>Out</span><span>Net</span><span>{haveBalance ? "Balance" : "Saved"}</span>
+          </div>
+          {rows.map((r) => (
+            <div className={"review-row plan-grid " + (r.type === "forecast" ? "plan-forecast-row" : "")} key={r.key}>
+              <span className="plan-month">{monthLabelFromKey(r.key)}<span className="plan-tag">{r.type === "forecast" ? "forecast" : "actual"}</span></span>
+              <span>{formatMoney(r.inc)}</span>
+              <span>{formatMoney(r.out)}</span>
+              <span className={r.net >= 0 ? "rv-under" : "rv-over"}>{formatMoney(r.net)}</span>
+              <span>{formatMoney(r.bal)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ text }) {
   return (
     <div className="glass-card dash-card empty-state">
@@ -2489,7 +2718,7 @@ function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks,
   );
 }
 
-function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude }) {
+function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets }) {
   if (view === "overview") return (
     <>
       <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
@@ -2497,6 +2726,8 @@ function MainContent({ view, name, targets, banks, hasData, transactions, overvi
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
+  if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "bills") return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} onToggleExclude={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
@@ -2548,7 +2779,7 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
     </div>
   );
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -2570,7 +2801,7 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} /></div>
+        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -2759,6 +2990,7 @@ function App() {
   const [bankRows, setBankRows] = useState([]);
   const [overviewSlots, setOverviewSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
+  const [allTargets, setAllTargets] = useState({});
   const [billExcludes, setBillExcludes] = useState([]);
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
@@ -2904,7 +3136,7 @@ function App() {
           setName(profile.name);
           setBanks(bankRows.map((b) => b.bank_name));
           setBankRows(bankRows);
-          setTargets(targetObj);
+          setTargets(targetObj); fetchAllTargets(uid).then(setAllTargets).catch(() => {});
           setCustomTransactions(txRows);
           setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
@@ -2976,7 +3208,7 @@ function App() {
       setName(profile?.name || "Shezaad");
       setBanks(bankRows.map((b) => b.bank_name));
       setBankRows(bankRows);
-      setTargets(targetObj);
+      setTargets(targetObj); fetchAllTargets(uid).then(setAllTargets).catch(() => {});
       setCustomTransactions(txRows);
       setStatements(stmtRows);
       setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
@@ -3016,6 +3248,7 @@ function App() {
   const handleSaveTargets = async (newTargets) => {
     const cleaned = Object.fromEntries(Object.entries(newTargets).map(([c, v]) => [c, Number(v) || 0]));
     setTargets(cleaned);
+    setAllTargets((prev) => ({ ...prev, [currentMonthKey()]: cleaned }));
     if (userId) {
       const key = currentMonthKey();
       try {
@@ -3120,11 +3353,13 @@ function App() {
               setName(profile.name);
               setBanks(bankRows.map((b) => b.bank_name));
               setBankRows(bankRows);
-              setTargets(targetObj);
+              setTargets(targetObj); fetchAllTargets(uid).then(setAllTargets).catch(() => {});
               setCustomTransactions(txRows);
               setStatements(stmtRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
               setOverviewSlots(parseOverviewLayout(profile));
+              setNavViews(parseNavLayout(profile));
+              setBillExcludes(parseBillExcludes(profile));
               setStage("dashboard");
             } else {
               setStage("onboarding");
@@ -3165,7 +3400,7 @@ function App() {
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} onDone={() => setStage("targets")} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onDone={(t) => { setTargets(t); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onDone={(t) => { setTargets(t); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -3211,6 +3446,7 @@ function App() {
         onChangeOverviewSlots={handleChangeOverviewSlots}
         navViews={navViews}
         onChangeNavViews={handleChangeNavViews}
+        allTargets={allTargets}
         billExcludes={billExcludes}
         onToggleBillExclude={handleToggleBillExclude}
         goals={goals}
@@ -3867,6 +4103,39 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bill-remove:hover { background: rgba(255,139,139,0.25); }
   .bill-excluded { margin-top: 6px; opacity: 0.85; }
   .insights-merchants { margin-top: 4px; }
+
+  /* ---- added: monthly review & long-term plan ---- */
+  .review-wrap { display: flex; flex-direction: column; gap: 16px; }
+  .review-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 4px; }
+  .review-tile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); }
+  .review-tile.rt-good { border-color: rgba(79,224,192,0.4); }
+  .review-tile.rt-bad { border-color: rgba(255,139,139,0.4); }
+  .rt-label { color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .rt-actual { color: #fff; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .rt-planned { color: rgba(255,255,255,0.5); font-size: 12px; }
+  .rt-verdict { font-size: 12px; font-weight: 600; margin-top: 4px; }
+  .rt-good .rt-verdict { color: #4fe0c0; }
+  .rt-bad .rt-verdict { color: #ff8b8b; }
+  .review-table { display: flex; flex-direction: column; margin-top: 10px; }
+  .review-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1.3fr; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px; color: rgba(255,255,255,0.85); }
+  .review-head { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+  .review-cat { display: flex; align-items: center; }
+  .rv-over { color: #ff8b8b; font-weight: 600; }
+  .rv-under { color: #4fe0c0; font-weight: 600; }
+  .plan-headline { display: flex; flex-direction: column; margin: 12px 0 8px; }
+  .plan-big { color: #fff; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; }
+  .plan-sub { color: rgba(255,255,255,0.6); font-size: 13px; }
+  .plan-verdict { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 12px; }
+  .plan-verdict.rt-good { background: rgba(79,224,192,0.12); color: #4fe0c0; }
+  .plan-verdict.rt-bad { background: rgba(255,139,139,0.12); color: #ff8b8b; }
+  .plan-grid { grid-template-columns: 1.4fr 1fr 1fr 1fr 1.1fr; }
+  .plan-month { display: flex; flex-direction: column; }
+  .plan-tag { font-size: 10px; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.04em; }
+  .plan-forecast-row .plan-tag { color: #8fb4ff; }
+  .plan-bar-actual { background: #4fe0c0 !important; }
+  .plan-bar-forecast { background: #4f8cff !important; }
+  .plan-table { max-height: 340px; overflow-y: auto; }
+  @media (max-width: 560px) { .review-cards { grid-template-columns: 1fr; } }
 
 </style>
 </body>
