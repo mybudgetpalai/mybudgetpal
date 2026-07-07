@@ -62,11 +62,16 @@ async function deleteGoalFromDb(id) {
   const { error } = await supabaseClient.from("goals").delete().eq("id", id);
   if (error) throw error;
 }
-async function fetchTargets(userId) {
+async function fetchTargets(userId, monthKey) {
   const { data } = await supabaseClient.from("targets").select("*").eq("user_id", userId);
-  const obj = {};
-  (data || []).forEach((row) => { obj[row.category] = row.monthly_target; });
-  return obj;
+  const rows = data || [];
+  const key = monthKey || (new Date().toISOString().slice(0, 7));
+  const pick = (k) => { const o = {}; rows.filter((r) => (r.month || null) === k).forEach((r) => { o[r.category] = r.monthly_target; }); return o; };
+  let obj = pick(key);
+  if (Object.keys(obj).length) return obj;
+  const months = [...new Set(rows.map((r) => r.month).filter(Boolean))].sort();
+  if (months.length) { obj = pick(months[months.length - 1]); if (Object.keys(obj).length) return obj; }
+  const legacy = {}; rows.filter((r) => !r.month).forEach((r) => { legacy[r.category] = r.monthly_target; }); return legacy;
 }
 function parseOverviewLayout(profile) {
   const valid = OVERVIEW_WIDGETS.map((w) => w.key);
@@ -281,6 +286,22 @@ function spendByCategoryForMonth(txs, k) {
   return o;
 }
 function catColor(c) { return CATEGORY_COLORS[c] || "#9aa4b8"; }
+function addMonths(key, n) { let y = +key.slice(0, 4), m = +key.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + "-" + pad2(m); }
+function isMidMonth() { const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return d.getDate() < last; }
+function avgSpendByCategory(transactions) {
+  const out = {};
+  const has = transactions && transactions.length > 0;
+  const keys = has ? lastNMonthKeys(latestMonthKey(transactions), 3) : [];
+  const perMonth = keys.map((k) => spendByCategoryForMonth(transactions, k));
+  TX_CATEGORIES.forEach((c) => {
+    if (!has) { out[c] = CATEGORY_MONTHLY[c] ? CATEGORY_MONTHLY[c][CATEGORY_MONTHLY[c].length - 1] : 0; return; }
+    const vals = perMonth.map((o) => o[c] || 0);
+    const nz = vals.filter((v) => v > 0);
+    const base = nz.length ? nz.reduce((a, b) => a + b, 0) / nz.length : 0;
+    out[c] = Math.round(base);
+  });
+  return out;
+}
 
 /* Deduplication: key = date + description + amount. Handles genuine same-day
    identical transactions by only skipping as many copies as already exist. */
@@ -1321,32 +1342,6 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
                 onAdd={(fl) => addFiles(b, fl)}
                 onRemove={(id) => removeFile(b, id)}
               />
-              <div className="balance-row">
-                <div className="balance-field">
-                  <label className="field-label">Starting balance</label>
-                  <div className="target-input-wrap" style={{ width: "100%" }}>
-                    <span className="target-currency">£</span>
-                    <input
-                      className="target-input"
-                      style={{ width: "100%" }}
-                      type="number"
-                      placeholder="0"
-                      value={balanceByBank[b].balance}
-                      onChange={(e) => setBalance(b, "balance", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="balance-field">
-                  <label className="field-label">As of date</label>
-                  <input
-                    className="glass-input"
-                    style={{ padding: "10px 12px", fontSize: 13, marginTop: 4 }}
-                    type="date"
-                    value={balanceByBank[b].date}
-                    onChange={(e) => setBalance(b, "date", e.target.value)}
-                  />
-                </div>
-              </div>
             </div>
           ))}
         </div>
@@ -1364,35 +1359,206 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
 
 /* ---------------- Processing simulation ---------------- */
 
-function ProcessingScreen({ onDone }) {
+function ProcessingScreen({ onDone, transactions }) {
+  const sample = React.useMemo(() => {
+    const spend = (transactions || []).filter((t) => t.amount < 0 && t.name);
+    const seen = new Set();
+    const uniq = [];
+    for (const t of spend) {
+      const k = t.name.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k); uniq.push(t);
+      if (uniq.length >= 10) break;
+    }
+    if (uniq.length < 4) {
+      const demo = [
+        { name: "SPINNEYS DUBAI", category: "Groceries", amount: -184 },
+        { name: "CAREEM RIDE", category: "Transport", amount: -32 },
+        { name: "NETFLIX.COM", category: "Subscriptions", amount: -46 },
+        { name: "STARBUCKS", category: "Dining", amount: -28 },
+        { name: "AMAZON.AE", category: "Shopping", amount: -220 },
+        { name: "DEWA", category: "Bills", amount: -310 },
+      ];
+      for (const d of demo) { if (uniq.length >= 6) break; uniq.push(d); }
+    }
+    return uniq;
+  }, [transactions]);
+
+  const [revealed, setRevealed] = useState(0);
   const [pct, setPct] = useState(0);
 
   useEffect(() => {
-    const start = Date.now();
-    const duration = 2400;
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const p = Math.min(100, Math.round((elapsed / duration) * 100));
-      setPct(p);
-      if (p >= 100) {
-        clearInterval(interval);
-        setTimeout(onDone, 300);
+    const total = sample.length || 1;
+    let i = 0;
+    const tick = setInterval(() => {
+      i += 1;
+      setRevealed(Math.min(i, total));
+      setPct(Math.min(100, Math.round((i / total) * 100)));
+      if (i >= total) {
+        clearInterval(tick);
+        setTimeout(onDone, 900);
       }
-    }, 60);
-    return () => clearInterval(interval);
-  }, []);
+    }, 420);
+    return () => clearInterval(tick);
+  }, [sample]);
 
   return (
     <div className="page stage-fade">
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
-      <div className="glass-card processing-card">
+      <div className="glass-card processing-card processing-anim-card">
         <div className="spinner" />
-        <h1 className="title" style={{ marginTop: 20 }}>We're reviewing your data</h1>
-        <p className="subtitle">Matching transactions to categories. This usually takes a few seconds.</p>
-        <div className="progress-track">
+        <h1 className="title" style={{ marginTop: 18 }}>Coding up your transactions</h1>
+        <p className="subtitle">Sorting each one into a category. This usually takes a few seconds.</p>
+
+        <div className="code-feed">
+          {sample.slice(0, revealed).map((t, i) => (
+            <div className="code-row" key={i}>
+              <span className="code-name">{t.name}</span>
+              <span className="code-arrow">→</span>
+              <span className="code-cat" style={{ background: catColor(t.category) + "22", color: catColor(t.category), borderColor: catColor(t.category) + "66" }}>
+                <span className="code-cat-dot" style={{ background: catColor(t.category) }} />
+                {t.category}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="progress-track" style={{ marginTop: 18 }}>
           <div className="progress-fill" style={{ width: pct + "%" }} />
         </div>
         <p className="summary-note">{pct}%</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Confirm one categorization (trust builder) ---------------- */
+
+function ConfirmCategoryScreen({ transactions, onConfirm, onDone }) {
+  const candidate = React.useMemo(() => {
+    const spend = (transactions || []).filter((t) => t.amount < 0 && t.name);
+    const known = (cat) => spend.find((t) => t.category === cat);
+    return known("Groceries") || spend.find((t) => t.category && !["Uncategorized", "Income", "Other"].includes(t.category)) || spend[0]
+      || { name: "SPINNEYS DUBAI", category: "Groceries", amount: -184 };
+  }, [transactions]);
+
+  const [choice, setChoice] = useState(candidate.category && candidate.category !== "Uncategorized" ? candidate.category : "Groceries");
+  const [submitting, setSubmitting] = useState(false);
+  const options = ALL_CATEGORIES.filter((c) => c !== "Uncategorized");
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    try { if (choice !== candidate.category && onConfirm) await onConfirm(candidate.name, choice); } catch (e) {}
+    setSubmitting(false);
+    onDone();
+  };
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card size-md">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        <h1 className="title">Quick check</h1>
+        <p className="subtitle">We sorted your transactions automatically. Help us confirm one so we know we've got it right.</p>
+
+        <div className="confirm-tx-card">
+          <span className="confirm-tx-name">{candidate.name}</span>
+          <span className="confirm-tx-amount">{formatMoney(candidate.amount)}</span>
+        </div>
+
+        <div className="field-group" style={{ marginTop: 16 }}>
+          <label className="field-label">We think this is</label>
+          <div className="target-input-wrap" style={{ width: "100%", padding: "4px 8px" }}>
+            <span className="cat-dot" style={{ background: catColor(choice), marginLeft: 4 }} />
+            <select className="confirm-select" value={choice} onChange={(e) => setChoice(e.target.value)}>
+              {options.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="nav-row">
+          <button className="glass-btn primary" disabled={submitting} onClick={handleConfirm}>
+            {submitting ? <span className="btn-spinner" /> : "Looks right"}
+          </button>
+        </div>
+        <p className="summary-note" style={{ marginTop: 10 }}>You'll be able to review and change any categorisation later.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Opening balance ---------------- */
+
+function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone }) {
+  const perBank = React.useMemo(() => {
+    return banks.map((b) => {
+      const stmts = (statements || []).filter((s) => s.bank === b && s.periodStart).sort((x, y) => (x.periodStart < y.periodStart ? -1 : 1));
+      const first = stmts[0];
+      return { bank: b, start: first ? first.periodStart : null, suggested: first && first.opening !== null && first.opening !== undefined ? first.opening : null };
+    });
+  }, [banks, statements]);
+
+  const [vals, setVals] = useState(() => Object.fromEntries(perBank.map((p) => [p.bank, { balance: p.suggested !== null && p.suggested !== undefined ? String(p.suggested) : "", date: p.start || "" }])));
+  const [submitting, setSubmitting] = useState(false);
+  const setV = (bank, field, value) => setVals((prev) => ({ ...prev, [bank]: { ...prev[bank], [field]: value } }));
+
+  const handleContinue = async () => {
+    setSubmitting(true);
+    for (const p of perBank) {
+      const v = vals[p.bank];
+      if (v && (v.balance !== "" || v.date)) {
+        try {
+          await supabaseClient.from("banks").update({
+            starting_balance: v.balance !== "" ? Number(v.balance) : null,
+            as_of_date: v.date || null,
+          }).eq("user_id", userId).eq("bank_name", p.bank);
+        } catch (e) {}
+      }
+    }
+    setSubmitting(false);
+    onDone(vals);
+  };
+
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card upload-card">
+        <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        <h1 className="title">Your opening balance</h1>
+        <p className="subtitle">What was the balance in each account at the start of the period you uploaded? This anchors your running balance and forecasts.</p>
+
+        <div className="bank-upload-list">
+          {perBank.map((p) => (
+            <div className="bank-upload-block" key={p.bank}>
+              <div className="bank-upload-head">
+                <span className="bank-upload-name">{p.bank}</span>
+                {p.suggested !== null && p.suggested !== undefined && <span className="bank-upload-count count-good">detected from statement</span>}
+              </div>
+              <div className="balance-row">
+                <div className="balance-field">
+                  <label className="field-label">Opening balance</label>
+                  <div className="target-input-wrap" style={{ width: "100%" }}>
+                    <span className="target-currency">£</span>
+                    <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
+                      value={vals[p.bank].balance} onChange={(e) => setV(p.bank, "balance", e.target.value)} />
+                  </div>
+                </div>
+                <div className="balance-field">
+                  <label className="field-label">As of date</label>
+                  <input className="glass-input" style={{ padding: "10px 12px", fontSize: 13, marginTop: 4 }} type="date"
+                    value={vals[p.bank].date} onChange={(e) => setV(p.bank, "date", e.target.value)} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="nav-row">
+          <button className="glass-btn ghost" disabled={submitting} onClick={() => onDone(vals)}>Skip</button>
+          <button className="glass-btn primary" disabled={submitting} onClick={handleContinue}>
+            {submitting ? <span className="btn-spinner" /> : "Continue"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1481,38 +1647,43 @@ function MonthlyBreakdownScreen({ onDone, transactions }) {
 /* ---------------- Target setting ---------------- */
 
 function TargetSettingScreen({ onDone, pushToast, userId, transactions }) {
-  const hasReal = transactions && transactions.length > 0;
-  const realLastMonth = hasReal ? spendByCategoryForMonth(transactions, latestMonthKey(transactions)) : null;
   const categories = TX_CATEGORIES;
-  const lastMonthIndex = MONTH_LABELS.length - 1;
-  const [targets, setTargets] = useState(() =>
-    Object.fromEntries(categories.map((c) => [c, hasReal ? Math.round(realLastMonth[c] || 0) : CATEGORY_MONTHLY[c][lastMonthIndex]]))
-  );
+  const avg = React.useMemo(() => avgSpendByCategory(transactions), [transactions]);
+
+  const months = React.useMemo(() => {
+    const cur = currentMonthKey();
+    const list = [{ key: cur, label: monthLabelFromKey(cur) + (isMidMonth() ? " · this month" : ""), current: true }];
+    for (let i = 1; i <= 6; i++) { const k = addMonths(cur, i); list.push({ key: k, label: monthLabelFromKey(k) + " " + k.slice(0, 4) }); }
+    return list;
+  }, []);
+
+  const [budgets, setBudgets] = useState(() => Object.fromEntries(months.map((m) => [m.key, { ...avg }])));
+  const [activeMonth, setActiveMonth] = useState(months[0].key);
   const [submitting, setSubmitting] = useState(false);
 
-  const setTarget = (c, v) => setTargets((prev) => ({ ...prev, [c]: v }));
-  const totalTarget = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0);
+  const setVal = (c, v) => setBudgets((prev) => ({ ...prev, [activeMonth]: { ...prev[activeMonth], [c]: v } }));
+  const applyToAll = () => {
+    const cur = budgets[activeMonth];
+    setBudgets((prev) => Object.fromEntries(months.map((m) => [m.key, { ...cur }])));
+    pushToast("Applied to all months", "success");
+  };
+  const monthTotal = (k) => categories.reduce((s, c) => s + (Number(budgets[k][c]) || 0), 0);
 
   const handleFinish = async () => {
     setSubmitting(true);
+    const curKey = currentMonthKey();
+    const rows = [];
+    months.forEach((m) => categories.forEach((c) => rows.push({ user_id: userId, category: c, month: m.key, monthly_target: Number(budgets[m.key][c]) || 0 })));
     try {
-      const rows = categories.map((c) => ({ user_id: userId, category: c, monthly_target: Number(targets[c]) || 0 }));
+      await supabaseClient.from("targets").delete().eq("user_id", userId).in("month", months.map((m) => m.key));
       const { error } = await supabaseClient.from("targets").insert(rows);
-      const saved = await fetchTargets(userId);
-      const targetsOk = categories.every((c) => saved[c] !== undefined);
-      if (error || !targetsOk) {
-        pushToast("Couldn't save targets: " + (error?.message || "check targets table permissions"), "error");
-        setSubmitting(false);
-        return;
-      }
-      pushToast("Targets saved", "success");
+      if (error) throw error;
+      pushToast("Budgets saved", "success");
     } catch (e) {
-      pushToast("Couldn't save targets: " + (e?.message || "please try again"), "error");
-      setSubmitting(false);
-      return;
+      pushToast("Couldn't save budgets — make sure your targets table has a 'month' column", "error");
     }
     setSubmitting(false);
-    onDone(targets);
+    onDone(budgets[curKey] || budgets[months[0].key]);
   };
 
   return (
@@ -1520,8 +1691,17 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions }) {
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card target-card">
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
-        <h1 className="title">Set your monthly targets</h1>
-        <p className="subtitle">We've pre-filled these based on last month. Adjust as you like.</p>
+        <h1 className="title">Set your budgets</h1>
+        <p className="subtitle">Pre-filled from your recent averages. Set a budget for the months ahead — switch months with the tabs.</p>
+
+        <div className="month-tabs">
+          {months.map((m) => (
+            <button key={m.key} className={"month-tab " + (activeMonth === m.key ? "month-tab-active" : "")} onClick={() => setActiveMonth(m.key)}>
+              {monthLabelFromKey(m.key)}{m.current ? "*" : ""}
+            </button>
+          ))}
+        </div>
+        <div className="month-active-label">{months.find((m) => m.key === activeMonth).label}</div>
 
         <div className="target-list">
           {categories.map((c) => (
@@ -1532,22 +1712,18 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions }) {
               </div>
               <div className="target-input-wrap">
                 <span className="target-currency">£</span>
-                <input
-                  className="target-input"
-                  type="number"
-                  min="0"
-                  value={targets[c]}
-                  onChange={(e) => setTarget(c, e.target.value)}
-                />
+                <input className="target-input" type="number" min="0" value={budgets[activeMonth][c]} onChange={(e) => setVal(c, e.target.value)} />
               </div>
             </div>
           ))}
         </div>
 
         <div className="target-total-row">
-          <span>Total monthly target</span>
-          <span className="target-total-amount">{formatMoney(totalTarget)}</span>
+          <span>Total for {monthLabelFromKey(activeMonth)}</span>
+          <span className="target-total-amount">{formatMoney(monthTotal(activeMonth))}</span>
         </div>
+
+        <button className="link-btn inline apply-all-btn" onClick={applyToAll}>Apply {monthLabelFromKey(activeMonth)}'s budget to all months</button>
 
         <div className="nav-row">
           <button className="glass-btn primary" disabled={submitting} onClick={handleFinish}>
@@ -2082,8 +2258,23 @@ const OVERVIEW_WIDGETS = [
   { key: "accounts", label: "Bank Accounts" },
   { key: "merchants", label: "Top Merchants" },
   { key: "insights", label: "Insights" },
+  { key: "empty", label: "➕ Empty slot" },
 ];
 const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "goals"];
+const TOUR_DEFAULT_SLOTS = ["summary", "breakdown", "insights", "empty"];
+const TOUR_COPY = {
+  summary: { title: "Monthly summary", body: "This shows how you're pacing against your budget for this month." },
+  breakdown: { title: "Spending breakdown", body: "This breaks your spending down by category, so you can see where your money goes." },
+  insights: { title: "Insights", body: "We surface notable changes here — a category creeping up, or a goal you're ahead on." },
+  empty: { title: "Make it yours", body: "This slot is all yours. When the tour ends, pick any widget from the menu to build your dashboard your way." },
+  transactions: { title: "Recent transactions", body: "A quick look at your latest activity." },
+  goals: { title: "Savings goal", body: "Track progress toward a savings goal." },
+  trends: { title: "Spending trend", body: "How your spending moves month to month." },
+  cashflow: { title: "Cash flow", body: "Income against outgoings, month by month." },
+  bills: { title: "Bills & subscriptions", body: "Your recurring payments in one place." },
+  accounts: { title: "Bank accounts", body: "Estimated balances across your accounts." },
+  merchants: { title: "Top merchants", body: "Where your money goes most." },
+};
 
 function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
   switch (key) {
@@ -2097,18 +2288,26 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
     case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
     case "insights": return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+    case "empty": return <div className="slot-empty"><div className="slot-empty-icon">+</div><p>Pick a widget from the menu above</p></div>;
     default: return null;
   }
 }
 
-function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
+function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
+  const revealed = !runTour || index <= tourStep;
+  const active = runTour && index === tourStep;
+  if (runTour && !revealed) {
+    return <div className="overview-slot overview-slot-coming"><span className="coming-soon">Coming up…</span></div>;
+  }
   return (
-    <div className="overview-slot">
-      <div className="overview-slot-head">
-        <select className="slot-select" value={widgetKey} onChange={(e) => onChange(e.target.value)}>
-          {OVERVIEW_WIDGETS.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
-        </select>
-      </div>
+    <div className={"overview-slot" + (active ? " tour-active" : "")}>
+      {!runTour && (
+        <div className="overview-slot-head">
+          <select className="slot-select" value={widgetKey} onChange={(e) => onChange(e.target.value)}>
+            {OVERVIEW_WIDGETS.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
+          </select>
+        </div>
+      )}
       <div className="overview-slot-body">
         {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData })}
       </div>
@@ -2116,19 +2315,19 @@ function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactio
   );
 }
 
-function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
+function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
   const updateSlot = (i, key) => onChangeSlots(slots.map((s, idx) => (idx === i ? key : s)));
   return (
     <div className="overview-grid">
       {slots.map((key, i) => (
-        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />
+        <OverviewSlot key={i} index={i} runTour={runTour} tourStep={tourStep} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />
       ))}
     </div>
   );
 }
 
-function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize }) {
-  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />;
+function MainContent({ view, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep }) {
+  if (view === "overview") return <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />;
   if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "goals") return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -2184,19 +2383,38 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
     </div>
   );
 }
-function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize }) {
-  const [panelOpen, setPanelOpen] = useState(true);
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour }) {
+  const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+
+  const effectiveView = runTour ? "overview" : view;
+  const stepKey = overviewSlots[tourStep] || "empty";
+  const copy = TOUR_COPY[stepKey] || { title: "", body: "" };
+  const advanceTour = () => { if (tourStep >= overviewSlots.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
+
   return (
     <div className="app-shell stage-fade">
-      {showExtraBanner && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
+      {showExtraBanner && !runTour && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
+      {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={view} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} />
-        <div className={"main-content " + (view === "overview" ? "main-content-wide" : "")}><MainContent view={view} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} /></div>
+        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} />
+        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}><MainContent view={effectiveView} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} /></div>
       </div>
+      {runTour && (
+        <div className="tour-card">
+          <div className="tour-step-count">Step {tourStep + 1} of {overviewSlots.length}</div>
+          <h3 className="tour-title">{copy.title}</h3>
+          <p className="tour-body">{copy.body}</p>
+          <div className="tour-dots">
+            {overviewSlots.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
+          </div>
+          <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= overviewSlots.length - 1 ? "Finish" : "Next"}</button>
+        </div>
+      )}
       {uploadOpen && (
         <UploadStatementModal
           onClose={() => setUploadOpen(false)}
@@ -2376,6 +2594,7 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [goals, setGoals] = useState([]);
   const [isDev, setIsDev] = useState(false);
+  const [runTour, setRunTour] = useState(false);
 
   const pushToast = (message, type) => {
     const id = Date.now() + Math.random();
@@ -2610,9 +2829,12 @@ function App() {
     const cleaned = Object.fromEntries(Object.entries(newTargets).map(([c, v]) => [c, Number(v) || 0]));
     setTargets(cleaned);
     if (userId) {
-      await supabaseClient.from("targets").delete().eq("user_id", userId);
-      const rows = Object.entries(cleaned).map(([category, monthly_target]) => ({ user_id: userId, category, monthly_target }));
-      if (rows.length) await supabaseClient.from("targets").insert(rows);
+      const key = currentMonthKey();
+      try {
+        await supabaseClient.from("targets").delete().eq("user_id", userId).eq("month", key);
+        const rows = Object.entries(cleaned).map(([category, monthly_target]) => ({ user_id: userId, category, month: key, monthly_target }));
+        if (rows.length) await supabaseClient.from("targets").insert(rows);
+      } catch (e) { pushToast("Couldn't save targets", "error"); }
     }
   };
   const handleRemoveBank = async (bankName) => {
@@ -2738,6 +2960,7 @@ function App() {
           setUploadedFiles(files); setBalances(bal);
           const allTx = [...(parsedTxs || []), ...customTransactions];
           const allStmts = [...statements, ...(newStatements || [])];
+          if (newStatements && newStatements.length) setStatements(allStmts);
           if (parsedTxs && parsedTxs.length) { setCustomTransactions((prev) => [...parsedTxs, ...prev]); runAiFallback(parsedTxs); }
           if (newStatements && newStatements.length) runReconciliation(allStmts, allTx, null);
           fetchBanks(userId).then((rows) => setBankRows(rows));
@@ -2746,11 +2969,15 @@ function App() {
       />
     );
   } else if (stage === "processing") {
-    content = <ProcessingScreen onDone={() => setStage("breakdown")} />;
+    content = <ProcessingScreen transactions={customTransactions} onDone={() => setStage("confirmCategory")} />;
+  } else if (stage === "confirmCategory") {
+    content = <ConfirmCategoryScreen transactions={customTransactions} onConfirm={recategorizeDescription} onDone={() => setStage("openingBalance")} />;
+  } else if (stage === "openingBalance") {
+    content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} onDone={() => setStage("targets")} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onDone={(t) => { setTargets(t); setShowExtraBanner(true); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onDone={(t) => { setTargets(t); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -2799,6 +3026,8 @@ function App() {
         accountData={{ statements, bankRows }}
         isDev={isDev}
         onResetDev={handleResetDev}
+        runTour={runTour}
+        onFinishTour={() => setRunTour(false)}
       />
     );
   }
@@ -3362,6 +3591,51 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
+  /* ---- coding-up animation ---- */
+  .processing-anim-card { max-width: 440px; }
+  .code-feed { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; width: 100%; min-height: 40px; }
+  .code-row { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 9px 12px; animation: codeRowIn 0.35s ease; }
+  .code-name { color: #fff; font-size: 13px; font-weight: 500; flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .code-arrow { color: rgba(255,255,255,0.4); font-size: 14px; flex-shrink: 0; }
+  .code-cat { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid; flex-shrink: 0; }
+  .code-cat-dot { width: 7px; height: 7px; border-radius: 50%; }
+  @keyframes codeRowIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ---- confirm categorisation ---- */
+  .confirm-tx-card { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 16px 18px; margin-top: 6px; }
+  .confirm-tx-name { color: #fff; font-size: 16px; font-weight: 600; }
+  .confirm-tx-amount { color: rgba(255,255,255,0.7); font-size: 15px; font-weight: 600; }
+  .confirm-select { flex: 1; background: none; border: none; color: #fff; font-family: inherit; font-size: 15px; font-weight: 600; outline: none; cursor: pointer; padding: 8px 6px; }
+  .confirm-select option { background: #171727; color: #fff; }
+
+  /* ---- month tabs (budgets) ---- */
+  .month-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-top: 4px; }
+  .month-tab { flex: 0 0 auto; font-family: inherit; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  .month-tab-active { background: linear-gradient(135deg, #4f8cff, #7f6bff); color: #fff; border-color: rgba(255,255,255,0.4); }
+  .month-active-label { color: rgba(255,255,255,0.5); font-size: 12px; margin: 8px 0 2px; }
+  .apply-all-btn { align-self: flex-start; margin-top: 12px; text-align: left; }
+
+  /* ---- empty widget slot ---- */
+  .slot-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.4); gap: 8px; text-align: center; }
+  .slot-empty-icon { width: 40px; height: 40px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 300; color: rgba(255,255,255,0.5); }
+  .slot-empty p { font-size: 12px; margin: 0; max-width: 160px; }
+
+  /* ---- dashboard tour ---- */
+  .overview-slot-coming { align-items: center; justify-content: center; display: flex; opacity: 0.5; }
+  .coming-soon { color: rgba(255,255,255,0.4); font-size: 13px; font-style: italic; }
+  .overview-slot.tour-active { border-style: solid; border-color: rgba(79,140,255,0.9); box-shadow: 0 0 0 2px rgba(79,140,255,0.35), 0 8px 30px rgba(79,140,255,0.25); animation: slotPop 0.4s ease; }
+  @keyframes slotPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+  .welcome-banner { text-align: center; color: #fff; font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3)); border-bottom: 1px solid rgba(255,255,255,0.15); }
+  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; width: calc(100% - 40px); max-width: 380px; background: rgba(20,22,40,0.96); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.2); border-radius: 22px; padding: 22px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); animation: tourCardIn 0.3s ease; }
+  @keyframes tourCardIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  .tour-step-count { color: #8fb4ff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .tour-title { color: #fff; font-size: 18px; font-weight: 700; margin: 0 0 6px; }
+  .tour-body { color: rgba(255,255,255,0.7); font-size: 14px; line-height: 1.5; margin: 0 0 16px; }
+  .tour-dots { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tour-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+  .tour-dot-on { background: linear-gradient(135deg, #4f8cff, #b56bff); }
+  .tour-next { width: 100%; }
+
 </style>
 </body>
 </html>
