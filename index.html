@@ -1084,10 +1084,10 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError }) {
 
 /* ---------------- Onboarding ---------------- */
 
-function OnboardingScreen({ onDone, userId, pushToast, onLogout }) {
+function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, initialBanks }) {
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [banks, setBanks] = useState([]);
+  const [name, setName] = useState(initialName || "");
+  const [banks, setBanks] = useState(initialBanks || []);
   const [savvy, setSavvy] = useState(null);
   const [tracking, setTracking] = useState(null);
   const [balanceCheck, setBalanceCheck] = useState(null);
@@ -1104,7 +1104,13 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout }) {
     if (step === ONBOARD_STEPS - 1) {
       setSubmitting(true);
       const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim() });
-      const { error: bErr } = await supabaseClient.from("banks").insert(banks.map((b) => ({ user_id: userId, bank_name: b })));
+      const existingBanks = await fetchBanks(userId);
+      const existingNames = existingBanks.map((r) => r.bank_name);
+      const toAdd = banks.filter((b) => !existingNames.includes(b));
+      const toRemove = existingNames.filter((n) => !banks.includes(n));
+      let bErr = null;
+      if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b }))); bErr = error; }
+      if (toRemove.length) { try { await supabaseClient.from("banks").delete().eq("user_id", userId).in("bank_name", toRemove); } catch (e) {} }
       const check = await fetchProfile(userId);
       const savedBanks = await fetchBanks(userId);
       const banksOk = banks.every((b) => savedBanks.some((r) => r.bank_name === b));
@@ -1136,6 +1142,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout }) {
         {step === 0 && (
           <div className="step">
             <h1 className="title">Nice to meet you, what's your name?</h1>
+            <p className="subtitle">Just so we know what to call you — nothing formal.</p>
             <input className="glass-input" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
         )}
@@ -1275,7 +1282,7 @@ function BankUploadBlock({ bank, files, error, onAdd, onRemove }) {
   );
 }
 
-function UploadScreen({ banks, onDone, pushToast, userId }) {
+function UploadScreen({ banks, onDone, pushToast, userId, onBack }) {
   const [filesByBank, setFilesByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, []])));
   const [balanceByBank, setBalanceByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, { balance: "", date: "" }])));
   const [errorsByBank, setErrorsByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, null])));
@@ -1389,6 +1396,7 @@ function UploadScreen({ banks, onDone, pushToast, userId }) {
         </div>
 
         <div className="nav-row">
+          {onBack && <button className="glass-btn ghost" disabled={submitting} onClick={onBack}>Back</button>}
           <button className="glass-btn ghost" disabled={submitting} onClick={() => handleContinue(true)}>Skip for now</button>
           <button className="glass-btn primary" disabled={!allHaveAtLeastOne || submitting} onClick={() => handleContinue(false)}>
             {submitting ? <span className="btn-spinner" /> : "Continue"}
@@ -3603,13 +3611,14 @@ function App() {
       />
     );
   } else if (stage === "onboarding") {
-    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} onDone={(d) => { setName(d.name); setBanks(d.banks); setStage("upload"); }} />;
+    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} initialName={name} initialBanks={banks} onDone={(d) => { setName(d.name); setBanks(d.banks); setStage("upload"); }} />;
   } else if (stage === "upload") {
     content = (
       <UploadScreen
         banks={banks}
         userId={userId}
         pushToast={pushToast}
+        onBack={() => setStage("onboarding")}
         onDone={(files, bal, parsedTxs, newStatements) => {
           setUploadedFiles(files); setBalances(bal);
           const allTx = [...(parsedTxs || []), ...customTransactions];
@@ -3740,26 +3749,28 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .glass-card.size-md { max-width: 420px; min-height: 420px; }
   .glass-card.size-lg { max-width: 460px; min-height: 500px; }
   .glass-card.onboard-card { max-width: 460px; min-height: 480px; transition: none; }
-  .glass-card.onboard-card .step { flex: 1; }
+  .glass-card.onboard-card .step { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .demo-badge { display: inline-block; margin-left: 10px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(79,140,255,0.18); color: #9bc0ff; border: 1px solid rgba(79,140,255,0.35); vertical-align: middle; }
   .auth-card { max-width: 400px; }
   .upload-card { max-width: 480px; max-height: 88vh; overflow-y: auto; }
   .processing-card { max-width: 400px; align-items: center; text-align: center; }
   .breakdown-screen-card { max-width: 640px; }
   .target-card { max-width: 760px; max-height: 88vh; overflow-y: auto; }
-  .budget-table-wrap { overflow-x: auto; margin: 12px 0 6px; border-radius: 14px; }
-  .budget-table { border-collapse: separate; border-spacing: 0; width: 100%; }
-  .budget-table th, .budget-table td { padding: 8px 6px; text-align: center; }
-  .bt-corner { text-align: left !important; color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; position: sticky; left: 0; background: #131b33; z-index: 2; }
-  .bt-month-head { color: rgba(255,255,255,0.55); font-size: 12px; font-weight: 600; white-space: nowrap; min-width: 62px; }
+  .budget-table-wrap { overflow-x: auto; margin: 16px 0 6px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.03); }
+  .budget-table { border-collapse: collapse; width: 100%; }
+  .budget-table th, .budget-table td { padding: 11px 12px; text-align: center; }
+  .bt-corner { text-align: left !important; color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; position: sticky; left: 0; background: #141c34; z-index: 2; border-bottom: 1px solid rgba(255,255,255,0.12); }
+  .bt-month-head { color: rgba(255,255,255,0.55); font-size: 12px; font-weight: 600; white-space: nowrap; min-width: 66px; border-bottom: 1px solid rgba(255,255,255,0.12); }
   .bt-month-current { color: #8fb4ff; }
-  .bt-cat { text-align: left !important; color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 7px; position: sticky; left: 0; background: #131b33; z-index: 1; padding-right: 12px; }
-  .bt-cell { padding: 4px 3px; }
-  .bt-input { width: 58px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 9px; color: #fff; font-size: 13px; font-family: inherit; outline: none; text-align: center; padding: 7px 4px; }
-  .bt-input:focus { border-color: rgba(79,140,255,0.7); box-shadow: 0 0 0 2px rgba(79,140,255,0.25); }
-  .bt-total-row td { border-top: 1px solid rgba(255,255,255,0.18); padding-top: 10px; }
+  .budget-table tbody tr td { border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .bt-cat { text-align: left !important; color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 8px; position: sticky; left: 0; background: #141c34; z-index: 1; padding-right: 16px; }
+  .bt-cell { padding: 3px 6px; }
+  .bt-input { width: 62px; background: transparent; border: none; border-radius: 8px; color: #fff; font-size: 13px; font-family: inherit; outline: none; text-align: center; padding: 8px 4px; transition: background 0.15s, box-shadow 0.15s; }
+  .bt-input:hover { background: rgba(255,255,255,0.05); }
+  .bt-input:focus { background: rgba(79,140,255,0.16); box-shadow: inset 0 0 0 1px rgba(79,140,255,0.6); }
+  .bt-total-row td { border-top: 1px solid rgba(255,255,255,0.18); border-bottom: none !important; padding-top: 13px; background: rgba(255,255,255,0.02); }
   .bt-total-cell { color: #8fb4ff; font-size: 13px; font-weight: 700; white-space: nowrap; }
-  .bt-total-row .bt-cat { color: #fff; font-weight: 700; }
+  .bt-total-row .bt-cat { color: #fff; font-weight: 700; background: #141c34; }
 
   .progress-dots { display: flex; gap: 6px; margin-bottom: 28px; }
   .dot { height: 5px; flex: 1; border-radius: 3px; background: rgba(255, 255, 255, 0.18); transition: background 0.3s ease; }
