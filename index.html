@@ -794,7 +794,7 @@ function LpCategoriseDemo() {
           </span>
         </div>
       ))}
-      <div className="lpd-ai-note" style={{ animationDelay: (0.7 + LP_DEMO_TXS.length * 0.55) + "s" }}>&#10024; Sorted automatically \u2014 fix any of them once, and it remembers.</div>
+      <div className="lpd-ai-note" style={{ animationDelay: (0.7 + LP_DEMO_TXS.length * 0.55) + "s" }}>&#10024; Sorted automatically &mdash; fix any of them once, and it remembers.</div>
     </div>
   );
 }
@@ -833,7 +833,7 @@ function LpViewsDemo() {
             <div className="lpd-bar-row" key={b.name}>
               <span className="lpd-bar-label"><span className="cat-dot" style={{ background: catColor(b.cat) }} />{b.name}</span>
               <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: b.pct + "%", background: catColor(b.cat) }} /></div>
-              <span className="lpd-bar-amt">\u00a3{b.val}</span>
+              <span className="lpd-bar-amt">&pound;{b.val}</span>
             </div>
           ))}
         </div>
@@ -844,9 +844,9 @@ function LpViewsDemo() {
           {review.map((r) => (
             <div className="lpd-review-row" key={r.name}>
               <span className="lpd-bar-label"><span className="cat-dot" style={{ background: catColor(r.name) }} />{r.name}</span>
-              <span>\u00a3{r.plan}</span>
-              <span>\u00a3{r.act}</span>
-              <span className="lpd-under">\u00a3{r.plan - r.act} under</span>
+              <span>&pound;{r.plan}</span>
+              <span>&pound;{r.act}</span>
+              <span className="lpd-under">&pound;{r.plan - r.act} under</span>
             </div>
           ))}
         </div>
@@ -864,18 +864,18 @@ function LpViewsDemo() {
       {tab === "goals" && (
         <div className="lpd-pane">
           <div className="lpd-goal">
-            <div className="lpd-goal-top"><span>&#127958;&#65039; Holiday fund</span><span>\u00a32,400 / \u00a34,000</span></div>
+            <div className="lpd-goal-top"><span>&#127958;&#65039; Holiday fund</span><span>&pound;2,400 / &pound;4,000</span></div>
             <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: "60%", background: "#4fe0c0" }} /></div>
-            <span className="lpd-goal-note">60% there \u2014 on pace for November</span>
+            <span className="lpd-goal-note">60% there &mdash; on pace for November</span>
           </div>
           <div className="lpd-goal">
-            <div className="lpd-goal-top"><span>&#128737;&#65039; Emergency fund</span><span>\u00a34,200 / \u00a310,000</span></div>
+            <div className="lpd-goal-top"><span>&#128737;&#65039; Emergency fund</span><span>&pound;4,200 / &pound;10,000</span></div>
             <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: "42%", background: "#4f8cff" }} /></div>
-            <span className="lpd-goal-note">42% there \u2014 \u00a3300/month gets you done by next summer</span>
+            <span className="lpd-goal-note">42% there &mdash; &pound;300/month gets you done by next summer</span>
           </div>
         </div>
       )}
-      <div className="lpd-views-hint">&#128070; Click the tabs \u2014 this is a taste of the real dashboard.</div>
+      <div className="lpd-views-hint">&#128070; Click the tabs &mdash; this is a taste of the real dashboard.</div>
     </div>
   );
 }
