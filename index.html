@@ -2109,14 +2109,91 @@ function CategoryEditor({ value, onChange }) {
 }
 function TransactionFeed({ limit, transactions, onRecategorize }) {
   const source = transactions || [];
-  const list = limit ? source.slice(0, limit) : source;
+  const [query, setQuery] = useState("");
+  const [cat, setCat] = useState("all");
+  const [month, setMonth] = useState("all");
+  const [type, setType] = useState("all");
+  const [minAmt, setMinAmt] = useState("");
+  const [sort, setSort] = useState("new");
+  const monthsWithData = React.useMemo(() => {
+    const set = new Set(source.filter((t) => t.date).map((t) => t.date.slice(0, 7)));
+    return [...set].sort().reverse();
+  }, [source]);
+  const catsPresent = React.useMemo(() => {
+    const set = new Set(source.map((t) => t.category).filter(Boolean));
+    return [...set].sort();
+  }, [source]);
+
+  if (limit) {
+    const list = source.slice(0, limit);
+    return (
+      <div className="glass-card dash-card">
+        <span className="card-label">Recent transactions</span>
+        <div className="tx-list">
+          {list.map((t, i) => (
+            <div className="tx-row" key={i}>
+              <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+              <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const q = query.trim().toLowerCase();
+  const minVal = Number(minAmt) > 0 ? Number(minAmt) : 0;
+  let filtered = source.filter((t) => {
+    if (cat !== "all" && t.category !== cat) return false;
+    if (month !== "all" && (t.date || "").slice(0, 7) !== month) return false;
+    if (type === "out" && !(t.amount < 0)) return false;
+    if (type === "in" && !(t.amount > 0)) return false;
+    if (minVal > 0 && Math.abs(t.amount) < minVal) return false;
+    if (q) {
+      const hay = (t.name + " " + (t.category || "") + " " + (t.date ? monthLabelFromKey(t.date.slice(0, 7)) : "")).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  filtered = filtered.slice().sort((a, b) => sort === "amt" ? Math.abs(b.amount) - Math.abs(a.amount) : (b.date || "").localeCompare(a.date || ""));
+
+  const spentTotal = filtered.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const hasFilter = q || cat !== "all" || month !== "all" || type !== "all" || minVal > 0;
+
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Recent transactions</span>
+      <div className="bd-box-head">
+        <span className="bd-box-title">Transactions</span>
+        <span className="tx-count">{filtered.length} {filtered.length === 1 ? "result" : "results"}{filtered.length ? " \u00B7 " + formatMoney(spentTotal) + " out" : ""}</span>
+      </div>
+      <div className="tx-filters">
+        <input className="tx-input tx-search" type="text" placeholder="Search merchant, category, month\u2026" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <select className="bd-month-select" value={cat} onChange={(e) => setCat(e.target.value)}>
+          <option value="all">All categories</option>
+          {catsPresent.map((c) => (<option key={c} value={c}>{c}</option>))}
+        </select>
+        <select className="bd-month-select" value={month} onChange={(e) => setMonth(e.target.value)}>
+          <option value="all">All months</option>
+          {monthsWithData.map((k) => (<option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>))}
+        </select>
+        <select className="bd-month-select" value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="all">Money in &amp; out</option>
+          <option value="out">Money out</option>
+          <option value="in">Money in</option>
+        </select>
+        <input className="tx-input tx-min" type="number" inputMode="numeric" placeholder="Min \u00a3" value={minAmt} onChange={(e) => setMinAmt(e.target.value)} />
+        <select className="bd-month-select" value={sort} onChange={(e) => setSort(e.target.value)}>
+          <option value="new">Newest first</option>
+          <option value="amt">Highest amount</option>
+        </select>
+        {hasFilter && <button className="tx-clear" onClick={() => { setQuery(""); setCat("all"); setMonth("all"); setType("all"); setMinAmt(""); }}>Clear</button>}
+      </div>
       <div className="tx-list">
-        {list.map((t, i) => (
-          <div className="tx-row" key={i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(cat) => onRecategorize(t.name, cat)} />) : t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+        {filtered.length === 0 ? (
+          <div className="tx-empty">No transactions match your filters.</div>
+        ) : filtered.map((t, i) => (
+          <div className="tx-row" key={t.id || i}>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -2124,6 +2201,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
     </div>
   );
 }
+
 function bdArc(cx, cy, r, a0, a1) {
   const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
   const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
@@ -2565,36 +2643,6 @@ function TrendsCard({ transactions }) {
   );
 }
 
-function CashFlowCard({ transactions }) {
-  const txs = transactions || [];
-  const keys = lastNMonthKeys(latestMonthKey(txs), 6);
-  const months = keys.map(monthLabelFromKey);
-  const income = keys.map((k) => Math.round(incomeForMonth(txs, k)));
-  const spend = keys.map((k) => Math.round(spendForMonth(txs, k)));
-  const max = Math.max(...income, ...spend, 1);
-  return (
-    <div className="glass-card dash-card">
-      <span className="card-label">Income vs outgoings</span>
-      <div className="trend-chart">
-        {months.map((m, i) => (
-          <div className="trend-bar-col" key={m + i}>
-            <div className="trend-bar-wrap dual">
-              <div className="trend-bar income-bar" style={{ height: (income[i] / max) * 100 + "%" }} />
-              <div className="trend-bar spend-bar" style={{ height: (spend[i] / max) * 100 + "%" }} />
-            </div>
-            <span className="trend-bar-label">{m}</span>
-          </div>
-        ))}
-      </div>
-      <div className="legend-row">
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Income</span>
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#4f8cff" }} />Outgoings</span>
-      </div>
-      <p className="summary-note">Net last month: {formatMoney(income[income.length - 1] - spend[spend.length - 1])}</p>
-    </div>
-  );
-}
-
 function BillsCard({ transactions, excludes, onToggleExclude, editable }) {
   const [editing, setEditing] = useState(false);
   const ex = excludes || [];
@@ -2980,7 +3028,6 @@ const TOUR_COPY = {
   transactions: { title: "Recent transactions", body: "A quick look at your latest activity." },
   goals: { title: "Savings goal", body: "Track progress toward a savings goal." },
   trends: { title: "Spending trend", body: "How your spending moves month to month." },
-  cashflow: { title: "Cash flow", body: "Income against outgoings, month by month." },
   bills: { title: "Bills & subscriptions", body: "Your recurring payments in one place." },
   accounts: { title: "Bank accounts", body: "Estimated balances across your accounts." },
   merchants: { title: "Top merchants", body: "Where your money goes most." },
@@ -2993,7 +3040,6 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
     case "goals": return <GoalsCard goals={goals} onAdd={goalsApi.add} onUpdate={goalsApi.update} onDelete={goalsApi.remove} />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-    case "cashflow": return hasData ? <CashFlowCard transactions={transactions} /> : <EmptyState text="No cash flow data yet — upload a statement to get started." />;
     case "bills": return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
     case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
     case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
@@ -4127,6 +4173,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .tx-category { color: rgba(255,255,255,0.45); font-size: 12px; }
   .tx-amount { color: #fff; font-size: 14px; font-weight: 600; }
   .tx-positive { color: #4fe0c0; }
+  .tx-count { color: rgba(255,255,255,0.5); font-size: 12px; }
+  .tx-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
+  .tx-input { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none; }
+  .tx-input::placeholder { color: rgba(255,255,255,0.4); }
+  .tx-input:focus { border-color: rgba(79,140,255,0.6); }
+  .tx-search { flex: 1 1 220px; min-width: 160px; }
+  .tx-min { width: 110px; }
+  .tx-clear { background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 14px; font-size: 13px; font-family: inherit; cursor: pointer; }
+  .tx-clear:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .tx-empty { color: rgba(255,255,255,0.4); font-size: 13px; padding: 20px 0; text-align: center; }
   .category-list { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
   .category-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
   .category-name { color: #fff; font-size: 14px; font-weight: 500; }
