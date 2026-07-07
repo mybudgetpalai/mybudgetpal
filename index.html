@@ -2367,11 +2367,13 @@ function BreakdownPage({ transactions, targets }) {
 
         <div className="glass-card dash-card bd-box bd-box-pie">
           <span className="bd-box-title">Spending mix</span>
-          <PieChart slices={pieSlices} total={total} />
-          <div className="bd-legend">
-            {pieSlices.map((s) => (
-              <span className="bd-legend-item" key={s.name}><span className="cat-dot" style={{ background: s.color }} />{s.name}</span>
-            ))}
+          <div className="bd-pie-body">
+            <PieChart slices={pieSlices} total={total} />
+            <div className="bd-legend">
+              {pieSlices.map((s) => (
+                <span className="bd-legend-item" key={s.name}><span className="cat-dot" style={{ background: s.color }} />{s.name}</span>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -4197,10 +4199,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-row { display: flex; gap: 16px; align-items: stretch; }
   .bd-row { flex-wrap: wrap; }
   .bd-box-where { flex: 2 1 340px; min-width: 300px; }
-  .bd-box-pie { flex: 1 1 240px; min-width: 220px; }
-  .bd-box-trend { flex: 1 1 280px; min-width: 240px; }
+  .bd-box-pie { flex: 1 1 240px; min-width: 220px; display: flex; flex-direction: column; }
+  .bd-pie-body { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .bd-box-trend { flex: 1 1 280px; min-width: 240px; display: flex; flex-direction: column; }
   .bd-pie-wrap { position: relative; margin-top: 8px; }
-  .bd-pie-svg { width: 100%; height: auto; max-width: 240px; display: block; margin: 8px auto 0; }
+  .bd-pie-svg { width: 100%; height: auto; max-width: 300px; display: block; margin: 0 auto; }
   .bd-pie-tip { position: absolute; pointer-events: none; background: rgba(16,22,40,0.96); border: 1px solid rgba(255,255,255,0.16); color: #fff; font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 8px; white-space: nowrap; transform: translate(12px, -50%); z-index: 5; display: flex; align-items: center; gap: 6px; }
   .bd-track-over { box-shadow: 0 0 0 1.5px #ff8b8b; }
   .bd-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; }
@@ -4240,7 +4243,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-tx-date { color: rgba(255,255,255,0.4); }
   .bd-tx-amt { color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; }
   .bd-tx-empty { color: rgba(255,255,255,0.4); font-size: 13px; }
-  .bd-movers { display: flex; flex-direction: column; gap: 16px; margin-top: 14px; }
+  .bd-movers { display: flex; flex-direction: column; gap: 16px; margin-top: 14px; flex: 1; justify-content: center; }
   .bd-mover { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
   .bd-mover-delta { font-size: 13px; font-weight: 500; padding-left: 15px; }
 
