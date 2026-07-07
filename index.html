@@ -1680,9 +1680,7 @@ function SidePanel({ open, active, setActive, isDev, onResetDev }) {
 }
 function SummaryCard({ targets, transactions }) {
   const lastIdx = MONTH_LABELS.length - 1;
-  const spent = (transactions && transactions.length > 0)
-    ? spendForMonth(transactions, latestMonthKey(transactions))
-    : Object.keys(CATEGORY_MONTHLY).reduce((s, c) => s + CATEGORY_MONTHLY[c][lastIdx], 0);
+  const spent = spendForMonth(transactions || [], latestMonthKey(transactions || []));
   const target = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0) || 1;
   const pct = Math.min(100, Math.round((spent / target) * 100));
   const expectedPct = Math.round((DAYS_INTO_MONTH() / daysInCurrentMonth()) * 100);
@@ -1717,7 +1715,7 @@ function SummaryCard({ targets, transactions }) {
 function DAYS_INTO_MONTH() { return new Date().getDate(); }
 
 function TransactionFeed({ limit, transactions }) {
-  const source = (transactions && transactions.length > 0) ? transactions : TRANSACTIONS;
+  const source = transactions || [];
   const list = limit ? source.slice(0, limit) : source;
   return (
     <div className="glass-card dash-card">
@@ -1734,17 +1732,11 @@ function TransactionFeed({ limit, transactions }) {
   );
 }
 function BreakdownCard({ transactions, targets }) {
-  let cats;
-  let isCurrentMonth = false;
-  if (transactions && transactions.length > 0) {
-    const monthKey = latestMonthKey(transactions);
-    isCurrentMonth = monthKey === currentMonthKey();
-    const byCat = spendByCategoryForMonth(transactions, monthKey);
-    cats = Object.entries(byCat).map(([name, amount]) => ({ name, amount, color: catColor(name) })).sort((a, b) => b.amount - a.amount);
-  } else {
-    const lastIdx = MONTH_LABELS.length - 1;
-    cats = Object.keys(CATEGORY_MONTHLY).map((c) => ({ name: c, amount: CATEGORY_MONTHLY[c][lastIdx], color: CATEGORY_COLORS[c] }));
-  }
+  const txs = transactions || [];
+  const monthKey = latestMonthKey(txs);
+  const isCurrentMonth = monthKey === currentMonthKey();
+  const byCat = spendByCategoryForMonth(txs, monthKey);
+  const cats = Object.entries(byCat).map(([name, amount]) => ({ name, amount, color: catColor(name) })).sort((a, b) => b.amount - a.amount);
   const total = cats.reduce((s, c) => s + c.amount, 0) || 1;
   return (
     <div className="glass-card dash-card">
@@ -1888,12 +1880,10 @@ function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
   );
 }
 function TrendsCard({ transactions }) {
-  let months = TREND_MONTHS, spend = TREND_SPEND;
-  if (transactions && transactions.length > 0) {
-    const keys = lastNMonthKeys(latestMonthKey(transactions), 6);
-    months = keys.map(monthLabelFromKey);
-    spend = keys.map((k) => Math.round(spendForMonth(transactions, k)));
-  }
+  const txs = transactions || [];
+  const keys = lastNMonthKeys(latestMonthKey(txs), 6);
+  const months = keys.map(monthLabelFromKey);
+  const spend = keys.map((k) => Math.round(spendForMonth(txs, k)));
   const max = Math.max(...spend, 1);
   return (
     <div className="glass-card dash-card">
@@ -1914,13 +1904,11 @@ function TrendsCard({ transactions }) {
 }
 
 function CashFlowCard({ transactions }) {
-  let months = TREND_MONTHS, income = TREND_INCOME, spend = TREND_SPEND;
-  if (transactions && transactions.length > 0) {
-    const keys = lastNMonthKeys(latestMonthKey(transactions), 6);
-    months = keys.map(monthLabelFromKey);
-    income = keys.map((k) => Math.round(incomeForMonth(transactions, k)));
-    spend = keys.map((k) => Math.round(spendForMonth(transactions, k)));
-  }
+  const txs = transactions || [];
+  const keys = lastNMonthKeys(latestMonthKey(txs), 6);
+  const months = keys.map(monthLabelFromKey);
+  const income = keys.map((k) => Math.round(incomeForMonth(txs, k)));
+  const spend = keys.map((k) => Math.round(spendForMonth(txs, k)));
   const max = Math.max(...income, ...spend, 1);
   return (
     <div className="glass-card dash-card">
@@ -1946,11 +1934,7 @@ function CashFlowCard({ transactions }) {
 }
 
 function BillsCard({ transactions }) {
-  let bills = BILLS;
-  if (transactions && transactions.length > 0) {
-    const detected = detectRecurringBills(transactions);
-    bills = detected.length ? detected : [];
-  }
+  const bills = detectRecurringBills(transactions || []);
   if (!bills.length) return <EmptyState text="No recurring payments detected yet — they show up once the same payment appears in 2+ months." />;
   const total = bills.reduce((s, b) => s + b.amount, 0);
   return (
@@ -2027,11 +2011,9 @@ function BankAccountsCard({ banks, transactions, accountData }) {
 }
 
 function MerchantsCard({ transactions }) {
-  let merchants = MERCHANTS;
-  if (transactions && transactions.length > 0) {
-    merchants = topMerchantsFor(transactions, latestMonthKey(transactions), 5);
-    if (merchants.length < 3) merchants = topMerchantsFor(transactions, null, 5);
-  }
+  const txs = transactions || [];
+  let merchants = topMerchantsFor(txs, latestMonthKey(txs), 5);
+  if (merchants.length < 3) merchants = topMerchantsFor(txs, null, 5);
   if (!merchants.length) return <EmptyState text="No merchant data yet — upload a statement to get started." />;
   const max = Math.max(...merchants.map((m) => m.amount), 1);
   return (
@@ -2050,11 +2032,8 @@ function MerchantsCard({ transactions }) {
 }
 
 function InsightsCard({ transactions, targets }) {
-  let insights = INSIGHTS;
-  if (transactions && transactions.length > 0) {
-    const built = buildInsights(transactions, targets);
-    insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
-  }
+  const built = buildInsights(transactions || [], targets);
+  const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Insights</span>
@@ -2347,7 +2326,7 @@ function App() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2600);
   };
 
-  const hasData = Object.values(uploadedFiles).some((arr) => arr && arr.length > 0) || customTransactions.length > 0;
+  const hasData = customTransactions.length > 0;
 
   const runAiFallback = async (txs) => {
     const uncats = txs.filter((t) => t.category === "Uncategorized");
