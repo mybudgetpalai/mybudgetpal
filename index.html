@@ -2088,7 +2088,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
   }
 }
 
-function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactions, goals, goalsApi }) {
+function OverviewSlot({ widgetKey, onChange, targets, banks, hasData, transactions, goals, goalsApi, accountData }) {
   return (
     <div className="overview-slot">
       <div className="overview-slot-head">
@@ -2108,7 +2108,7 @@ function OverviewGrid({ slots, onChangeSlots, targets, banks, hasData, transacti
   return (
     <div className="overview-grid">
       {slots.map((key, i) => (
-        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} />
+        <OverviewSlot key={i} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} />
       ))}
     </div>
   );
