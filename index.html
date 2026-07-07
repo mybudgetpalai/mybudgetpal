@@ -2801,12 +2801,15 @@ function InsightsCard({ transactions, targets }) {
   );
 }
 
-function MonthlyReviewCard({ transactions, allTargets }) {
+function MonthlyReviewCard({ transactions, allTargets, isDev }) {
   const txs = transactions || [];
   const done = completedMonthsWithData(txs);
   const [monthKey, setMonthKey] = useState(done.length ? done[done.length - 1] : currentMonthKey());
   if (!done.length) return <EmptyState text="Your monthly review appears once a month has finished. Upload statements covering a completed month to see how you did versus your plan." />;
-  const budgets = (allTargets && allTargets[monthKey]) || {};
+  const rawBudgets = (allTargets && allTargets[monthKey]) || {};
+  const hasRealBudget = TX_CATEGORIES.some((c) => Number(rawBudgets[c]) > 0);
+  const usingSampleTargets = isDev && !hasRealBudget;
+  const budgets = usingSampleTargets ? DEMO_TARGETS : rawBudgets;
   const hasBudget = TX_CATEGORIES.some((c) => Number(budgets[c]) > 0);
   const byCat = spendByCategoryForMonth(txs, monthKey);
   const actualSpend = Math.round(spendForMonth(txs, monthKey));
@@ -2831,6 +2834,7 @@ function MonthlyReviewCard({ transactions, allTargets }) {
           </select>
         </div>
         <p className="subtitle" style={{ margin: "2px 0 14px" }}>How {label} actually turned out, next to what you planned.</p>
+        {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
         <div className="review-cards">
           <div className={"review-tile " + (spendDiff <= 0 ? "rt-good" : "rt-bad")}>
             <span className="rt-label">You spent</span>
@@ -3083,7 +3087,7 @@ function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks,
   );
 }
 
-function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets }) {
+function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev }) {
   if (view === "overview") return (
     <>
       <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
@@ -3091,7 +3095,7 @@ function MainContent({ view, name, targets, banks, hasData, transactions, overvi
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
+  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
@@ -3203,7 +3207,7 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -4177,6 +4181,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .tx-count { color: rgba(255,255,255,0.5); font-size: 12px; }
   .tx-instructions { color: rgba(255,255,255,0.55); font-size: 13px; margin: 6px 0 0; line-height: 1.5; }
   .tx-instructions b { color: #8fb4ff; font-weight: 600; }
+  .mr-sample-note { color: #ffb84f !important; }
   .tx-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
   .tx-input { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none; }
   .tx-input::placeholder { color: rgba(255,255,255,0.4); }
