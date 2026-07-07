@@ -2140,19 +2140,19 @@ function BreakdownPage({ transactions, targets }) {
               const sharePct = total > 0 ? Math.round((amount / total) * 100) : 0;
               const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
               const isOpen = openCat === name;
-              let fillPct, fillColor, amtLabel, noTarget = false;
+              let fillPct, amtLabel, noTarget = false, over = false, shareLabel;
               if (compareTargets) {
                 if (budget > 0) {
-                  const over = amount > budget;
+                  over = amount > budget;
                   fillPct = Math.min(100, (amount / budget) * 100);
-                  fillColor = over ? "#ff8b8b" : color;
                   amtLabel = formatMoney(amount) + " / " + formatMoney(budget);
+                  shareLabel = Math.round((amount / budget) * 100) + "% used";
                 } else {
-                  fillPct = 0; fillColor = color; amtLabel = formatMoney(amount); noTarget = true;
+                  fillPct = 0; amtLabel = formatMoney(amount); noTarget = true; shareLabel = null;
                 }
               } else {
                 fillPct = topAmount > 0 ? Math.max(4, (amount / topAmount) * 100) : 0;
-                fillColor = color; amtLabel = formatMoney(amount);
+                amtLabel = formatMoney(amount); shareLabel = sharePct + "%";
               }
               const catTxs = txs
                 .filter((t) => t.amount < 0 && t.category === name && t.date.slice(0, 7) === activeKey)
@@ -2163,12 +2163,12 @@ function BreakdownPage({ transactions, targets }) {
                     <div className="category-top">
                       <span className="category-name">
                         <span className="cat-dot" style={{ background: color }} />{name}
-                        <span className="bd-share">&middot; {sharePct}%</span>
+                        {shareLabel && <span className="bd-share">&middot; {shareLabel}</span>}
                         <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
                       </span>
                       <span className="category-amount bd-amt">{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
                     </div>
-                    <div className="category-track"><div className="category-fill" style={{ width: fillPct + "%", background: fillColor }} /></div>
+                    <div className={"category-track" + (over ? " bd-track-over" : "")}><div className="category-fill" style={{ width: fillPct + "%", background: color }} /></div>
                   </div>
                   {isOpen && (
                     <div className="bd-tx-list">
@@ -2191,6 +2191,11 @@ function BreakdownPage({ transactions, targets }) {
         <div className="glass-card dash-card bd-box bd-box-pie">
           <span className="bd-box-title">Spending mix</span>
           <PieChart slices={pieSlices} total={total} />
+          <div className="bd-legend">
+            {pieSlices.map((s) => (
+              <span className="bd-legend-item" key={s.name}><span className="cat-dot" style={{ background: s.color }} />{s.name}</span>
+            ))}
+          </div>
         </div>
 
         {showTrend && (
@@ -3960,7 +3965,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
   .bd-box { max-width: none; }
   .bd-box-title { color: #fff; font-size: 15px; font-weight: 600; display: block; margin-bottom: 4px; }
-  .bd-row { display: flex; gap: 16px; align-items: flex-start; }
+  .bd-row { display: flex; gap: 16px; align-items: stretch; }
   .bd-row { flex-wrap: wrap; }
   .bd-box-where { flex: 2 1 340px; min-width: 300px; }
   .bd-box-pie { flex: 1 1 240px; min-width: 220px; }
@@ -3968,6 +3973,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-pie-wrap { position: relative; margin-top: 8px; }
   .bd-pie-svg { width: 100%; height: auto; max-width: 240px; display: block; margin: 8px auto 0; }
   .bd-pie-tip { position: absolute; pointer-events: none; background: rgba(16,22,40,0.96); border: 1px solid rgba(255,255,255,0.16); color: #fff; font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 8px; white-space: nowrap; transform: translate(12px, -50%); z-index: 5; display: flex; align-items: center; gap: 6px; }
+  .bd-track-over { box-shadow: 0 0 0 1.5px #ff8b8b; }
+  .bd-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; }
+  .bd-legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.75); }
   .bd-box-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .bd-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.7); cursor: pointer; user-select: none; }
   .bd-check input { width: 15px; height: 15px; accent-color: #4f8cff; cursor: pointer; }
