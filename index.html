@@ -2023,6 +2023,46 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
     </div>
   );
 }
+function bdArc(cx, cy, r, a0, a1) {
+  const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
+  const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+  const large = (a1 - a0) > Math.PI ? 1 : 0;
+  return "M " + cx + " " + cy + " L " + x0 + " " + y0 + " A " + r + " " + r + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
+}
+function PieChart({ slices, total }) {
+  const [hover, setHover] = useState(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const wrapRef = React.useRef(null);
+  const cx = 100, cy = 100, r = 92;
+  let ang = -Math.PI / 2;
+  const paths = slices.map((s, i) => {
+    const frac = total > 0 ? s.value / total : 0;
+    const start = ang, end = ang + frac * Math.PI * 2;
+    ang = end;
+    return { name: s.name, color: s.color, i, start, end, frac, full: frac >= 0.9999 };
+  });
+  function onMove(e) {
+    if (!wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  }
+  return (
+    <div className="bd-pie-wrap" ref={wrapRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+      <svg viewBox="0 0 200 200" className="bd-pie-svg">
+        {paths.map((p) => (
+          p.full
+            ? <circle key={p.i} cx={cx} cy={cy} r={r} fill={p.color} style={{ opacity: hover === null || hover === p.i ? 1 : 0.4, transition: "opacity .12s" }} onMouseEnter={() => setHover(p.i)} />
+            : <path key={p.i} d={bdArc(cx, cy, r, p.start, p.end)} fill={p.color} style={{ opacity: hover === null || hover === p.i ? 1 : 0.4, transition: "opacity .12s", cursor: "default" }} onMouseEnter={() => setHover(p.i)} />
+        ))}
+      </svg>
+      {hover !== null && (
+        <div className="bd-pie-tip" style={{ left: pos.x, top: pos.y }}>
+          <span className="cat-dot" style={{ background: paths[hover].color }} />{paths[hover].name} {Math.round(paths[hover].frac * 100)}%
+        </div>
+      )}
+    </div>
+  );
+}
 function BreakdownPage({ transactions, targets }) {
   const txs = transactions || [];
   const monthsWithData = React.useMemo(() => {
@@ -2055,7 +2095,9 @@ function BreakdownPage({ transactions, targets }) {
     .filter((m) => m.avg > 0 && Math.abs(m.diff) >= 25 && Math.abs(Math.round((m.diff / m.avg) * 100)) >= 10)
     .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
     .slice(0, 4);
+  const showTrend = !isCurrentMonth && movers.length > 0;
 
+  const pieSlices = cats.map((c) => ({ name: c, value: byCat[c], color: catColor(c) }));
   const spentTitle = isCurrentMonth ? "You've spent so far in " + monthLabelFromKey(activeKey) : "You spent in " + monthLabelFromKey(activeKey);
   const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
 
@@ -2066,12 +2108,12 @@ function BreakdownPage({ transactions, targets }) {
           <div>
             <span className="card-label">{spentTitle}</span>
             <div className="bd-headline">{formatMoney(total)}</div>
-            {totalPct !== null && totalDiff !== 0 && (
+            {!isCurrentMonth && totalPct !== null && totalDiff !== 0 && (
               <div className={"bd-total-delta " + (totalDiff > 0 ? "delta-up" : "delta-down")}>
                 {totalDiff > 0 ? "\u25B2" : "\u25BC"}{Math.abs(totalPct)}% &middot; {formatMoney(Math.abs(totalDiff))} {totalDiff > 0 ? "more" : "less"} than {monthLabelFromKey(prevKey)}
               </div>
             )}
-            {totalDiff === 0 && prevTotal > 0 && <div className="bd-total-delta delta-flat">About the same as {monthLabelFromKey(prevKey)}</div>}
+            {!isCurrentMonth && totalDiff === 0 && prevTotal > 0 && <div className="bd-total-delta delta-flat">About the same as {monthLabelFromKey(prevKey)}</div>}
           </div>
           <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
             {monthsWithData.map((k) => (<option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>))}
@@ -2143,7 +2185,12 @@ function BreakdownPage({ transactions, targets }) {
           </div>
         </div>
 
-        {movers.length > 0 && (
+        <div className="glass-card dash-card bd-box bd-box-pie">
+          <span className="bd-box-title">Spending mix</span>
+          <PieChart slices={pieSlices} total={total} />
+        </div>
+
+        {showTrend && (
           <div className="glass-card dash-card bd-box bd-box-trend">
             <span className="bd-box-title">Trend analysis</span>
             <div className="bd-movers">
@@ -2945,7 +2992,7 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -3876,8 +3923,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-box { max-width: none; }
   .bd-box-title { color: #fff; font-size: 15px; font-weight: 600; display: block; margin-bottom: 4px; }
   .bd-row { display: flex; gap: 16px; align-items: flex-start; }
-  .bd-box-where { flex: 1 1 58%; min-width: 280px; }
-  .bd-box-trend { flex: 1 1 34%; min-width: 240px; }
+  .bd-row { flex-wrap: wrap; }
+  .bd-box-where { flex: 2 1 340px; min-width: 300px; }
+  .bd-box-pie { flex: 1 1 240px; min-width: 220px; }
+  .bd-box-trend { flex: 1 1 280px; min-width: 240px; }
+  .bd-pie-wrap { position: relative; margin-top: 8px; }
+  .bd-pie-svg { width: 100%; height: auto; max-width: 240px; display: block; margin: 8px auto 0; }
+  .bd-pie-tip { position: absolute; pointer-events: none; background: rgba(16,22,40,0.96); border: 1px solid rgba(255,255,255,0.16); color: #fff; font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 8px; white-space: nowrap; transform: translate(12px, -50%); z-index: 5; display: flex; align-items: center; gap: 6px; }
   .bd-box-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .bd-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.7); cursor: pointer; user-select: none; }
   .bd-check input { width: 15px; height: 15px; accent-color: #4f8cff; cursor: pointer; }
@@ -3909,7 +3961,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-mover { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
   .bd-mover-delta { font-size: 13px; font-weight: 500; }
 
-  @media (max-width: 720px) { .bd-row { flex-direction: column; } .bd-box-where, .bd-box-trend { flex: 1 1 auto; width: 100%; min-width: 0; } }
+  @media (max-width: 720px) { .bd-row { flex-direction: column; } .bd-box-where, .bd-box-pie, .bd-box-trend { flex: 1 1 auto; width: 100%; min-width: 0; } }
 
   /* settings */
   .back-btn { color: #fff; font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
