@@ -1126,7 +1126,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout }) {
   return (
     <div className="page stage-fade">
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
-      <div className={"glass-card " + CARD_SIZE[step]}>
+      <div className="glass-card onboard-card">
         <div className="progress-dots">
           {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
             <div key={i} className={"dot " + (i <= step ? "dot-active" : "")} />
@@ -1531,7 +1531,7 @@ function ConfirmCategoryScreen({ transactions, onConfirm, onDone }) {
 
 /* ---------------- Opening balance ---------------- */
 
-function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone }) {
+function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, onBack }) {
   const perBank = React.useMemo(() => {
     return banks.map((b) => {
       const stmts = (statements || []).filter((s) => s.bank === b && s.periodStart).sort((x, y) => (x.periodStart < y.periodStart ? -1 : 1));
@@ -1596,6 +1596,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone }) 
         </div>
 
         <div className="nav-row">
+          {onBack && <button className="glass-btn ghost" disabled={submitting} onClick={onBack}>Back</button>}
           <button className="glass-btn ghost" disabled={submitting} onClick={() => onDone(vals)}>Skip</button>
           <button className="glass-btn primary" disabled={submitting} onClick={handleContinue}>
             {submitting ? <span className="btn-spinner" /> : "Continue"}
@@ -1608,7 +1609,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone }) 
 
 /* ---------------- Monthly breakdown table ---------------- */
 
-function MonthlyBreakdownScreen({ onDone, transactions }) {
+function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
   const hasReal = transactions && transactions.length > 0;
   let categories, monthLabels, byCatByMonth, incomeByMonth;
   if (hasReal) {
@@ -1679,6 +1680,7 @@ function MonthlyBreakdownScreen({ onDone, transactions }) {
         </div>
 
         <div className="nav-row">
+          {onBack && <button className="glass-btn ghost" onClick={onBack}>Back</button>}
           <button className="glass-btn primary" onClick={onDone}>Set my monthly targets</button>
         </div>
       </div>
@@ -1688,7 +1690,7 @@ function MonthlyBreakdownScreen({ onDone, transactions }) {
 
 /* ---------------- Target setting ---------------- */
 
-function TargetSettingScreen({ onDone, pushToast, userId, transactions }) {
+function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack }) {
   const categories = TX_CATEGORIES;
   const avg = React.useMemo(() => avgSpendByCategory(transactions), [transactions]);
 
@@ -1781,6 +1783,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions }) {
         <button className="link-btn inline apply-all-btn" onClick={applyToAll}>Apply {monthLabelFromKey(activeMonth)}'s budget to all months</button>
 
         <div className="nav-row">
+          {onBack && <button className="glass-btn ghost" disabled={submitting} onClick={onBack}>Back</button>}
           <button className="glass-btn primary" disabled={submitting} onClick={handleFinish}>
             {submitting ? <span className="btn-spinner" /> : "Finish setup"}
           </button>
@@ -2823,11 +2826,12 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData }) {
   );
 }
 
-function EmptyState({ text }) {
+function EmptyState({ text, title }) {
   return (
     <div className="glass-card dash-card empty-state">
-      <div className="empty-icon">◇</div>
-      <p className="empty-text">{text || "Nothing to show yet — upload a statement to get started."}</p>
+      <div className="empty-icon-wrap"><span className="empty-icon">✨</span></div>
+      <p className="empty-title">{title || "Nothing here just yet"}</p>
+      <p className="empty-text">{text || "Upload a statement and this will fill with your own data."}</p>
     </div>
   );
 }
@@ -2970,6 +2974,33 @@ function MappingScreen({ transactions, onRecategorize, onBack }) {
     </div>
   );
 }
+const DEMO_BANK = "Demo Bank";
+const DEMO_TRANSACTIONS = (() => {
+  const now = new Date();
+  const mk = (m, day, name, amount, category) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - m, day);
+    return { id: "demo-" + name.replace(/[^a-z0-9]/gi, "") + "-" + m + "-" + day, date: d.toISOString().slice(0, 10), name, amount, category, bank: DEMO_BANK };
+  };
+  const rows = [];
+  for (let m = 2; m >= 0; m--) {
+    rows.push(mk(m, 1, "SALARY - ACME LTD", 3200, "Income"));
+    rows.push(mk(m, 3, "SPINNEYS DUBAI", -184, "Groceries"));
+    rows.push(mk(m, 5, "CARREFOUR MALL", -212, "Groceries"));
+    rows.push(mk(m, 6, "CAREEM RIDE", -34, "Transport"));
+    rows.push(mk(m, 8, "STARBUCKS DIFC", -28, "Dining"));
+    rows.push(mk(m, 10, "NETFLIX.COM", -46, "Subscriptions"));
+    rows.push(mk(m, 12, "DEWA UTILITIES", -310, "Bills"));
+    rows.push(mk(m, 14, "AMAZON.AE", -220, "Shopping"));
+    rows.push(mk(m, 16, "TALABAT ORDER", -62, "Dining"));
+    rows.push(mk(m, 19, "SALIK TOLL", -20, "Transport"));
+    rows.push(mk(m, 22, "NOON.COM", -155, "Shopping"));
+    rows.push(mk(m, 25, "DU MOBILE", -110, "Bills"));
+    rows.push(mk(m, 27, "COSTA COFFEE", -24, "Dining"));
+  }
+  return rows;
+})();
+const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
+
 function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
@@ -2983,16 +3014,20 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
   const stepKey = overviewSlots[tourStep] || "empty";
   const copy = TOUR_COPY[stepKey] || { title: "", body: "" };
   const advanceTour = () => { if (tourStep >= overviewSlots.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
+  const demoActive = runTour && !hasData;
+  const viewTransactions = demoActive ? DEMO_TRANSACTIONS : transactions;
+  const viewTargets = demoActive ? DEMO_TARGETS : targets;
+  const viewHasData = demoActive ? true : hasData;
 
   return (
     <div className="app-shell stage-fade">
       {showExtraBanner && !runTour && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
-      {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋</div>}
+      {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={targets} banks={banks} hasData={hasData} transactions={transactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -3109,7 +3144,7 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
           <div className="settings-bank-list">
             {categories.length > 0 ? categories.map((c) => (
               <div className="settings-bank-row" key={c}>
-                <span>{c}</span>
+                <span><span className="cat-dot" style={{ background: CATEGORY_COLORS[c], marginRight: 8, display: "inline-block", verticalAlign: "middle" }} />{c}</span>
                 {editingTargets ? (
                   <div className="target-input-wrap">
                     <span className="target-currency">£</span>
@@ -3587,11 +3622,11 @@ function App() {
   } else if (stage === "confirmCategory") {
     content = <ConfirmCategoryScreen transactions={customTransactions} onConfirm={recategorizeDescription} onDone={() => setStage("openingBalance")} />;
   } else if (stage === "openingBalance") {
-    content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
+    content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
-    content = <MonthlyBreakdownScreen transactions={customTransactions} onDone={() => setStage("targets")} />;
+    content = <MonthlyBreakdownScreen transactions={customTransactions} onBack={() => setStage("openingBalance")} onDone={() => setStage("targets")} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onDone={(t) => { setTargets(t); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} onBack={() => setStage("breakdown")} onDone={(t) => { setTargets(t); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -3699,6 +3734,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .glass-card.size-sm { max-width: 380px; min-height: 300px; }
   .glass-card.size-md { max-width: 420px; min-height: 420px; }
   .glass-card.size-lg { max-width: 460px; min-height: 500px; }
+  .glass-card.onboard-card { max-width: 460px; min-height: 480px; transition: none; }
+  .glass-card.onboard-card .step { flex: 1; }
+  .demo-badge { display: inline-block; margin-left: 10px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(79,140,255,0.18); color: #9bc0ff; border: 1px solid rgba(79,140,255,0.35); vertical-align: middle; }
   .auth-card { max-width: 400px; }
   .upload-card { max-width: 480px; max-height: 88vh; overflow-y: auto; }
   .processing-card { max-width: 400px; align-items: center; text-align: center; }
@@ -4055,6 +4093,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .glass-card.size-sm { min-height: 260px; }
     .glass-card.size-md { min-height: 380px; }
     .glass-card.size-lg { min-height: 460px; }
+    .glass-card.onboard-card { min-height: 440px; }
     .title { font-size: 19px; }
     .subtitle { font-size: 13px; }
 
@@ -4230,9 +4269,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .stmt-issue { color: #ffb84f; font-size: 12px; margin: 8px 4px 0; background: rgba(255,184,79,0.1); border: 1px solid rgba(255,184,79,0.25); border-radius: 10px; padding: 7px 10px; }
 
   /* empty states */
-  .empty-state { align-items: center; text-align: center; padding: 36px 22px; }
-  .empty-icon { font-size: 28px; color: rgba(255,255,255,0.3); margin-bottom: 10px; }
-  .empty-text { color: rgba(255,255,255,0.5); font-size: 13px; margin: 0; max-width: 280px; }
+  .empty-state { align-items: center; justify-content: center; text-align: center; padding: 40px 24px; }
+  .empty-icon-wrap { width: 52px; height: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; background: linear-gradient(135deg, rgba(79,140,255,0.28), rgba(181,107,255,0.28)); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25); }
+  .empty-icon { font-size: 22px; color: #fff; line-height: 1; }
+  .empty-title { color: rgba(255,255,255,0.92); font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  .empty-text { color: rgba(255,255,255,0.55); font-size: 13px; margin: 0; max-width: 300px; line-height: 1.5; }
 
   /* toasts */
   .modal-overlay {
