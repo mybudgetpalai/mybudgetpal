@@ -2880,6 +2880,20 @@ function MonthlyReviewCard({ transactions, allTargets, isDev }) {
                 </div>
               );
             })}
+            {(() => {
+              const tp = TX_CATEGORIES.reduce((s, c) => s + (Number(budgets[c]) || 0), 0);
+              const ta = TX_CATEGORIES.reduce((s, c) => s + Math.round(byCat[c] || 0), 0);
+              const td = ta - tp;
+              const over = td > 0;
+              return (
+                <div className="review-row review-total">
+                  <span className="review-cat">Total</span>
+                  <span>{formatMoney(tp)}</span>
+                  <span>{formatMoney(ta)}</span>
+                  <span className={over ? "rv-over" : "rv-under"}>{tp === 0 ? "\u2014" : (over ? "+" + formatMoney(td) + " over" : formatMoney(-td) + " under")}</span>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -4718,10 +4732,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .rt-verdict { font-size: 12px; font-weight: 600; margin-top: 4px; }
   .rt-good .rt-verdict { color: #4fe0c0; }
   .rt-bad .rt-verdict { color: #ff8b8b; }
-  .review-table { display: flex; flex-direction: column; margin-top: 10px; }
-  .review-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1.3fr; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px; color: rgba(255,255,255,0.85); }
-  .review-head { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
-  .review-cat { display: flex; align-items: center; }
+  .review-table { display: flex; flex-direction: column; margin-top: 16px; }
+  .review-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.3fr; gap: 16px; align-items: center; padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 16px; color: #fff; }
+  .review-row > span:nth-child(2), .review-row > span:nth-child(3), .review-row > span:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
+  .review-head { color: rgba(255,255,255,0.5); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; padding: 4px 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.16); }
+  .review-cat { display: flex; align-items: center; gap: 12px; font-weight: 500; }
+  .review-cat .cat-dot { width: 11px; height: 11px; }
+  .review-total { border-bottom: none; border-top: 1.5px solid rgba(255,255,255,0.22); margin-top: 2px; padding-top: 16px; font-weight: 700; }
+  .review-total .review-cat { font-weight: 700; }
   .rv-over { color: #ff8b8b; font-weight: 600; }
   .rv-under { color: #4fe0c0; font-weight: 600; }
   .plan-headline { display: flex; flex-direction: column; margin: 12px 0 8px; }
