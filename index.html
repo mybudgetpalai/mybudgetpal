@@ -2023,6 +2023,112 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
     </div>
   );
 }
+function BreakdownPage({ transactions, targets }) {
+  const txs = transactions || [];
+  const monthsWithData = React.useMemo(() => {
+    const set = new Set(txs.filter((t) => t.date && t.amount < 0).map((t) => t.date.slice(0, 7)));
+    return [...set].sort().reverse();
+  }, [txs]);
+  const [monthKey, setMonthKey] = useState(monthsWithData[0] || latestMonthKey(txs));
+  const [openCat, setOpenCat] = useState(null);
+  const activeKey = monthsWithData.includes(monthKey) ? monthKey : (monthsWithData[0] || monthKey);
+  const isCurrentMonth = activeKey === currentMonthKey();
+
+  const byCat = spendByCategoryForMonth(txs, activeKey);
+  const prevKey = addMonths(activeKey, -1);
+  const byCatPrev = spendByCategoryForMonth(txs, prevKey);
+  const avgKeys = lastNMonthKeys(addMonths(activeKey, -1), 3);
+  const avgByCat = {};
+  avgKeys.forEach((k) => { const o = spendByCategoryForMonth(txs, k); Object.keys(o).forEach((c) => { avgByCat[c] = (avgByCat[c] || 0) + o[c]; }); });
+  Object.keys(avgByCat).forEach((c) => { avgByCat[c] = avgByCat[c] / avgKeys.length; });
+
+  const cats = Object.keys(byCat).filter((c) => byCat[c] > 0).sort((a, b) => byCat[b] - byCat[a]);
+  const total = cats.reduce((s, c) => s + byCat[c], 0);
+  const prevTotal = Object.values(byCatPrev).reduce((s, v) => s + v, 0);
+  const totalDelta = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
+
+  function pct(a, b) { return b > 0 ? Math.round(((a - b) / b) * 100) : null; }
+
+  return (
+    <div className="glass-card dash-card">
+      <div className="bd-header">
+        <div>
+          <span className="card-label">Total spent</span>
+          <div className="bd-headline">{formatMoney(total)}</div>
+          {totalDelta !== null && (
+            <div className={"bd-total-delta " + (totalDelta > 0 ? "delta-up" : "delta-down")}>
+              {totalDelta > 0 ? "\u25b2" : "\u25bc"} {Math.abs(totalDelta)}% vs {monthLabelFromKey(prevKey)}
+            </div>
+          )}
+        </div>
+        <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
+          {monthsWithData.map((k) => (
+            <option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="category-list bd-list">
+        {cats.map((name) => {
+          const amount = byCat[name];
+          const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
+          const color = catColor(name);
+          const overBudget = budget > 0 && amount > budget;
+          const fillPct = budget > 0 ? Math.min(100, (amount / budget) * 100) : (amount > 0 ? 100 : 0);
+          const sharePct = total > 0 ? Math.round((amount / total) * 100) : 0;
+          const projected = isCurrentMonth ? projectMonthEnd(amount) : null;
+          const showPace = budget > 0 && projected !== null;
+          const paceOver = showPace && projected > budget;
+          const dMonth = pct(amount, byCatPrev[name] || 0);
+          const dAvg = pct(amount, avgByCat[name] || 0);
+          const isOpen = openCat === name;
+          const catTxs = txs
+            .filter((t) => t.amount < 0 && t.category === name && t.date.slice(0, 7) === activeKey)
+            .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+          return (
+            <div className="bd-cat" key={name}>
+              <div className={"bd-cat-row" + (isOpen ? " bd-open" : "")} onClick={() => setOpenCat(isOpen ? null : name)}>
+                <div className="category-top">
+                  <span className="category-name">
+                    <span className="cat-dot" style={{ background: color }} />{name}
+                    <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
+                  </span>
+                  <span className="category-amount">{formatMoney(amount)}{budget > 0 ? " / " + formatMoney(budget) : ""}</span>
+                </div>
+                <div className="category-track"><div className="category-fill" style={{ width: fillPct + "%", background: overBudget ? "#ff8b8b" : color }} /></div>
+                <div className="bd-meta">
+                  <span className="bd-share">{sharePct}% of spend</span>
+                  <span className="bd-deltas">
+                    {dMonth !== null && <span className={dMonth > 0 ? "delta-up" : (dMonth < 0 ? "delta-down" : "delta-flat")}>{dMonth > 0 ? "\u25b2" : (dMonth < 0 ? "\u25bc" : "\u2013")}{Math.abs(dMonth)}% vs last mo</span>}
+                    {dAvg !== null && <span className="bd-avg">{dAvg > 0 ? "+" : ""}{dAvg}% vs 3-mo avg</span>}
+                  </span>
+                </div>
+                {showPace && (
+                  <div className={"category-pace " + (paceOver ? "pace-note-over" : "pace-note-under")}>
+                    On pace for ~{formatMoney(projected)} ({paceOver ? formatMoney(projected - budget) + " over" : formatMoney(budget - projected) + " under"})
+                  </div>
+                )}
+              </div>
+              {isOpen && (
+                <div className="bd-tx-list">
+                  {catTxs.length === 0 ? (
+                    <div className="bd-tx-empty">No transactions.</div>
+                  ) : catTxs.map((t, i) => (
+                    <div className="bd-tx-row" key={t.id || i}>
+                      <span className="bd-tx-name">{t.name}<span className="bd-tx-date"> \u00b7 {formatTxDate(t.date)}</span></span>
+                      <span className="bd-tx-amt">{formatMoney(Math.abs(t.amount))}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BreakdownCard({ transactions, targets }) {
   const txs = transactions || [];
   const monthKey = latestMonthKey(txs);
@@ -2725,7 +2831,7 @@ function MainContent({ view, name, targets, banks, hasData, transactions, overvi
       <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} />
     </>
   );
-  if (view === "breakdown") return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -3727,6 +3833,32 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .category-amount { color: rgba(255,255,255,0.6); font-size: 13px; }
   .category-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
   .category-fill { height: 100%; border-radius: 3px; }
+
+  .bd-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .bd-headline { color: #fff; font-size: 30px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
+  .bd-total-delta { font-size: 12px; font-weight: 500; margin-top: 4px; }
+  .bd-month-select { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .bd-month-select option { color: #111; }
+  .bd-list { margin-top: 20px; gap: 10px; }
+  .bd-cat { border-radius: 12px; }
+  .bd-cat-row { cursor: pointer; padding: 10px; margin: -10px -10px 0; border-radius: 12px; transition: background 0.15s; }
+  .bd-cat-row:hover { background: rgba(255,255,255,0.04); }
+  .bd-cat-row.bd-open { background: rgba(255,255,255,0.05); }
+  .bd-chev { font-size: 14px; color: rgba(255,255,255,0.4); margin-left: 5px; transition: transform 0.2s; vertical-align: middle; }
+  .bd-chev-open { transform: rotate(180deg); }
+  .bd-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; gap: 10px; flex-wrap: wrap; }
+  .bd-share { font-size: 12px; color: rgba(255,255,255,0.55); }
+  .bd-deltas { display: flex; gap: 12px; font-size: 12px; align-items: center; }
+  .bd-avg { color: rgba(255,255,255,0.4); }
+  .delta-up { color: #ff8b8b; }
+  .delta-down { color: #4fe0c0; }
+  .delta-flat { color: rgba(255,255,255,0.4); }
+  .bd-tx-list { margin: 8px 0 2px; padding: 4px 0 4px 12px; border-left: 2px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; gap: 9px; }
+  .bd-tx-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .bd-tx-name { color: rgba(255,255,255,0.85); font-size: 13px; }
+  .bd-tx-date { color: rgba(255,255,255,0.4); }
+  .bd-tx-amt { color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .bd-tx-empty { color: rgba(255,255,255,0.4); font-size: 13px; }
 
   /* settings */
   .back-btn { color: #fff; font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
