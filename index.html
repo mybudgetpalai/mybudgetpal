@@ -497,6 +497,20 @@ function formatMoney(n) {
   const sym = CURRENCY_SYMBOLS[FX.home] || "£";
   return sign + sym + Math.abs(n).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
+function formatNum(n) {
+  const sign = n < 0 ? "-" : "";
+  return sign + Math.abs(n).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function fmtBalInput(v) {
+  if (v === "" || v === null || v === undefined) return "";
+  let str = String(v);
+  const neg = str.trim().startsWith("-");
+  str = str.replace(/-/g, "");
+  const parts = str.split(".");
+  const intPart = (parts[0] || "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const dec = parts.length > 1 ? "." + parts.slice(1).join("").slice(0, 2) : "";
+  return (neg ? "-" : "") + intPart + dec;
+}
 function formatMoneyNative(n, cur) {
   const sign = n < 0 ? "-" : "";
   const sym = CURRENCY_SYMBOLS[cur] || "£";
@@ -842,6 +856,18 @@ async function aiCategorize(descriptions) {
   });
   if (error || !data || !data.categories) throw new Error((error && error.message) || (data && data.error) || "AI categorization unavailable");
   return data.categories;
+}
+function buildTxDigest(transactions) {
+  const txs = (transactions || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 1200);
+  const lines = txs.map((t) => (t.date || "") + "|" + (t.name || "") + "|" + (t.amount < 0 ? "-" : "+") + Math.abs(Number(t.amount) || 0).toFixed(2) + "|" + (t.category || "Uncategorized"));
+  return { home: FX.home, count: txs.length, transactions: lines };
+}
+async function aiAskInsights(question, transactions) {
+  const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
+    body: { action: "ask", question: String(question).slice(0, 500), data: buildTxDigest(transactions) },
+  });
+  if (error || !data || !data.answer) throw new Error((error && error.message) || (data && data.error) || "Couldn\u2019t get an answer just now \u2014 please try again.");
+  return data.answer;
 }
 
 /* One entry point: file -> { transactions, meta } */
@@ -2285,15 +2311,15 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
               <div className="balance-row">
                 <div className="balance-field">
                   <label className="field-label">Opening balance</label>
-                  <div className="target-input-wrap" style={{ width: "100%" }}>
+                  <div className="target-input-wrap balance-input-wrap" style={{ width: "100%", padding: "10px 12px", marginTop: 4 }}>
                     <span className="target-currency">{homeSym()}</span>
-                    <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
-                      value={vals[p.bank].balance} onChange={(e) => setV(p.bank, "balance", e.target.value)} />
+                    <input className="target-input" style={{ width: "100%", fontSize: 14 }} type="text" inputMode="decimal" placeholder="0"
+                      value={fmtBalInput(vals[p.bank].balance)} onChange={(e) => setV(p.bank, "balance", e.target.value.replace(/[^0-9.\-]/g, ""))} />
                   </div>
                 </div>
                 <div className="balance-field">
                   <label className="field-label">As of date</label>
-                  <input className="glass-input" style={{ padding: "10px 12px", fontSize: 13, marginTop: 4 }} type="date"
+                  <input className="glass-input" style={{ padding: "10px 12px", fontSize: 14, marginTop: 4 }} type="date"
                     value={vals[p.bank].date} onChange={(e) => setV(p.bank, "date", e.target.value)} />
                 </div>
               </div>
@@ -2633,11 +2659,11 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
               ))}
               <tr className="bt-total-row">
                 <td className="bt-cat">Total spend</td>
-                {months.map((m) => <td key={m.key} className="bt-cell bt-total-cell">{formatMoney(monthTotal(m.key))}</td>)}
+                {months.map((m) => <td key={m.key} className="bt-cell bt-total-cell"><span className="bt-total-disp"><span className="bt-cur">{homeSym()}</span><span className="bt-total-num">{formatNum(monthTotal(m.key))}</span></span></td>)}
               </tr>
               <tr className="bt-total-row">
                 <td className="bt-cat">Saved</td>
-                {months.map((m) => <td key={m.key} className={"bt-cell bt-total-cell " + (monthNet(m.key) >= 0 ? "bt-net-pos" : "bt-net-neg")}>{formatMoney(monthNet(m.key))}</td>)}
+                {months.map((m) => <td key={m.key} className={"bt-cell bt-total-cell " + (monthNet(m.key) >= 0 ? "bt-net-pos" : "bt-net-neg")}><span className="bt-total-disp"><span className="bt-total-num">{formatMoney(monthNet(m.key))}</span></span></td>)}
               </tr>
             </tbody>
           </table>
@@ -2744,8 +2770,10 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const taskList = tasks || [];
   const initial = (name[0] || "?").toUpperCase();
   return (
     <div className="topbar">
@@ -2755,6 +2783,24 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
       </div>
       <div className="topbar-right">
         <button className="btn btn-ghost upload-statement-btn" onClick={onOpenUpload}>Upload statement</button>
+        <div className="inbox-wrap">
+          <button className="inbox-btn" onClick={() => setInboxOpen((v) => !v)} aria-label="Tasks" title="Tasks">
+            {"\ud83d\udce5"}{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
+          </button>
+          {inboxOpen && (
+            <div className="inbox-menu">
+              <div className="inbox-menu-head">Your tasks{taskList.length ? " \u00b7 " + taskList.length : ""}</div>
+              {taskList.length === 0 ? (
+                <div className="inbox-empty">{"\ud83c\udf89"} All caught up \u2014 nothing to do right now.</div>
+              ) : taskList.map((t) => (
+                <button key={t.id} className="inbox-item" onClick={() => { setInboxOpen(false); t.action(); }}>
+                  <span className="inbox-item-icon">{t.icon}</span>
+                  <span className="inbox-item-text"><span className="inbox-item-title">{t.title}</span><span className="inbox-item-desc">{t.desc}</span></span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="avatar-wrap">
         <button className="avatar" onClick={() => setMenuOpen((v) => !v)}>{initial}</button>
         {menuOpen && (
@@ -2825,6 +2871,27 @@ function CustomiseMenuModal({ current, onClose, onSave }) {
     </div>
   );
 }
+function BudgetRing({ spent, target }) {
+  const t = target || 1;
+  const pct = Math.min(100, Math.round((spent / t) * 100));
+  const overspent = spent > t;
+  const R = 70, CIRC = 2 * Math.PI * R;
+  const ringColor = overspent ? "#ff8b8b" : "#4f8cff";
+  return (
+    <div className="budget-ring-wrap">
+      <svg className="budget-ring" viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="14" />
+        <circle cx="80" cy="80" r={R} fill="none" stroke={ringColor} strokeWidth="14" strokeLinecap="round"
+          strokeDasharray={CIRC} strokeDashoffset={CIRC - CIRC * (Math.min(100, pct) / 100)} transform="rotate(-90 80 80)"
+          style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+      </svg>
+      <div className="budget-ring-center">
+        <span className="budget-ring-pct" style={overspent ? { color: "#ff8b8b" } : null}>{pct}%</span>
+        <span className="budget-ring-sub">of budget</span>
+      </div>
+    </div>
+  );
+}
 function SummaryCard({ targets, transactions, rollovers }) {
   const lastIdx = MONTH_LABELS.length - 1;
   const spent = spendForMonth(transactions || [], latestMonthKey(transactions || []));
@@ -2850,24 +2917,12 @@ function SummaryCard({ targets, transactions, rollovers }) {
         <span className="card-label">This month</span>
         <span className={"pace-badge " + (overPace ? "pace-over" : "pace-good")}>{overPace ? "Over pace" : "On track"}</span>
       </div>
-      <div className="budget-ring-wrap">
-        <svg className="budget-ring" viewBox="0 0 160 160">
-          <circle cx="80" cy="80" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="14" />
-          <circle cx="80" cy="80" r={R} fill="none" stroke={ringColor} strokeWidth="14" strokeLinecap="round"
-            strokeDasharray={CIRC} strokeDashoffset={CIRC - CIRC * (filledPct / 100)} transform="rotate(-90 80 80)"
-            style={{ transition: "stroke-dashoffset 0.6s ease" }} />
-        </svg>
-        <div className="budget-ring-center">
-          <span className="budget-ring-pct" style={overspent ? { color: "#ff8b8b" } : null}>{pct}%</span>
-          <span className="budget-ring-sub">of budget</span>
-        </div>
-      </div>
+      <BudgetRing spent={spent} target={target} />
       {overspent && <div className="overspend-alert">🚨 Over budget — {formatMoney(spent - target)} over your {formatMoney(target)} target</div>}
       <div className="summary-amounts" style={{ justifyContent: "center" }}>
         <span className="summary-spent">{formatMoney(spent)}</span>
         <span className="summary-target">of {formatMoney(target)} target</span>
       </div>
-      <p className="summary-note">{pct}% of budget used</p>
       {(() => {
         const rb = rolloverForMonth(rollovers, currentMonthKey());
         if (!rb) return null;
@@ -3036,6 +3091,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const [compareTargets, setCompareTargets] = useState(false);
   const activeKey = monthsWithData.includes(monthKey) ? monthKey : (monthsWithData[0] || monthKey);
   const isCurrentMonth = activeKey === currentMonthKey();
+  const bdTarget = (targets && isCurrentMonth) ? TX_CATEGORIES.reduce((s, c) => s + (Number(targets[c]) || 0), 0) : 0;
 
   const byCat = spendByCategoryForMonth(txs, activeKey);
   const prevKey = addMonths(activeKey, -1);
@@ -3082,9 +3138,12 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
             )}
             {!isCurrentMonth && totalDiff === 0 && prevTotal > 0 && <div className="bd-total-delta delta-flat">About the same as {monthLabelFromKey(prevKey)}</div>}
           </div>
-          <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
-            {monthsWithData.map((k) => (<option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>))}
-          </select>
+          <div className="bd-hero-right">
+            {bdTarget > 0 && <div className="bd-hero-ring"><BudgetRing spent={total} target={bdTarget} /></div>}
+            <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
+              {monthsWithData.map((k) => (<option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -3364,7 +3423,7 @@ function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
     </div>
   );
 }
-function TrendsCard({ transactions }) {
+function TrendsCard({ transactions, compact }) {
   const txs = transactions || [];
   const [cat, setCat] = useState(TX_CATEGORIES[0]);
   let keys = lastNMonthKeys(latestMonthKey(txs), 6);
@@ -3380,6 +3439,7 @@ function TrendsCard({ transactions }) {
   const catMax = Math.max(...catSpend, 1);
   return (
     <div className="trends-wrap">
+      {!compact && (<>
       <div className="glass-card dash-card">
         <span className="card-label">Net inflow / outflow</span>
         <div className="trend-chart">
@@ -3416,6 +3476,7 @@ function TrendsCard({ transactions }) {
         </div>
         <p className="summary-note">Total spend per month {"\u00B7"} {formatMoney(spend[spend.length - 1])} last month</p>
       </div>
+      </>)}
 
       <div className="glass-card dash-card">
         <div className="summary-head">
@@ -3561,11 +3622,45 @@ function MerchantsCard({ transactions }) {
   );
 }
 
-function InsightsCard({ transactions, targets }) {
+function InsightsAsk({ transactions }) {
+  const [q, setQ] = useState("");
+  const [ans, setAns] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ask = async (question) => {
+    const query = String(question != null ? question : q).trim();
+    if (!query || busy) return;
+    setQ(query); setBusy(true); setErr(""); setAns("");
+    try { const a = await aiAskInsights(query, transactions); setAns(a); }
+    catch (e) { setErr((e && e.message) || "Something went wrong \u2014 please try again."); }
+    setBusy(false);
+  };
+  const examples = ["How much did I spend on coffee last month?", "What was my biggest expense this month?", "Am I spending more on dining than usual?"];
+  return (
+    <div className="insights-ask">
+      <span className="card-label">Ask about your money</span>
+      <div className="ask-row">
+        <input className="glass-input ask-input" placeholder="e.g. How much did I spend on coffee last month?" value={q}
+          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} />
+        <button className="glass-btn primary ask-btn" onClick={() => ask()} disabled={busy}>{busy ? <span className="btn-spinner" /> : "Ask"}</button>
+      </div>
+      {!ans && !busy && !err && (
+        <div className="ask-examples">
+          {examples.map((ex) => <button key={ex} className="ask-chip" onClick={() => ask(ex)}>{ex}</button>)}
+        </div>
+      )}
+      {busy && <div className="ask-answer ask-loading">Looking through your transactions\u2026</div>}
+      {err && <div className="ask-answer ask-error">{err}</div>}
+      {ans && !busy && <div className="ask-answer">{ans}</div>}
+    </div>
+  );
+}
+function InsightsCard({ transactions, targets, full }) {
   const built = buildInsights(transactions || [], targets);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
   return (
     <div className="glass-card dash-card">
+      {full && <InsightsAsk transactions={transactions} />}
       <span className="card-label">Insights</span>
       <div className="insight-list">
         {insights.map((ins, i) => (
@@ -3887,7 +3982,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
                   <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
                   <span>{formatMoney(b)}</span>
                   <span>{formatMoney(a)}</span>
-                  <span className={over ? "rv-over" : "rv-under"}>{b === 0 ? "\u2014" : (over ? "+" + formatMoney(d) + " over" : formatMoney(-d) + " under")}</span>
+                  <span className={over ? "rv-over" : "rv-under"}>{b === 0 ? "\u2014" : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d))}</span>
                 </div>
               );
             })}
@@ -3898,7 +3993,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
                   <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{displayCat(c)}</span>
                   <span>{"\u2014"}</span>
                   <span>{formatMoney(a)}</span>
-                  <span className="rv-over">+{formatMoney(a)} unbudgeted</span>
+                  <span className="rv-over">-{formatMoney(a)} unbudgeted</span>
                 </div>
               );
             })}
@@ -3912,7 +4007,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
                   <span className="review-cat">Total</span>
                   <span>{formatMoney(tp)}</span>
                   <span>{formatMoney(ta)}</span>
-                  <span className={over ? "rv-over" : "rv-under"}>{tp === 0 ? "\u2014" : (over ? "+" + formatMoney(td) + " over" : formatMoney(-td) + " under")}</span>
+                  <span className={over ? "rv-over" : "rv-under"}>{tp === 0 ? "\u2014" : (over ? "-" + formatMoney(td) : "+" + formatMoney(-td))}</span>
                 </div>
               );
             })()}
@@ -4025,11 +4120,13 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
 
       <div className="glass-card dash-card">
         <span className="card-label">Projected {word} over time</span>
-        <div className="trend-chart">
+        <div className="trend-chart ltp-proj-chart">
           {cols.map((r) => (
             <div className="trend-bar-col" key={r.k}>
               <div className="trend-bar-wrap">
-                <div className={"trend-bar " + (r.actual ? "plan-bar-actual" : "plan-bar-forecast")} style={{ height: (((r.close - minB) / span) * 100) + "%" }} title={formatMoney(r.close)} />
+                <div className={"trend-bar ltp-bar " + (r.actual ? "plan-bar-actual" : "plan-bar-forecast")} style={{ height: (((r.close - minB) / span) * 100) + "%" }} title={formatMoney(r.close)}>
+                  <span className="ltp-bar-val">{formatMoney(r.close)}</span>
+                </div>
               </div>
               <span className="trend-bar-label">{monthLabelFromKey(r.k)}</span>
             </div>
@@ -4043,7 +4140,7 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
 
       <div className="glass-card dash-card">
         <span className="card-label">Month by month</span>
-        <p className="subtitle" style={{ margin: "6px 0 10px" }}>Months across the top — ✓ means finished (actuals). The bottom-right cell is where you land.</p>
+        <p className="subtitle" style={{ margin: "6px 0 10px" }}>Months across the top — columns tagged <span className="ltp-actual-chip">✓ actual</span> are finished (straight from your statements); the rest are your plan. The bottom-right cell is where you land.</p>
         <div className="ltp-wrap">
           <table className="ltp-table">
             <thead>
@@ -4051,7 +4148,7 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
                 <th className="ltp-sticky"></th>
                 {cols.map((r) => (
                   <th key={r.k} className={r.actual ? "ltp-actual-head" : "ltp-plan-head"}>
-                    {monthLabelFromKey(r.k)} {r.k.slice(2, 4)}{r.actual ? " ✓" : ""}
+                    {monthLabelFromKey(r.k)} {r.k.slice(2, 4)}{r.actual ? <span className="ltp-actual-chip">✓ actual</span> : null}
                   </th>
                 ))}
               </tr>
@@ -4190,7 +4287,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} rollovers={rollovers} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
     case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-    case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
+    case "trends": return hasData ? <TrendsCard transactions={transactions} compact /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
     case "bills": return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
     case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
     case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
@@ -4246,7 +4343,7 @@ function UncatBanner({ count, onSort, label }) {
   if (!count || hidden) return null;
   return (
     <div className="catrev-banner uncat-banner-block">
-      <span className="catrev-banner-text">{"\ud83c\udff7\ufe0f"} <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"\u2014"} they’re left out of your budgets until sorted.</span>
+      <span className="catrev-banner-text">{"\ud83c\udff7\ufe0f"} <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"\u2014"} still counted in your spending, just not assigned to a category yet.</span>
       <div className="catrev-banner-actions">
         <button className="catrev-banner-btn" onClick={onSort}>Sort now</button>
         <button className="catrev-banner-later" onClick={() => setHidden(true)}>Later</button>
@@ -4287,7 +4384,7 @@ function SafeToSpendHero({ targets, transactions, rollovers }) {
   );
 }
 
-function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, initialEdit }) {
+function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, initialEdit, onEditPlan }) {
   const cats = ["Income", ...TX_CATEGORIES];
   const monthKeys = React.useMemo(() => {
     const ks = Object.keys(allTargets || {}).filter((k) => /^\d{4}-\d{2}$/.test(k)).sort();
@@ -4319,12 +4416,17 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
     <div className="glass-card dash-card">
       <div className="summary-head">
         <span className="card-label">Monthly targets {"\u2014"} all months</span>
-        {!editing && <button className="link-btn inline" onClick={() => setEditing(true)}>Edit</button>}
+        {!editing && (
+          <div className="targets-actions">
+            {onEditPlan && <button className="glass-btn ghost targets-rebuild-btn" onClick={onEditPlan}>{"\u21bb"} Rebuild from a goal</button>}
+            <button className="link-btn inline" onClick={() => setEditing(true)}>Adjust numbers</button>
+          </div>
+        )}
       </div>
-      <p className="subtitle" style={{ margin: "4px 0 12px" }}>Your category targets across every month. {editing ? "Adjust any cell, then save." : "Tap Edit to change any month."}</p>
+      <p className="subtitle" style={{ margin: "4px 0 14px" }}>Your category targets across every month. {editing ? "Adjust any cell, then save." : "Rebuild the whole plan from a savings goal, or fine-tune individual numbers."}</p>
 
       <div className="budget-table-wrap">
-        <table className="budget-table">
+        <table className="budget-table targets-table">
           <thead>
             <tr>
               <th className="bt-corner">Category</th>
@@ -4344,14 +4446,14 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
                         <input className="bt-input" type="number" min="0" value={drafts[k] ? drafts[k][c] : ""}
                           onChange={(e) => setDrafts((prev) => ({ ...prev, [k]: { ...prev[k], [c]: e.target.value } }))} />
                       </span>
-                    ) : formatMoney(cellVal(k, c))}
+                    ) : <span className="bt-read-num">{formatMoney(cellVal(k, c))}</span>}
                   </td>
                 ))}
               </tr>
             ))}
             <tr className="bt-total-row">
               <td className="bt-cat">Total spend</td>
-              {monthKeys.map((k) => <td key={k} className="bt-cell bt-total-cell">{formatMoney(monthTotal(k))}</td>)}
+              {monthKeys.map((k) => <td key={k} className="bt-cell bt-total-cell"><span className="bt-total-disp"><span className="bt-cur">{homeSym()}</span><span className="bt-total-num">{formatNum(monthTotal(k))}</span></span></td>)}
             </tr>
           </tbody>
         </table>
@@ -4398,14 +4500,14 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-  if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} />;
+  if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
   if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} plan={plan} onEditPlan={onEditPlan} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "bills") return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} onToggleExclude={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
-  if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+  if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
 function MappingScreen({ transactions, onRecategorize, onBack, theme }) {
@@ -4500,6 +4602,11 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
   const viewTargets = demoActive ? DEMO_TARGETS : targets;
   const viewHasData = demoActive ? true : hasData;
   const uncatCount = (viewTransactions || []).filter((t) => t.category === "Uncategorized").length;
+  const completedMonths = completedMonthsWithData(viewTransactions || []);
+  const inboxTasks = [];
+  if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "\ud83c\udff7\ufe0f", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
+  if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "\u2699\ufe0f", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
+  if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; inboxTasks.push({ id: "review-" + rm, icon: "\ud83d\udcc6", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
 
   return (
     <div className="app-shell stage-fade" data-theme={theme || "midnight"}>
@@ -4510,7 +4617,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
@@ -5847,7 +5954,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .menu-item:hover { background: rgba(255,255,255,0.1); }
   .body-row { display: flex; }
   .side-panel { width: 0; overflow: hidden; background: rgba(255,255,255,0.04); border-right: 1px solid rgba(255,255,255,0.08); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); position: sticky; top: 65px; align-self: flex-start; z-index: 11; display: flex; flex-direction: column; }
-  .side-reset-btn { margin-top: auto; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #ff8b8b; background: rgba(255,139,139,0.1); border: 1px solid rgba(255,139,139,0.35); border-radius: 12px; padding: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .side-reset-btn { margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #ff8b8b; background: rgba(255,139,139,0.1); border: 1px solid rgba(255,139,139,0.35); border-radius: 12px; padding: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .side-reset-btn:hover { background: rgba(255,139,139,0.2); }
   .side-panel-open { width: 220px; padding: 20px 14px; }
   .side-panel-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 8px; }
@@ -6377,6 +6484,61 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-net-row td { font-weight: 600; }
   .ltp-close-row td { border-top: 1px solid rgba(255,255,255,0.14); }
   .ltp-goal-cell { background: rgba(79,224,192,0.14); color: #4fe0c0 !important; font-weight: 800; }
+
+  /* ---- batch: alignment, rings, inbox, ltp, targets, ask ---- */
+  .bt-total-disp { display: inline-flex; align-items: baseline; gap: 1px; padding: 4px 7px; }
+  .bt-total-num { display: inline-block; min-width: 54px; text-align: right; font-variant-numeric: tabular-nums; }
+  .balance-input-wrap { align-items: center; }
+  .balance-input-wrap .target-input { text-align: right; }
+
+  .bd-hero-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+  .bd-hero-ring .budget-ring-wrap { margin: 0; }
+  .bd-hero-ring .budget-ring { width: 104px; height: 104px; }
+  .bd-hero-ring .budget-ring-pct { font-size: 21px; }
+  .bd-hero-ring .budget-ring-sub { font-size: 10px; }
+
+  .ltp-proj-chart { height: 150px; margin-top: 30px; }
+  .ltp-bar { position: relative; }
+  .ltp-bar-val { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ltp-bal-row td { font-weight: 800 !important; background: rgba(143,180,255,0.14) !important; }
+  .ltp-net-row td { font-weight: 800 !important; background: rgba(143,180,255,0.08) !important; }
+  .ltp-bal-row .ltp-sticky, .ltp-net-row .ltp-sticky { background: rgba(34,44,74,0.98); color: #fff; font-weight: 800; }
+  .ltp-close-row td { border-top: 1px solid rgba(255,255,255,0.22); }
+  .ltp-actual-chip { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #4fe0c0; background: rgba(79,224,192,0.16); border: 1px solid rgba(79,224,192,0.4); border-radius: 5px; padding: 1px 4px; vertical-align: middle; }
+  .ltp-table td.ltp-actual { background: rgba(79,224,192,0.045); }
+
+  .targets-actions { display: flex; align-items: center; gap: 12px; }
+  .targets-rebuild-btn { padding: 7px 12px; font-size: 12.5px; white-space: nowrap; }
+  .targets-table th.bt-month-head { text-align: right; }
+  .targets-table td.bt-cell { text-align: right; }
+  .targets-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
+  .bt-read-num { font-variant-numeric: tabular-nums; color: rgba(255,255,255,0.92); }
+
+  .inbox-wrap { position: relative; }
+  .inbox-btn { position: relative; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+  .inbox-btn:hover { background: rgba(255,255,255,0.12); }
+  .inbox-badge { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #ff5e7a; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #141428; }
+  .inbox-menu { position: absolute; top: 46px; right: 0; width: 300px; max-width: 82vw; background: rgba(28,30,46,0.97); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 12px 30px rgba(0,0,0,0.45); z-index: 40; }
+  .inbox-menu-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.5); padding: 6px 10px 4px; }
+  .inbox-empty { color: rgba(255,255,255,0.65); font-size: 13px; padding: 12px 10px; }
+  .inbox-item { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: none; border: none; font-family: inherit; padding: 10px; border-radius: 11px; cursor: pointer; }
+  .inbox-item:hover { background: rgba(255,255,255,0.07); }
+  .inbox-item-icon { font-size: 16px; line-height: 1.3; flex-shrink: 0; }
+  .inbox-item-text { display: flex; flex-direction: column; gap: 2px; }
+  .inbox-item-title { color: #fff; font-size: 13.5px; font-weight: 600; }
+  .inbox-item-desc { color: rgba(255,255,255,0.55); font-size: 12px; line-height: 1.35; }
+
+  .insights-ask { border: 1px solid rgba(143,180,255,0.28); background: rgba(79,140,255,0.06); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; }
+  .ask-row { display: flex; gap: 8px; margin-top: 10px; }
+  .ask-input { flex: 1; min-width: 0; }
+  .ask-btn { flex-shrink: 0; min-width: 74px; }
+  .ask-examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .ask-chip { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: rgba(255,255,255,0.75); font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 20px; cursor: pointer; }
+  .ask-chip:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .ask-answer { margin-top: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 14px; color: #fff; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+  .ask-loading { color: rgba(255,255,255,0.6); }
+  .ask-error { color: #ffb4b4; border-color: rgba(255,139,139,0.4); background: rgba(255,139,139,0.1); }
+
 
   @keyframes mbPop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
   .modal-x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.6); font-size: 14px; cursor: pointer; }
