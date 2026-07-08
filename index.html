@@ -222,14 +222,14 @@ const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "
 const VIEWS = [
   { key: "overview", label: "Overview" },
   { key: "breakdown", label: "Spending Breakdown" },
-  { key: "targets", label: "Targets" },
   { key: "monthlyreview", label: "Monthly Review" },
   { key: "longterm", label: "Long-Term Plan" },
+  { key: "targets", label: "Targets" },
   { key: "transactions", label: "Transactions" },
   { key: "trends", label: "Trends" },
   { key: "bills", label: "Bills & Subscriptions" },
-  { key: "accounts", label: "Bank Accounts" },
   { key: "insights", label: "Insights" },
+  { key: "accounts", label: "Bank Accounts" },
 ];
 
 const TREND_MONTHS = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
@@ -495,12 +495,12 @@ function applyFxToTx(t) {
 function formatMoney(n) {
   const sign = n < 0 ? "-" : "";
   const sym = CURRENCY_SYMBOLS[FX.home] || "£";
-  return sign + sym + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return sign + sym + Math.abs(n).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 function formatMoneyNative(n, cur) {
   const sign = n < 0 ? "-" : "";
   const sym = CURRENCY_SYMBOLS[cur] || "£";
-  return sign + sym + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return sign + sym + Math.abs(n).toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -1162,7 +1162,7 @@ function LpCurrencyDemo() {
   const SYM = { GBP: "\u00a3", AED: "AED\u00a0" };
   const RATE = { "GBP>AED": 4.65, "AED>GBP": 0.215 };
   const conv = (n, from) => from === home ? n : Math.round(n * RATE[from + ">" + home]);
-  const fmt = (n, cur) => (n < 0 ? "-" : "") + SYM[cur] + Math.abs(n).toLocaleString();
+  const fmt = (n, cur) => (n < 0 ? "-" : "") + SYM[cur] + Math.abs(Math.round(n)).toLocaleString("en-GB");
   const txs = [
     { name: "SALARY \u00b7 BRIGHTWAVE", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: 3400 },
     { name: "TESCO EXPRESS", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: -72 },
@@ -2734,14 +2734,14 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initial = (name[0] || "?").toUpperCase();
   return (
     <div className="topbar">
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand">{APP_NAME}</div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview">{APP_NAME}</div>
       </div>
       <div className="topbar-right">
         <button className="btn btn-ghost upload-statement-btn" onClick={onOpenUpload}>Upload statement</button>
@@ -2767,9 +2767,17 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
         <span className="side-panel-label">Views</span>
         {onCustomise && <button className="side-edit-views" onClick={onCustomise} aria-label="Customise menu" title="Customise menu">✎</button>}
       </div>
-      {list.map((v) => (
+      {list.filter((v) => v.key !== "accounts").map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
       ))}
+      {list.some((v) => v.key === "accounts") && (
+        <div className="side-accounts-wrap">
+          <div className="side-divider" />
+          <button className={"side-item side-item-accounts " + (active === "accounts" ? "side-item-active" : "")} onClick={() => setActive("accounts")}>
+            <span className="side-accounts-icon">🏦</span><span>Bank Accounts</span>
+          </button>
+        </div>
+      )}
       {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
     </div>
   );
@@ -3365,6 +3373,7 @@ function TrendsCard({ transactions }) {
               <div className="trend-bar-wrap dual">
                 <div className="trend-bar income-bar" style={{ height: (income[i] / flowMax) * 100 + "%" }} />
                 <div className="trend-bar spend-bar" style={{ height: (spend[i] / flowMax) * 100 + "%" }} />
+                <span className="trend-tip">In {formatMoney(income[i])} {"\u00B7"} Out {formatMoney(spend[i])}</span>
               </div>
               <span className="trend-bar-label">{m}</span>
             </div>
@@ -3384,6 +3393,7 @@ function TrendsCard({ transactions }) {
             <div className="trend-bar-col" key={"s" + m + i}>
               <div className="trend-bar-wrap">
                 <div className="trend-bar" style={{ height: (spend[i] / spendMax) * 100 + "%" }} />
+                <span className="trend-tip">{formatMoney(spend[i])}</span>
               </div>
               <span className="trend-bar-label">{m}</span>
             </div>
@@ -3404,6 +3414,7 @@ function TrendsCard({ transactions }) {
             <div className="trend-bar-col" key={"c" + m + i}>
               <div className="trend-bar-wrap">
                 <div className="trend-bar" style={{ height: (catSpend[i] / catMax) * 100 + "%", background: catColor(cat) }} />
+                <span className="trend-tip">{formatMoney(catSpend[i])}</span>
               </div>
               <span className="trend-bar-label">{m}</span>
             </div>
@@ -3538,10 +3549,6 @@ function MerchantsCard({ transactions }) {
 function InsightsCard({ transactions, targets }) {
   const built = buildInsights(transactions || [], targets);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
-  const txs = transactions || [];
-  let merchants = topMerchantsFor(txs, latestMonthKey(txs), 5);
-  if (merchants.length < 3) merchants = topMerchantsFor(txs, null, 5);
-  const mMax = Math.max(...merchants.map((m) => m.amount), 1);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Insights</span>
@@ -3553,19 +3560,6 @@ function InsightsCard({ transactions, targets }) {
           </div>
         ))}
       </div>
-      {merchants.length > 0 && (
-        <div className="insights-merchants">
-          <span className="card-label" style={{ display: "block", margin: "18px 0 8px" }}>Top merchants</span>
-          <div className="category-list">
-            {merchants.map((m) => (
-              <div className="category-row" key={m.name}>
-                <div className="category-top"><span className="category-name">{m.name}</span><span className="category-amount">{formatMoney(m.amount)}</span></div>
-                <div className="category-track"><div className="category-fill" style={{ width: (m.amount / mMax) * 100 + "%", background: "#4f8cff" }} /></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -4429,7 +4423,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => setView("overview")} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
@@ -5752,6 +5746,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: rgba(255,255,255,0.65); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
   .side-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
   .side-item-active { background: var(--grad-nav); color: #fff; }
+  .brand-clickable { cursor: pointer; }
+  .side-accounts-wrap { margin-top: auto; }
+  .side-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 10px 4px; }
+  .side-item-accounts { display: flex; align-items: center; gap: 9px; font-weight: 600; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+  .side-item-accounts:hover { background: rgba(255,255,255,0.1); }
+  .side-item-accounts.side-item-active { background: var(--grad-nav); border-color: transparent; }
+  .side-accounts-icon { font-size: 15px; line-height: 1; }
   .main-content { flex: 1; padding: 28px; display: flex; flex-direction: column; gap: 20px; max-width: none; }
   .main-content-wide { max-width: none; width: 100%; min-height: calc(100vh - 65px); padding: 20px 24px; overflow-y: auto; }
   .overview-grid { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(320px, auto); gap: 16px; }
@@ -6030,6 +6031,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; margin-top: 16px; }
   .trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
   .trend-bar-wrap { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+  .trend-bar-wrap { position: relative; }
+  .trend-tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: rgba(12,16,28,0.96); border: 1px solid rgba(255,255,255,0.14); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 6; }
+  .trend-bar-col:hover .trend-tip { opacity: 1; }
   .trend-bar { width: 60%; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #4f8cff, #7f6bff); transition: height 0.4s ease; }
   .trend-bar-wrap.dual .trend-bar { width: 40%; }
   .income-bar { background: linear-gradient(180deg, #4fe0c0, #2fae90); }
