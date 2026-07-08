@@ -2556,7 +2556,7 @@ function CustomiseMenuModal({ current, onClose, onSave }) {
     </div>
   );
 }
-function SummaryCard({ targets, transactions }) {
+function SummaryCard({ targets, transactions, rollovers }) {
   const lastIdx = MONTH_LABELS.length - 1;
   const spent = spendForMonth(transactions || [], latestMonthKey(transactions || []));
   const target = Object.values(targets).reduce((s, v) => s + (Number(v) || 0), 0) || 1;
@@ -2599,6 +2599,11 @@ function SummaryCard({ targets, transactions }) {
         <span className="summary-target">of {formatMoney(target)} target</span>
       </div>
       <p className="summary-note">{pct}% of budget used</p>
+      {(() => {
+        const rb = rolloverForMonth(rollovers, currentMonthKey());
+        if (!rb) return null;
+        return <p className={"summary-note rollover-note " + (rb > 0 ? "rn-up" : "rn-down")}>{rb < 0 ? "↓" : "↑"} {formatMoney(Math.abs(rb))} rollover {rb < 0 ? "trimmed from" : "added to"} this month's spendable</p>;
+      })()}
       {paceNote && <p className={"summary-note pace-note " + (overPace ? "pace-note-over" : "pace-note-under")}>{paceNote}</p>}
     </div>
   );
@@ -3779,9 +3784,9 @@ const TOUR_COPY = {
   merchants: { title: "Top merchants", body: "Where your money goes most." },
 };
 
-function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
+function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers }) {
   switch (key) {
-    case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
+    case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} rollovers={rollovers} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
     case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
@@ -3794,7 +3799,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
   }
 }
 
-function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
+function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers }) {
   const revealed = !runTour || index <= tourStep;
   const active = runTour && index === tourStep;
   const slotRef = React.useRef(null);
@@ -3818,30 +3823,30 @@ function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, 
         </div>
       )}
       <div className="overview-slot-body">
-        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes })}
+        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers })}
       </div>
     </div>
   );
 }
 
-function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
+function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers }) {
   const updateSlot = (i, key) => onChangeSlots(slots.map((s, idx) => (idx === i ? key : s)));
   return (
     <div className="overview-grid">
       {slots.map((key, i) => (
-        <OverviewSlot key={i} index={i} runTour={runTour} tourStep={tourStep} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} />
+        <OverviewSlot key={i} index={i} runTour={runTour} tourStep={tourStep} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} rollovers={rollovers} />
       ))}
     </div>
   );
 }
 
-function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview }) {
+function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers }) {
   if (view === "overview") return (
     <>
       <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…{!runTour && uncatCount > 0 && (
         <button className="uncat-pill" onClick={onOpenCatReview}>{"\ud83c\udff7\ufe0f"} {uncatCount} to categorise</button>
       )}</div>
-      <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} />
+      <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} rollovers={rollovers} />
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
@@ -3932,7 +3937,6 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
   const [tourStep, setTourStep] = useState(0);
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [catReviewOpen, setCatReviewOpen] = useState(false);
-  const [uncatDismissedAt, setUncatDismissedAt] = useState(null);
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
@@ -3945,7 +3949,6 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
   const viewTargets = demoActive ? DEMO_TARGETS : targets;
   const viewHasData = demoActive ? true : hasData;
   const uncatCount = (viewTransactions || []).filter((t) => t.category === "Uncategorized").length;
-  const showCatBanner = !runTour && uncatCount > 0 && (uncatDismissedAt === null || uncatCount > uncatDismissedAt) && (effectiveView === "overview" || effectiveView === "breakdown");
 
   return (
     <div className="app-shell stage-fade" data-theme={theme || "midnight"}>
@@ -3955,31 +3958,12 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
           <button className="demo-reminder-btn" onClick={() => setUploadOpen(true)}>Add your real bank statement</button>
         </div>
       )}
-      {!runTour && (() => {
-        const rb = rolloverForMonth(rollovers, currentMonthKey());
-        if (!rb) return null;
-        return (
-          <div className="rollover-banner">
-            <span>{rb < 0 ? "↓" : "↑"} Budget rollover this month: <strong>{formatMoney(rb)}</strong> {rb < 0 ? "trimmed from" : "added to"} your spendable</span>
-          </div>
-        );
-      })()}
-      {showExtraBanner && !runTour && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
-      {showCatBanner && (
-        <div className="catrev-banner">
-          <span className="catrev-banner-text">{"\ud83c\udff7\ufe0f"} <strong>{uncatCount}</strong> transaction{uncatCount !== 1 ? "s" : ""} still need{uncatCount === 1 ? "s" : ""} a category {"\u2014"} your breakdown may be incomplete.</span>
-          <span className="catrev-banner-actions">
-            <button className="catrev-banner-btn" onClick={() => setCatReviewOpen(true)}>Review now</button>
-            <button className="catrev-banner-later" onClick={() => setUncatDismissedAt(uncatCount)}>Later</button>
-          </span>
-        </div>
-      )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -4019,7 +4003,7 @@ const THEMES = [
   { key: "forest", label: "Forest", preview: "linear-gradient(135deg,#34d399,#059669)" },
   { key: "rose", label: "Rose", preview: "linear-gradient(135deg,#f472b6,#a855f7)" },
 ];
-function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate }) {
+function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
@@ -4107,6 +4091,12 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
         </div>
         <div className="dash-card settings-section">
           <span className="card-label">Profile</span>
+          {extraPending && (
+            <div className="settings-nudge">
+              <span>Answer a few extra questions to personalise your experience.</span>
+              <button className="glass-btn primary settings-nudge-btn" onClick={onCompleteExtra}>Complete now</button>
+            </div>
+          )}
           <div className="field-group" style={{ marginTop: 14 }}>
             <label className="field-label">Name</label>
             <input className="glass-input" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
@@ -4296,7 +4286,7 @@ function App() {
   React.useEffect(() => {
     // Hold the month-end review until the user has finished the welcome tour and
     // any first-run setup — it should never interrupt onboarding.
-    if (stage !== "dashboard" || reviewMonth || runTour || showExtraBanner) return;
+    if (stage !== "dashboard" || reviewMonth || runTour) return;
     if (!hasData) return;
     const done = completedMonthsWithData(customTransactions);
     if (!done.length) return;
@@ -4828,6 +4818,8 @@ function App() {
   } else if (stage === "settings") {
     content = (
       <SettingsScreen
+        extraPending={showExtraBanner}
+        onCompleteExtra={() => setStage("extraQuestions")}
         name={name} banks={banks} targets={targets} userId={userId}
         pushToast={pushToast}
         onBack={() => setStage("dashboard")}
@@ -5009,6 +5001,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catrev-banner-btn { background: #8fb4ff; color: #0b1220; border: none; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
   .catrev-banner-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
   .catrev-banner-later { background: none; border: none; color: #9aa4b8; font-size: 12.5px; font-family: inherit; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
+  .settings-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(143,180,255,0.1); border: 1px solid rgba(143,180,255,0.3); color: #cfe0ff; font-size: 13px; }
+  .settings-nudge-btn { flex: none; padding: 8px 16px; font-size: 13px; border-radius: 999px; }
+  .rollover-note { margin-top: 6px; }
+  .rollover-note.rn-up { color: #4fe0c0; }
+  .rollover-note.rn-down { color: #ffb84f; }
   .uncat-pill { margin-left: 12px; vertical-align: middle; background: rgba(143,180,255,0.14); border: 1px solid rgba(143,180,255,0.35); color: #8fb4ff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s; }
   .uncat-pill:hover { background: rgba(143,180,255,0.24); }
   .catrev-card { max-width: 520px; width: 100%; max-height: 82vh; display: flex; flex-direction: column; }
