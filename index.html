@@ -2572,13 +2572,13 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
         <p className="subtitle">Amounts are in your home currency, across all your accounts.</p>
         <div className="field-group">
           <label className="field-label">Your balance at the start of {currentMonthName()} {balEst != null ? "(estimated from your statements)" : ""}</label>
-          <input className="glass-input" type="number" placeholder="e.g. 9000" value={curBal} onChange={(e) => setCurBal(e.target.value)} />
+          <input className="glass-input" type="text" inputMode="decimal" placeholder="e.g. £9,000" value={curBal === "" ? "" : (CURRENCY_SYMBOLS[FX.home] || "£") + fmtBalInput(curBal)} onChange={(e) => setCurBal(e.target.value.replace(/[^0-9.]/g, ""))} />
         </div>
         {method === "balance" && (
           <>
             <div className="field-group">
               <label className="field-label">Balance you want to reach</label>
-              <input className="glass-input" type="number" placeholder="e.g. 15000" value={goalBalance} onChange={(e) => setGoalBalance(e.target.value)} />
+              <input className="glass-input" type="text" inputMode="decimal" placeholder="e.g. £15,000" value={goalBalance === "" ? "" : (CURRENCY_SYMBOLS[FX.home] || "£") + fmtBalInput(goalBalance)} onChange={(e) => setGoalBalance(e.target.value.replace(/[^0-9.]/g, ""))} />
             </div>
             <div className="field-group">
               <label className="field-label">By the end of</label>
@@ -2593,7 +2593,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
           <>
             <div className="field-group">
               <label className="field-label">Amount to save</label>
-              <input className="glass-input" type="number" placeholder="e.g. 6000" value={saveAmount} onChange={(e) => setSaveAmount(e.target.value)} />
+              <input className="glass-input" type="text" inputMode="decimal" placeholder="e.g. £6,000" value={saveAmount === "" ? "" : (CURRENCY_SYMBOLS[FX.home] || "£") + fmtBalInput(saveAmount)} onChange={(e) => setSaveAmount(e.target.value.replace(/[^0-9.]/g, ""))} />
             </div>
             <div className="field-group">
               <label className="field-label">Over the next</label>
@@ -5647,6 +5647,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     --shadow-card: 0 1px 3px rgba(16,24,40,0.06), 0 1px 2px rgba(16,24,40,0.04);
     --shadow-pop: 0 12px 32px rgba(16,24,40,0.16);
   }
+  .app-shell[data-theme="dark"] .demo-reminder { background: #2A2110; border-bottom-color: #4A3A15; }
+  .app-shell[data-theme="dark"] .demo-reminder-text, .app-shell[data-theme="dark"] .demo-reminder-text strong { color: #F5C97B; }
   .app-shell[data-theme="dark"] {
     color-scheme: dark;
     --bg: #0F1218; --card: #171C25; --surface-2: #1D2430; --surface-3: #232B38;
@@ -5695,7 +5697,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .glass-card.onboard-card { max-width: 460px; min-height: 480px; transition: none; }
   .glass-card.onboard-card.onboard-compact { min-height: 0; }
   .glass-card.onboard-card .step { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-  .demo-badge { display: inline-block; margin-left: 10px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: #9bc0ff; border: 1px solid var(--accent); vertical-align: middle; }
+  .demo-badge { display: inline-block; margin-left: 10px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); vertical-align: middle; }
   .demo-sim { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0 8px; }
   .demo-file { touch-action: none; flex: 0 0 auto; width: 150px; padding: 16px 12px; border-radius: 16px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border: 1px solid var(--line); text-align: center; cursor: grab; transition: transform 0.15s, opacity 0.4s; box-shadow: 0 6px 20px rgba(0,0,0,0.25); user-select: none; }
   .demo-file:hover { transform: translateY(-3px) scale(1.02); }
@@ -5713,18 +5715,18 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .demo-drop-over { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); transform: scale(1.03); }
   .demo-drop-done { border-style: solid; border-color: rgba(79,224,192,0.7); background: rgba(79,224,192,0.14); color: #4fe0c0; font-weight: 700; }
   .demo-skip-empty { opacity: 0.85; }
-  .demo-reminder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 16px; padding: 11px 18px; background: linear-gradient(90deg, rgba(255,184,79,0.16), rgba(255,139,139,0.14)); border-bottom: 1px solid rgba(255,184,79,0.3); }
-  .demo-reminder-text { color: #ffd9a0; font-size: 13px; }
-  .demo-reminder-text strong { color: #ffb84f; }
-  .demo-reminder-btn { background: #ffb84f; color: #1a1205; border: none; border-radius: 999px; padding: 7px 16px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: transform 0.15s, filter 0.15s; }
+  .demo-reminder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 16px; padding: 11px 18px; background: #FFF3DC; border-bottom: 1px solid #F0DDB0; }
+  .demo-reminder-text { color: #7A4D0B; font-size: 13px; }
+  .demo-reminder-text strong { color: #7A4D0B; font-weight: 800; }
+  .demo-reminder-btn { background: #F0A93B; color: #3A2405; border: none; border-radius: 999px; padding: 7px 16px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: transform 0.15s, filter 0.15s; }
   .demo-reminder-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
-  .catrev-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 16px; padding: 10px 18px; background: linear-gradient(90deg, rgba(143,180,255,0.14), rgba(79,224,192,0.12)); border-bottom: 1px solid rgba(143,180,255,0.28); }
-  .catrev-banner-text { color: #cfe0ff; font-size: 13px; }
+  .catrev-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 16px; padding: 10px 18px; background: var(--accent-soft); border-bottom: 1px solid var(--line); }
+  .catrev-banner-text { color: var(--ink); font-size: 13px; }
   .catrev-banner-text strong { color: var(--accent); }
   .catrev-banner-actions { display: flex; align-items: center; gap: 10px; }
-  .catrev-banner-btn { background: var(--accent); color: #0b1220; border: none; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
+  .catrev-banner-btn { background: var(--accent); color: var(--on-accent); border: none; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
   .catrev-banner-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
-  .catrev-banner-later { background: none; border: none; color: #9aa4b8; font-size: 12.5px; font-family: inherit; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
+  .catrev-banner-later { background: none; border: none; color: var(--ink-3); font-size: 12.5px; font-family: inherit; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
   .settings-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(143,180,255,0.1); border: 1px solid rgba(143,180,255,0.3); color: #cfe0ff; font-size: 13px; }
   .settings-nudge-btn { flex: none; padding: 8px 16px; font-size: 13px; border-radius: 999px; }
   .rollover-note { margin-top: 6px; }
@@ -5817,15 +5819,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
   .chip:hover { background: var(--surface-3); }
   .chip-selected {
-    background: var(--accent);
-    border-color: #ffffff;
-    box-shadow: 0 0 0 2px var(--accent-shadow), 0 4px 16px var(--accent-shadow);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: none;
     font-weight: 700;
   }
   .check-badge {
     display: flex; align-items: center; justify-content: center;
     width: 18px; height: 18px; border-radius: 50%;
-    background: var(--card); color: #4f6cff;
+    background: var(--accent); color: var(--on-accent);
     font-size: 11px; font-weight: 900; flex-shrink: 0;
   }
   .goal-wrap { display: flex; flex-wrap: wrap; gap: 10px; overflow-y: auto; max-height: 340px; }
@@ -5848,9 +5851,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
   .segment:hover { background: var(--surface-3); }
   .segment-active {
-    background: var(--accent);
-    border-color: #ffffff;
-    box-shadow: 0 0 0 2px var(--accent-shadow), 0 4px 16px var(--accent-shadow);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: none;
     font-weight: 700;
   }
 
@@ -5925,7 +5929,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; will-change: transform; transform: translateZ(0); }
   .topbar-left { display: flex; align-items: center; gap: 14px; }
   .icon-btn { background: none; border: none; cursor: pointer; padding: 8px; font-size: 20px; }
-  .hamburger, .hamburger::before, .hamburger::after { display: block; width: 18px; height: 2px; background: #fff; border-radius: 2px; position: relative; }
+  .hamburger, .hamburger::before, .hamburger::after { display: block; width: 18px; height: 2px; background: var(--ink); border-radius: 2px; position: relative; }
   .hamburger::before, .hamburger::after { content: ""; position: absolute; }
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
   .brand { color: var(--ink); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
@@ -5933,7 +5937,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; }
   .avatar-wrap { position: relative; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  .avatar-menu { position: absolute; top: 44px; right: 0; background: rgba(30, 30, 45, 0.92); border: 1px solid var(--line); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .avatar-menu { position: absolute; top: 44px; right: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-pop); padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
   .menu-item { font-family: inherit; text-align: left; background: none; border: none; color: var(--ink); font-size: 14px; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
   .menu-item:hover { background: var(--surface-2); }
   .body-row { display: flex; }
@@ -6456,12 +6460,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
   .ltp-table th, .ltp-table td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .ltp-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
-  .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--panel-bg, rgba(20,28,54,0.97)); text-align: left; font-weight: 600; color: var(--ink-2); min-width: 140px; z-index: 1; }
+  .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--ink); min-width: 140px; z-index: 1; }
   .ltp-table .ltp-sticky .cat-dot { margin-right: 7px; }
   .ltp-actual-head { color: var(--ink-2) !important; }
   .ltp-plan-head { color: var(--accent-solid) !important; }
   .ltp-actual { color: var(--ink); }
-  .ltp-plan { color: rgba(158,194,255,0.95); }
+  .ltp-plan { color: var(--accent); }
   .ltp-neg { opacity: 0.92; }
   .ltp-bal-row td { font-weight: 700; background: var(--surface-2); }
   .ltp-net-row td { font-weight: 600; }
@@ -6483,8 +6487,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-proj-chart { height: 150px; margin-top: 30px; }
   .ltp-bar { position: relative; }
   .ltp-bar-val { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; font-size: 10.5px; font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .ltp-bal-row td { font-weight: 800 !important; background: rgba(143,180,255,0.14) !important; }
-  .ltp-net-row td { font-weight: 800 !important; background: rgba(143,180,255,0.08) !important; }
+  .ltp-bal-row td { font-weight: 800 !important; background: var(--accent-soft) !important; }
+  .ltp-net-row td { font-weight: 800 !important; background: var(--accent-soft) !important; }
   .ltp-bal-row .ltp-sticky, .ltp-net-row .ltp-sticky { background: rgba(34,44,74,0.98); color: var(--ink); font-weight: 800; }
   .ltp-close-row td { border-top: 1px solid var(--line); }
   .ltp-actual-chip { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #4fe0c0; background: rgba(79,224,192,0.16); border: 1px solid rgba(79,224,192,0.4); border-radius: 5px; padding: 1px 4px; vertical-align: middle; }
@@ -6501,7 +6505,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .inbox-btn { position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .inbox-btn:hover { background: var(--surface-3); }
   .inbox-badge { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #ff5e7a; color: var(--ink); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #141428; }
-  .inbox-menu { position: absolute; top: 46px; right: 0; width: 300px; max-width: 82vw; background: rgba(28,30,46,0.97); border: 1px solid var(--line); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 12px 30px rgba(0,0,0,0.45); z-index: 40; }
+  .inbox-menu { position: absolute; top: 46px; right: 0; width: 300px; max-width: 82vw; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 3px; box-shadow: var(--shadow-pop); z-index: 40; }
   .inbox-menu-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); padding: 6px 10px 4px; }
   .inbox-empty { color: var(--ink-2); font-size: 13px; padding: 12px 10px; }
   .inbox-item { display: flex; gap: 10px; align-items: flex-start; text-align: left; background: none; border: none; font-family: inherit; padding: 10px; border-radius: 11px; cursor: pointer; }
@@ -6653,10 +6657,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* ---- dashboard tour ---- */
   .overview-slot-coming { align-items: center; justify-content: center; display: flex; opacity: 0.5; }
   .coming-soon { color: var(--ink-3); font-size: 13px; font-style: italic; }
-  .overview-slot.tour-active { border-style: solid; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-shadow), 0 8px 30px var(--accent-shadow); animation: slotPop 0.4s ease; }
+  .overview-slot.tour-active { border-style: solid; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); animation: slotPop 0.4s ease; }
   @keyframes slotPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
   .welcome-banner { text-align: center; color: var(--ink); font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--line); }
-  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; width: calc(100% - 40px); max-width: 380px; background: rgba(20,22,40,0.96); border: 1px solid var(--line); border-radius: 22px; padding: 22px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); animation: tourCardIn 0.3s ease; }
+  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; width: calc(100% - 40px); max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow-pop); animation: tourCardIn 0.3s ease; }
   @keyframes tourCardIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .tour-step-count { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
   .tour-title { color: var(--ink); font-size: 18px; font-weight: 700; margin: 0 0 6px; }
@@ -6678,7 +6682,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* ---- added: greeting / trends / customise / bills-edit ---- */
   .overview-greeting { color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 2px 4px 16px; }
-  .uncat-banner-block { border-bottom: none; border: 1px solid rgba(143,180,255,0.28); border-radius: 14px; margin: 0 4px 14px; justify-content: space-between; }
+  .uncat-banner-block { border-bottom: none; border: 1px solid var(--line); border-radius: 14px; margin: 0 4px 14px; justify-content: space-between; }
   .safe-hero { background: linear-gradient(150deg, var(--accent-soft), rgba(127,107,255,0.10)); border: 1px solid var(--accent); border-radius: 18px; padding: 18px 20px; margin: 0 4px 18px; }
   .safe-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
   .safe-hero-main { display: flex; flex-direction: column; gap: 2px; }
