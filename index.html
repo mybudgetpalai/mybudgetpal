@@ -509,6 +509,7 @@ function spendByCategoryForMonth(txs, k) {
   return o;
 }
 function catColor(c) { return CATEGORY_COLORS[c] || "#9aa4b8"; }
+function displayCat(c) { return c === "Uncategorized" ? "Needs review" : c; }
 function addMonths(key, n) { let y = +key.slice(0, 4), m = +key.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + "-" + pad2(m); }
 function isMidMonth() { const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return d.getDate() < last; }
 function avgSpendByCategory(transactions) {
@@ -627,8 +628,8 @@ function buildInsights(txs, targets) {
     const a = curCats[c], b = prevCats[c];
     if (b > 20 && a > 20) {
       const chg = Math.round(((a - b) / b) * 100);
-      if (chg >= 25) out.push({ type: "warning", text: c + " spend is up " + chg + "% vs last month." });
-      else if (chg <= -25) out.push({ type: "positive", text: c + " spend is down " + Math.abs(chg) + "% vs last month." });
+      if (chg >= 25) out.push({ type: "warning", text: displayCat(c) + " spend is up " + chg + "% vs last month." });
+      else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " spend is down " + Math.abs(chg) + "% vs last month." });
     }
   });
   const totalTarget = Object.values(targets || {}).reduce((s, v) => s + (Number(v) || 0), 0);
@@ -2244,7 +2245,7 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
                 <tr key={c}>
                   <td className="row-label">
                     <span className="cat-dot" style={{ background: catColor(c) }} />
-                    {c}
+                    {displayCat(c)}
                   </td>
                   {byCatByMonth[c].map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
                 </tr>
@@ -2593,11 +2594,11 @@ function DAYS_INTO_MONTH() { return new Date().getDate(); }
 
 function CategoryEditor({ value, onChange }) {
   const [open, setOpen] = useState(false);
-  if (!open) return (<span className="cat-view"><span className="cat-dot" style={{ background: catColor(value) }} />{value} <button className="edit-link" onClick={() => setOpen(true)}>Edit</button></span>);
+  if (!open) return (<span className="cat-view"><span className="cat-dot" style={{ background: catColor(value) }} />{displayCat(value)} <button className="edit-link" onClick={() => setOpen(true)}>Edit</button></span>);
   return (
     <select className="cat-select" autoFocus value={value} onBlur={() => setOpen(false)}
       onChange={(e) => { onChange(e.target.value); setOpen(false); }}>
-      {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+      {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{displayCat(c)}</option>)}
     </select>
   );
 }
@@ -2626,7 +2627,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
         <div className="tx-list">
           {list.map((t, i) => (
             <div className="tx-row" key={i}>
-              <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+              <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
               <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
             </div>
           ))}
@@ -2665,7 +2666,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
         <input className="tx-input tx-search" type="text" placeholder="Search merchant, category, month…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <select className="bd-month-select" value={cat} onChange={(e) => setCat(e.target.value)}>
           <option value="all">All categories</option>
-          {catsPresent.map((c) => (<option key={c} value={c}>{c}</option>))}
+          {catsPresent.map((c) => (<option key={c} value={c}>{displayCat(c)}</option>))}
         </select>
         <select className="bd-month-select" value={month} onChange={(e) => setMonth(e.target.value)}>
           <option value="all">All months</option>
@@ -2688,7 +2689,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
           <div className="tx-empty">No transactions match your filters.</div>
         ) : filtered.map((t, i) => (
           <div className="tx-row" key={t.id || i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -2771,7 +2772,7 @@ function BreakdownPage({ transactions, targets }) {
     .slice(0, 4);
   const showTrend = !isCurrentMonth && movers.length > 0;
 
-  const pieSlices = cats.map((c) => ({ name: c, value: byCat[c], color: catColor(c) }));
+  const pieSlices = cats.map((c) => ({ name: displayCat(c), value: byCat[c], color: catColor(c) }));
   const spentTitle = isCurrentMonth ? "You've spent so far in " + monthLabelFromKey(activeKey) : "You spent in " + monthLabelFromKey(activeKey);
   const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
 
@@ -2833,7 +2834,7 @@ function BreakdownPage({ transactions, targets }) {
                   <div className={"bd-cat-row" + (isOpen ? " bd-open" : "")} onClick={() => setOpenCat(isOpen ? null : name)}>
                     <div className="category-top">
                       <span className="category-name">
-                        <span className="cat-dot" style={{ background: color }} />{name}
+                        <span className="cat-dot" style={{ background: color }} />{displayCat(name)}
                         {shareLabel && <span className={"bd-share" + (over ? " bd-share-over" : "")}>&middot; {shareLabel}</span>}
                         <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
                       </span>
@@ -2880,7 +2881,7 @@ function BreakdownPage({ transactions, targets }) {
                 const pctv = Math.abs(Math.round((m.diff / m.avg) * 100));
                 return (
                   <div className="bd-mover" key={m.name}>
-                    <span className="category-name"><span className="cat-dot" style={{ background: catColor(m.name) }} />{m.name}</span>
+                    <span className="category-name"><span className="cat-dot" style={{ background: catColor(m.name) }} />{displayCat(m.name)}</span>
                     <span className={"bd-mover-delta " + (up ? "delta-up" : "delta-down")}>
                       {up ? "\u25B2" : "\u25BC"} {pctv}% {up ? "higher" : "lower"} &middot; {formatMoney(Math.abs(m.diff))} {up ? "more" : "less"} than usual
                     </span>
@@ -2938,7 +2939,7 @@ function BreakdownCard({ transactions, targets }) {
             <div className="category-row" key={name}>
               <div className="category-top">
                 <span className="category-name">
-                  <span className="cat-dot" style={{ background: color }} />{name}
+                  <span className="cat-dot" style={{ background: color }} />{displayCat(name)}
                   {shareLabel && <span className={"bd-share" + (over ? " bd-share-over" : "")}>&middot; {shareLabel}</span>}
                 </span>
                 <span className={"category-amount bd-amt" + (over ? " bd-amt-over" : "")}>{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
@@ -3306,7 +3307,8 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
   const over = net < 0;
   const label = monthLabelFromKey(month) + " " + month.slice(0, 4);
   const winCat = TX_CATEGORIES.map((c) => ({ c, diff: (Number(budgets[c]) || 0) - Math.round(byCat[c] || 0) })).sort((a, b) => b.diff - a.diff)[0];
-  const max = Math.max(1, ...TX_CATEGORIES.map((c) => Math.max(Number(budgets[c]) || 0, Math.round(byCat[c] || 0))));
+  const extraCats = Object.keys(byCat).filter((c) => !TX_CATEGORIES.includes(c) && Math.round(byCat[c]) > 0).sort((a, b) => byCat[b] - byCat[a]);
+  const max = Math.max(1, ...TX_CATEGORIES.map((c) => Math.max(Number(budgets[c]) || 0, Math.round(byCat[c] || 0))), ...extraCats.map((c) => Math.round(byCat[c] || 0)));
 
   let monthsLeft = 4;
   if (goal && goal.targetDate) {
@@ -3360,6 +3362,18 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
                       <div className="rmb-spent" style={{ width: (a / max) * 100 + "%", background: o ? "#ff6b6b" : "var(--accent)" }} />
                     </div>
                     <span className="rmb-val" style={{ color: o ? "#ff6b6b" : "rgba(255,255,255,0.7)" }}>{formatMoney(a)}</span>
+                  </div>
+                );
+              })}
+              {extraCats.map((c) => {
+                const a = Math.round(byCat[c] || 0);
+                return (
+                  <div className="rmb-row" key={c}>
+                    <span className="rmb-name">{displayCat(c)}</span>
+                    <div className="rmb-track">
+                      <div className="rmb-spent" style={{ width: (a / max) * 100 + "%", background: catColor(c) }} />
+                    </div>
+                    <span className="rmb-val" style={{ color: "rgba(255,255,255,0.7)" }}>{formatMoney(a)}</span>
                   </div>
                 );
               })}
@@ -3441,6 +3455,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
   const budgets = usingSampleTargets ? DEMO_TARGETS : rawBudgets;
   const hasBudget = TX_CATEGORIES.some((c) => Number(budgets[c]) > 0);
   const byCat = spendByCategoryForMonth(txs, monthKey);
+  const extraCats = Object.keys(byCat).filter((c) => !TX_CATEGORIES.includes(c) && Math.round(byCat[c]) > 0).sort((a, b) => byCat[b] - byCat[a]);
   const actualSpend = Math.round(spendForMonth(txs, monthKey));
   const actualIncome = Math.round(incomeForMonth(txs, monthKey));
   const plannedSpend = Math.round(TX_CATEGORIES.reduce((s, c) => s + (Number(budgets[c]) || 0), 0));
@@ -3510,9 +3525,20 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
                 </div>
               );
             })}
+            {extraCats.map((c) => {
+              const a = Math.round(byCat[c] || 0);
+              return (
+                <div className="review-row" key={c}>
+                  <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{displayCat(c)}</span>
+                  <span>{"\u2014"}</span>
+                  <span>{formatMoney(a)}</span>
+                  <span className="rv-over">+{formatMoney(a)} unbudgeted</span>
+                </div>
+              );
+            })}
             {(() => {
               const tp = TX_CATEGORIES.reduce((s, c) => s + (Number(budgets[c]) || 0), 0);
-              const ta = TX_CATEGORIES.reduce((s, c) => s + Math.round(byCat[c] || 0), 0);
+              const ta = [...TX_CATEGORIES, ...extraCats].reduce((s, c) => s + Math.round(byCat[c] || 0), 0);
               const td = ta - tp;
               const over = td > 0;
               return (
@@ -4383,7 +4409,7 @@ function App() {
         await supabaseClient.from("transactions").update({ category: newCategory }).eq("user_id", userId).eq("description", description);
       } catch (e) { pushToast("Changed here, but couldn't save to your account", "error"); return; }
     }
-    pushToast("\u201C" + description + "\u201D \u2192 " + newCategory, "success");
+    pushToast("\u201C" + description + "\u201D \u2192 " + displayCat(newCategory), "success");
   };
 
   const startDemo = (demoCurs) => {
