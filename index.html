@@ -16,6 +16,21 @@
 <style>
   html, body { margin: 0; padding: 0; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; scroll-behavior: smooth; }
   #root { min-height: 100vh; }
+
+  /* ---- icon system + motion (steps 2-3) ---- */
+  .ic { vertical-align: -2px; flex-shrink: 0; }
+  .tx-cat-ico { width: 28px; height: 28px; border-radius: 9px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 10px; }
+  .tx-row { display: flex; align-items: center; }
+  .tx-row .tx-info { flex: 1; min-width: 0; }
+  .cat-ico { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; background: var(--surface-2); margin-right: 7px; vertical-align: -5px; }
+  .inbox-empty .ic, .catrev-banner-text .ic, .demo-reminder-text .ic, .overspend-alert .ic, .stmt-issue .ic, .review-win .ic { vertical-align: -2.5px; margin-right: 2px; }
+  .insight-icon .ic { vertical-align: -3px; }
+  .empty-icon .ic { color: var(--accent); }
+  @keyframes barGrow { from { width: 0; } }
+  .category-fill, .goal-fill, .pace-fill, .progress-fill, .safe-hero-fill, .lpd-progress-fill, .lpd-bar-fill { animation: barGrow 0.9s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  @media (prefers-reduced-motion: reduce) {
+    .category-fill, .goal-fill, .pace-fill, .progress-fill, .safe-hero-fill, .lpd-progress-fill, .lpd-bar-fill { animation: none; }
+  }
 </style>
 </head>
 <body>
@@ -24,6 +39,68 @@
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
 const APP_NAME = "MyBudgetPal";
+
+/* ---------------- Icons (inline SVG, stroke = currentColor) ---------------- */
+const ICON_PATHS = {
+  groceries: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z|M3 6h18|M16 10a4 4 0 0 1-8 0",
+  dining: "M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2|M7 2v20|M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3|M21 15v7",
+  transport: "M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L17 10l-2.2-3.5c-.4-.6-1-.9-1.7-.9H9c-.6 0-1.2.3-1.6.8L4.8 10l-2.3 1.1C1.6 11.5 1 12.3 1 13.2V16c0 .6.4 1 1 1h2|M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0|M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
+  shopping: "M2 2h3l2.6 12.6A2 2 0 0 0 9.6 16h8.7a2 2 0 0 0 2-1.6L22 7H6|M8 20a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0|M17 20a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0",
+  subscriptions: "M17 2l4 4-4 4|M3 11V9a4 4 0 0 1 4-4h14|M7 22l-4-4 4-4|M21 13v2a4 4 0 0 1-4 4H3",
+  bills: "M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z|M8 8h8|M8 12h8|M8 16h5",
+  income: "M2 6h20v12H2Z|M10 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0|M6 12h.01|M18 12h.01",
+  tag: "M12 2H2v10l9.3 9.3a1.9 1.9 0 0 0 2.7 0l7-7a1.9 1.9 0 0 0 0-2.7L12 2Z|M7 7h.01",
+  other: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M8 12h.01|M12 12h.01|M16 12h.01",
+  check: "M20 6 9 17l-5-5",
+  x: "M18 6 6 18|M6 6l12 12",
+  plus: "M12 5v14|M5 12h14",
+  alert: "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z|M12 9v4|M12 17h.01",
+  edit: "M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z",
+  inbox: "M22 12h-6l-2 3h-4l-2-3H2|M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z",
+  file: "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z|M14 2v6h6",
+  chart: "M3 3v18h18|M8 17V9|M13 17V5|M18 17v-3",
+  linechart: "M3 3v18h18|M7 15l4-4 3 3 5-6",
+  target: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M12 7a5 5 0 1 0 0 10 5 5 0 1 0 0-10Z|M12 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2Z",
+  bank: "M3 22h18|M6 18v-7|M10 18v-7|M14 18v-7|M18 18v-7|M12 2 2 8h20L12 2Z",
+  calendar: "M8 2v4|M16 2v4|M3 6h18v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z|M3 10h18",
+  sliders: "M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6",
+  sparkles: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z|M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z",
+  trending: "M22 7 13.5 15.5l-5-5L2 17|M16 7h6v6",
+  info: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M12 11v5|M12 8h.01",
+  checkcircle: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M8.5 12.2l2.4 2.4 4.6-4.8",
+};
+function Icon({ name, size = 16, strokeWidth = 2, className = "", style }) {
+  const d = ICON_PATHS[name] || ICON_PATHS.tag;
+  return (
+    <svg className={"ic " + className} style={style} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {d.split("|").map((p, i) => <path key={i} d={p} />)}
+    </svg>
+  );
+}
+const CATEGORY_ICONS = {
+  Groceries: "groceries", Dining: "dining", Transport: "transport", Shopping: "shopping",
+  Subscriptions: "subscriptions", Bills: "bills", Income: "income", Uncategorized: "tag", Other: "other",
+};
+function CountUp({ value, format, duration = 800 }) {
+  const [display, setDisplay] = useState(() => Number(value) || 0);
+  const rafRef = useRef(null);
+  useEffect(() => {
+    const target = Number(value) || 0;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { setDisplay(target); return; }
+    const startT = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - startT) / duration);
+      const e = 1 - Math.pow(1 - p, 3);
+      setDisplay(target * e);
+      if (p < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    setDisplay(0);
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [value]);
+  return <React.Fragment>{(format || ((n) => Math.round(n)))(display)}</React.Fragment>;
+}
 
 const SUPABASE_URL = "https://pjqjzcmqbeqgzyhpbhfz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_M6NKJyabkWYkzYoEMPgoaA_Pw8x53Vg";
@@ -1168,7 +1245,7 @@ function LpViewsDemo() {
         <div className="lpd-pane">
           <div className="lpd-goal">
             <div className="lpd-goal-top"><span>&#127958;&#65039; Holiday fund</span><span>&pound;2,400 / &pound;4,000</span></div>
-            <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: "60%", background: "#4fe0c0" }} /></div>
+            <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: "60%", background: catColor("Income") }} /></div>
             <span className="lpd-goal-note">60% there &mdash; on pace for November</span>
           </div>
           <div className="lpd-goal">
@@ -1223,7 +1300,7 @@ function LpCurrencyDemo() {
         <span>Combined, in {home}</span>
         <b className={total >= 0 ? "lpd-cur-pos" : ""}>{fmt(total, home)}</b>
       </div>
-      <div className="lpd-views-hint">👆 Switch your home currency — every account converts at a rate locked per month.</div>
+      <div className="lpd-views-hint">Switch your home currency — every account converts at a rate locked per month.</div>
     </div>
   );
 }
@@ -1313,13 +1390,13 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
       <div className="lp-section lp-wrap">
         <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
         <div className="features">
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Multi-currency</h3><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Spending breakdown</h3><p>See exactly what you spend by category, every month.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Monthly targets</h3><p>Set a budget per category and track how you're pacing.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Savings goals</h3><p>Plan toward a goal and see your progress over time.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Bills & subscriptions</h3><p>Keep track of recurring payments and due dates in one place.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Trends over time</h3><p>See how your spending and income shift month to month.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Customizable views</h3><p>Switch between different dashboard views to see the data your way.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="income" size={17} /></div><h3>Multi-currency</h3><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="chart" size={17} /></div><h3>Spending breakdown</h3><p>See exactly what you spend by category, every month.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="target" size={17} /></div><h3>Monthly targets</h3><p>Set a budget per category and track how you're pacing.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h3>Savings goals</h3><p>Plan toward a goal and see your progress over time.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="bills" size={17} /></div><h3>Bills & subscriptions</h3><p>Keep track of recurring payments and due dates in one place.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="linechart" size={17} /></div><h3>Trends over time</h3><p>See how your spending and income shift month to month.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="sliders" size={17} /></div><h3>Customizable views</h3><p>Switch between different dashboard views to see the data your way.</p></div>
         </div>
       </div>
 
@@ -1492,7 +1569,7 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
               {(banks && banks.length ? banks : []).map((b) => (
                 <button key={b} className={"chip " + (bank === b ? "chip-selected" : "")} onClick={() => setBank(b)}>
                   <span>{b}</span>
-                  {bank === b && <span className="check-badge">✓</span>}
+                  {bank === b && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -1732,7 +1809,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
               {CURRENCIES.map((c) => (
                 <button key={c} className={"segment " + (currencies[0] === c ? "segment-active" : "")} onClick={() => setPrimary(c)}>
                   <span>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</span>
-                  {currencies[0] === c && <span className="check-badge">✓</span>}
+                  {currencies[0] === c && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -1747,7 +1824,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                   {CURRENCIES.filter((c) => c !== currencies[0]).map((c) => (
                     <button key={c} className={"segment " + (currencies[1] === c ? "segment-active" : "")} onClick={() => setSecondary(c)}>
                       <span>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</span>
-                      {currencies[1] === c && <span className="check-badge">✓</span>}
+                      {currencies[1] === c && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                     </button>
                   ))}
                 </div>
@@ -1769,7 +1846,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                     return (
                       <button key={cur + b} className={"chip bank-chip " + (sel ? "chip-selected" : "")} onClick={() => toggleBankCur(b, cur)}>
                         <span>{b}</span>
-                        {sel && <span className="check-badge">✓</span>}
+                        {sel && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                       </button>
                     );
                   })}
@@ -1785,7 +1862,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
               {SAVVY_OPTIONS.map((opt) => (
                 <button key={opt.key} className={"segment " + (savvy === opt.key ? "segment-active" : "")} onClick={() => setSavvy(opt.key)}>
                   <span>{opt.label}</span>
-                  {savvy === opt.key && <span className="check-badge">✓</span>}
+                  {savvy === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -1798,7 +1875,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
               {TRACKING_OPTIONS.map((opt) => (
                 <button key={opt.key} className={"segment " + (tracking === opt.key ? "segment-active" : "")} onClick={() => setTracking(opt.key)}>
                   <span>{opt.label}</span>
-                  {tracking === opt.key && <span className="check-badge">✓</span>}
+                  {tracking === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -1811,7 +1888,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
               {BALANCE_OPTIONS.map((opt) => (
                 <button key={opt.key} className={"segment " + (balanceCheck === opt.key ? "segment-active" : "")} onClick={() => setBalanceCheck(opt.key)}>
                   <span>{opt.label}</span>
-                  {balanceCheck === opt.key && <span className="check-badge">✓</span>}
+                  {balanceCheck === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -1825,7 +1902,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
               {GOALS.map((g) => (
                 <button key={g} className={"chip goal-chip " + (goals.includes(g) ? "chip-selected" : "")} onClick={() => toggleGoal(g)}>
                   <span>{g}</span>
-                  {goals.includes(g) && <span className="check-badge">✓</span>}
+                  {goals.includes(g) && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -2102,7 +2179,7 @@ function DemoUploadScreen({ currencies, onUseDemo, onSkipEmpty, onBack }) {
                    style={touchDrag && touchDrag.c === c ? { transform: "translate(" + touchDrag.dx + "px, " + touchDrag.dy + "px)", transition: "none", zIndex: 5, position: "relative" } : undefined}
                    onClick={() => markDropped(c)}
                    title="Drag me into the box, or click">
-                <div className="demo-file-icon">📄</div>
+                <div className="demo-file-icon"><Icon name="file" size={18} /></div>
                 <div className="demo-file-name">Sample_{c}_Statement.csv</div>
                 <div className="demo-file-hint">{multi ? c + " account" : "drag me → or click"}</div>
               </div>
@@ -2634,7 +2711,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
             </thead>
             <tbody>
               <tr className="bt-income-row">
-                <td className="bt-cat"><span className="cat-dot" style={{ background: "#4fe0c0" }} />Income</td>
+                <td className="bt-cat"><span className="cat-dot" style={{ background: catColor("Income") }} />Income</td>
                 {months.map((m) => (
                   <td key={m.key} className="bt-cell">
                     <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
@@ -2727,7 +2804,7 @@ function ExtraQuestionsScreen({ onDone, onSkip, pushToast, userId }) {
             {SALARY_RANGES.map((s) => (
               <button key={s} className={"segment " + (salary === s ? "segment-active" : "")} onClick={() => setSalary(s)}>
                 <span>{s}</span>
-                {salary === s && <span className="check-badge">✓</span>}
+                {salary === s && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
               </button>
             ))}
           </div>
@@ -2739,7 +2816,7 @@ function ExtraQuestionsScreen({ onDone, onSkip, pushToast, userId }) {
             {EMPLOYMENT_TYPES.map((e) => (
               <button key={e} className={"segment " + (employment === e ? "segment-active" : "")} onClick={() => setEmployment(e)}>
                 <span>{e}</span>
-                {employment === e && <span className="check-badge">✓</span>}
+                {employment === e && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
               </button>
             ))}
           </div>
@@ -2785,16 +2862,16 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
         <button className="btn btn-ghost upload-statement-btn" onClick={onOpenUpload}>Upload statement</button>
         <div className="inbox-wrap">
           <button className="inbox-btn" onClick={() => setInboxOpen((v) => !v)} aria-label="Tasks" title="Tasks">
-            {"\ud83d\udce5"}{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
+            <Icon name="inbox" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
           </button>
           {inboxOpen && (
             <div className="inbox-menu">
               <div className="inbox-menu-head">Your tasks{taskList.length ? " \u00b7 " + taskList.length : ""}</div>
               {taskList.length === 0 ? (
-                <div className="inbox-empty">{"\ud83c\udf89"} All caught up \u2014 nothing to do right now.</div>
+                <div className="inbox-empty"><Icon name="checkcircle" size={15} /> All caught up \u2014 nothing to do right now.</div>
               ) : taskList.map((t) => (
                 <button key={t.id} className="inbox-item" onClick={() => { setInboxOpen(false); t.action(); }}>
-                  <span className="inbox-item-icon">{t.icon}</span>
+                  <span className="inbox-item-icon"><Icon name={t.icon} size={16} /></span>
                   <span className="inbox-item-text"><span className="inbox-item-title">{t.title}</span><span className="inbox-item-desc">{t.desc}</span></span>
                 </button>
               ))}
@@ -2821,7 +2898,7 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
     <div className={"side-panel " + (open ? "side-panel-open" : "")}>
       <div className="side-panel-label-row">
         <span className="side-panel-label">Views</span>
-        {onCustomise && <button className="side-edit-views" onClick={onCustomise} aria-label="Customise menu" title="Customise menu">✎</button>}
+        {onCustomise && <button className="side-edit-views" onClick={onCustomise} aria-label="Customise menu" title="Customise menu"><Icon name="edit" size={13} /></button>}
       </div>
       {list.filter((v) => v.key !== "accounts").map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
@@ -2830,7 +2907,7 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
         <div className="side-accounts-wrap">
           <div className="side-divider" />
           <button className={"side-item side-item-accounts " + (active === "accounts" ? "side-item-active" : "")} onClick={() => setActive("accounts")}>
-            <span className="side-accounts-icon">🏦</span><span>Bank Accounts</span>
+            <span className="side-accounts-icon"><Icon name="bank" size={15} /></span><span>Bank Accounts</span>
           </button>
         </div>
       )}
@@ -2886,7 +2963,7 @@ function BudgetRing({ spent, target }) {
           style={{ transition: "stroke-dashoffset 0.6s ease" }} />
       </svg>
       <div className="budget-ring-center">
-        <span className="budget-ring-pct" style={overspent ? { color: "#ff8b8b" } : null}>{pct}%</span>
+        <span className="budget-ring-pct" style={overspent ? { color: "#ff8b8b" } : null}><CountUp value={pct} duration={700} />%</span>
         <span className="budget-ring-sub">of budget</span>
       </div>
     </div>
@@ -2918,9 +2995,9 @@ function SummaryCard({ targets, transactions, rollovers }) {
         <span className={"pace-badge " + (overPace ? "pace-over" : "pace-good")}>{overPace ? "Over pace" : "On track"}</span>
       </div>
       <BudgetRing spent={spent} target={target} />
-      {overspent && <div className="overspend-alert">🚨 Over budget — {formatMoney(spent - target)} over your {formatMoney(target)} target</div>}
+      {overspent && <div className="overspend-alert"><Icon name="alert" size={13} /> Over budget — {formatMoney(spent - target)} over your {formatMoney(target)} target</div>}
       <div className="summary-amounts" style={{ justifyContent: "center" }}>
-        <span className="summary-spent">{formatMoney(spent)}</span>
+        <span className="summary-spent"><CountUp value={spent} format={formatMoney} /></span>
         <span className="summary-target">of {formatMoney(target)} target</span>
       </div>
       {(() => {
@@ -2969,7 +3046,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
         <div className="tx-list">
           {list.map((t, i) => (
             <div className="tx-row" key={i}>
-              <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+              <span className="tx-cat-ico" style={{ color: COLORS[t.category] || "var(--ink-3)" }}><Icon name={CATEGORY_ICONS[t.category] || "tag"} size={14} /></span><div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
               <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
             </div>
           ))}
@@ -3031,7 +3108,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
           <div className="tx-empty">No transactions match your filters.</div>
         ) : filtered.map((t, i) => (
           <div className="tx-row" key={t.id || i}>
-            <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+            <span className="tx-cat-ico" style={{ color: COLORS[t.category] || "var(--ink-3)" }}><Icon name={CATEGORY_ICONS[t.category] || "tag"} size={14} /></span><div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -3185,7 +3262,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
                   <div className={"bd-cat-row" + (isOpen ? " bd-open" : "")} onClick={() => setOpenCat(isOpen ? null : name)}>
                     <div className="category-top">
                       <span className="category-name">
-                        <span className="cat-dot" style={{ background: color }} />{displayCat(name)}
+                        <span className="cat-ico" style={{ color }}><Icon name={CATEGORY_ICONS[name] || "tag"} size={13} /></span>{displayCat(name)}
                         {shareLabel && <span className={"bd-share" + (over ? " bd-share-over" : "")}>&middot; {shareLabel}</span>}
                         <i className={"ti ti-chevron-down bd-chev" + (isOpen ? " bd-chev-open" : "")} />
                       </span>
@@ -3293,7 +3370,7 @@ function BreakdownCard({ transactions, targets }) {
             <div className="category-row" key={name}>
               <div className="category-top">
                 <span className="category-name">
-                  <span className="cat-dot" style={{ background: color }} />{displayCat(name)}
+                  <span className="cat-ico" style={{ color }}><Icon name={CATEGORY_ICONS[name] || "tag"} size={13} /></span>{displayCat(name)}
                   {shareLabel && <span className={"bd-share" + (over ? " bd-share-over" : "")}>&middot; {shareLabel}</span>}
                 </span>
                 <span className={"category-amount bd-amt" + (over ? " bd-amt-over" : "")}>{amtLabel}{noTarget && <span className="bd-notarget"> &middot; no target</span>}</span>
@@ -3377,7 +3454,7 @@ function GoalRow({ goal, onUpdate, onDelete }) {
       </div>
       <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill goal-fill" style={{ width: pct + "%" }} /></div>
       <p className="summary-note" style={{ textAlign: "left" }}>
-        {done ? "Goal reached 🎉" : pct + "% there · " + formatMoney(remaining) + " to go" +
+        {done ? "Goal reached" : pct + "% there · " + formatMoney(remaining) + " to go" +
           (months !== null ? " · " + months + " month" + (months !== 1 ? "s" : "") + " left" : "") +
           (perMonth !== null && !done ? " · save ~" + formatMoney(perMonth) + "/month to hit it" : "")}
       </p>
@@ -3455,7 +3532,7 @@ function TrendsCard({ transactions, compact }) {
           ))}
         </div>
         <div className="legend-row">
-          <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Money in</span>
+          <span className="legend-item"><span className="legend-dot" style={{ background: catColor("Income") }} />Money in</span>
           <span className="legend-item"><span className="legend-dot" style={{ background: "var(--accent)" }} />Money out</span>
         </div>
         <p className="summary-note">Net last month: {formatMoney(net[net.length - 1])}</p>
@@ -3584,14 +3661,14 @@ function BankAccountsCard({ banks, transactions, accountData }) {
                     <div className="stmt-row" key={s.id}>
                       <span className="stmt-period">{s.periodStart && s.periodEnd ? s.periodStart + " → " + s.periodEnd : (s.fileName || "Statement")}</span>
                       {s.status === "reconciled" && <span className="stmt-badge stmt-ok">✓ Balances</span>}
-                      {s.status === "mismatch" && <span className="stmt-badge stmt-bad">⚠ Off by {formatMoneyNative(Math.abs(s.difference), FX.bankCurrency[b] || "GBP")}</span>}
+                      {s.status === "mismatch" && <span className="stmt-badge stmt-bad"><Icon name="alert" size={10} /> Off by {formatMoneyNative(Math.abs(s.difference), FX.bankCurrency[b] || "GBP")}</span>}
                       {s.status === "unverified" && <span className="stmt-badge stmt-na">○ Unchecked</span>}
                     </div>
                   ))}
                 </div>
               )}
               {bankIssues.map((iss, i) => (
-                <div className="stmt-issue" key={i}>⚠ {iss.text}</div>
+                <div className="stmt-issue" key={i}><Icon name="alert" size={12} /> {iss.text}</div>
               ))}
             </div>
           );
@@ -3665,7 +3742,7 @@ function InsightsCard({ transactions, targets, full }) {
       <div className="insight-list">
         {insights.map((ins, i) => (
           <div className={"insight-row insight-" + ins.type} key={i}>
-            <span className="insight-icon">{ins.type === "warning" ? "🚨" : ins.type === "positive" ? "👍" : "ℹ"}</span>
+            <span className="insight-icon"><Icon name={ins.type === "warning" ? "alert" : ins.type === "positive" ? "trending" : "info"} size={15} /></span>
             <span>{ins.text}</span>
           </div>
         ))}
@@ -3744,7 +3821,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="glass-card review-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={onClose}>✕</button>
+        <button className="modal-x" onClick={onClose}><Icon name="x" size={16} /></button>
         <div className="review-steps">
           {[0, 1, 2, 3].map((i) => <div key={i} className={"review-step-dot " + (i <= step ? "rsd-on" : "")} />)}
         </div>
@@ -3754,10 +3831,10 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
             <div className="card-label" style={{ color: "var(--accent)" }}>{label}</div>
             <h2 className="review-h2">{label.split(" ")[0]} is done. Let’s see how it went.</h2>
             <div className="review-bigstat">
-              <span className="review-bignum">{formatMoney(actualSpend)}</span>
+              <span className="review-bignum"><CountUp value={actualSpend} format={formatMoney} /></span>
               <span className="review-biglabel">spent of {formatMoney(plannedSpend)} budgeted</span>
             </div>
-            {winCat && winCat.diff > 0 && <div className="review-win">✨ Top category win — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
+            {winCat && winCat.diff > 0 && <div className="review-win"><Icon name="sparkles" size={13} /> Top category win — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
             <div className="review-minibars">
               {TX_CATEGORIES.map((c) => {
                 const b = Number(budgets[c]) || 0, a = Math.round(byCat[c] || 0), o = a > b;
@@ -3837,7 +3914,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
         )}
         {step === 2 && planOn && planAhead && (
           <div className="review-step">
-            <div className="card-label" style={{ color: "var(--accent)" }}>Ahead of plan 🎉</div>
+            <div className="card-label" style={{ color: "var(--accent)" }}>Ahead of plan</div>
             <h2 className="review-h2">You're {formatMoney(planVar)} ahead. What do you want to do with it?</h2>
             <p className="subtitle">Whichever you pick, your Long-Term Plan updates so everything still adds up.</p>
             <button className="plan-opt" disabled={busy} onClick={() => act("plan_bank", { amount: planVar })}>
@@ -3856,7 +3933,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
         )}
         {step === 2 && planOn && !planBehind && !planAhead && (
           <div className="review-step">
-            <div className="card-label" style={{ color: "var(--accent)" }}>On plan 🎯</div>
+            <div className="card-label" style={{ color: "var(--accent)" }}>On plan</div>
             <h2 className="review-h2">Bang on plan — nothing to fix</h2>
             <p className="subtitle">You saved exactly what you planned, so your goal of {formatMoney(plan.targetBalance)} by {monthLabelFromKey(plan.targetMonth)} stays right on track.</p>
             <button className="glass-btn primary" disabled={busy} onClick={() => act("plan_keep", {})}>{busy ? <span className="btn-spinner" /> : "Great — continue"}</button>
@@ -3946,7 +4023,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
             <span className="rt-label">You spent</span>
             <span className="rt-actual">{formatMoney(actualSpend)}</span>
             <span className="rt-planned">planned {hasBudget ? formatMoney(plannedSpend) : "\u2014"}</span>
-            {hasBudget && <span className="rt-verdict">{spendDiff <= 0 ? formatMoney(-spendDiff) + " under budget \ud83c\udf89" : formatMoney(spendDiff) + " over budget"}</span>}
+            {hasBudget && <span className="rt-verdict">{spendDiff <= 0 ? formatMoney(-spendDiff) + " under budget" : formatMoney(spendDiff) + " over budget"}</span>}
           </div>
           <div className={"review-tile " + (incomeDiff >= 0 ? "rt-good" : "rt-bad")}>
             <span className="rt-label">You earned</span>
@@ -4133,7 +4210,7 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
           ))}
         </div>
         <div className="legend-row">
-          <span className="legend-item"><span className="legend-dot" style={{ background: "#4fe0c0" }} />Actual so far</span>
+          <span className="legend-item"><span className="legend-dot" style={{ background: catColor("Income") }} />Actual so far</span>
           <span className="legend-item"><span className="legend-dot" style={{ background: "var(--accent)" }} />Plan</span>
         </div>
       </div>
@@ -4159,7 +4236,7 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
                 {cols.map((r) => <td key={r.k} className={r.actual ? "ltp-actual" : "ltp-plan"}>{formatMoney(r.open)}</td>)}
               </tr>
               <tr>
-                <td className="ltp-sticky"><span className="cat-dot" style={{ background: "#4fe0c0" }} />Income</td>
+                <td className="ltp-sticky"><span className="cat-dot" style={{ background: catColor("Income") }} />Income</td>
                 {cols.map((r) => <td key={r.k} className={r.actual ? "ltp-actual" : "ltp-plan"}>{formatMoney(r.inc)}</td>)}
               </tr>
               {TX_CATEGORIES.map((c) => (
@@ -4210,7 +4287,7 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
         </div>
         {rows.length === 0 ? (
           <div className="catrev-done">
-            <div className="catrev-done-icon">{"\ud83c\udf89"}</div>
+            <div className="catrev-done-icon"><Icon name="checkcircle" size={26} /></div>
             <p>All sorted {"\u2014"} every transaction now has a category.</p>
             <button className="glass-btn primary" onClick={onClose}>Done</button>
           </div>
@@ -4250,7 +4327,7 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
 function EmptyState({ text, title }) {
   return (
     <div className="glass-card dash-card empty-state">
-      <div className="empty-icon-wrap"><span className="empty-icon">✨</span></div>
+      <div className="empty-icon-wrap"><span className="empty-icon"><Icon name="sparkles" size={22} /></span></div>
       <p className="empty-title">{title || "Nothing here just yet"}</p>
       <p className="empty-text">{text || "Upload a statement and this will fill with your own data."}</p>
     </div>
@@ -4266,7 +4343,7 @@ const OVERVIEW_WIDGETS = [
   { key: "accounts", label: "Bank Accounts" },
   { key: "merchants", label: "Top Merchants" },
   { key: "insights", label: "Insights" },
-  { key: "empty", label: "➕ Empty slot" },
+  { key: "empty", label: "+ Empty slot" },
 ];
 const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "insights"];
 const TOUR_DEFAULT_SLOTS = ["summary", "breakdown", "insights", "empty"];
@@ -4343,7 +4420,7 @@ function UncatBanner({ count, onSort, label }) {
   if (!count || hidden) return null;
   return (
     <div className="catrev-banner uncat-banner-block">
-      <span className="catrev-banner-text">{"\ud83c\udff7\ufe0f"} <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"\u2014"} still counted in your spending, just not assigned to a category yet.</span>
+      <span className="catrev-banner-text"><Icon name="tag" size={13} /> <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"\u2014"} still counted in your spending, just not assigned to a category yet.</span>
       <div className="catrev-banner-actions">
         <button className="catrev-banner-btn" onClick={onSort}>Sort now</button>
         <button className="catrev-banner-later" onClick={() => setHidden(true)}>Later</button>
@@ -4370,7 +4447,7 @@ function SafeToSpendHero({ targets, transactions, rollovers }) {
       <div className="safe-hero-row">
         <div className="safe-hero-main">
           <span className="safe-hero-label">Safe to spend today</span>
-          <span className={"safe-hero-num" + (over ? " safe-hero-over" : "")}>{formatMoney(perDay)}</span>
+          <span className={"safe-hero-num" + (over ? " safe-hero-over" : "")}><CountUp value={perDay} format={formatMoney} /></span>
         </div>
         <div className="safe-hero-side">
           {over
@@ -4604,19 +4681,19 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
   const uncatCount = (viewTransactions || []).filter((t) => t.category === "Uncategorized").length;
   const completedMonths = completedMonthsWithData(viewTransactions || []);
   const inboxTasks = [];
-  if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "\ud83c\udff7\ufe0f", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
-  if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "\u2699\ufe0f", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
-  if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; inboxTasks.push({ id: "review-" + rm, icon: "\ud83d\udcc6", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
+  if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "tag", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
+  if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "sliders", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
+  if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
 
   return (
     <div className="app-shell stage-fade" data-theme={normalizeTheme(theme)}>
       {usingDemo && !runTour && (
         <div className="demo-reminder">
-          <span className="demo-reminder-text">📊 You’re exploring with <strong>sample data</strong> — these numbers aren’t yours yet.</span>
+          <span className="demo-reminder-text"><Icon name="chart" size={13} /> You’re exploring with <strong>sample data</strong> — these numbers aren’t yours yet.</span>
           <button className="demo-reminder-btn" onClick={() => setUploadOpen(true)}>Add your real bank statement</button>
         </div>
       )}
-      {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
+      {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
@@ -4740,7 +4817,7 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
               <button key={t.key} className={"theme-swatch" + ((normalizeTheme(theme)) === t.key ? " theme-swatch-active" : "")} onClick={() => onChangeTheme(t.key)}>
                 <span className="theme-chip" style={{ background: t.preview }} />
                 <span className="theme-name">{t.label}</span>
-                {(normalizeTheme(theme)) === t.key && <span className="theme-tick">✓</span>}
+                {(normalizeTheme(theme)) === t.key && <span className="theme-tick"><Icon name="check" size={12} strokeWidth={3} /></span>}
               </button>
             ))}
           </div>
@@ -5026,7 +5103,7 @@ function App() {
     } else if (action === "plan_bank" && plan) {
       const p = { ...plan, targetBalance: Math.round(plan.targetBalance + (payload && payload.amount ? payload.amount : 0)) };
       setPlan(p); try { await savePlanToDb(userId, p); } catch (e) {}
-      pushToast("Goal raised to " + formatMoney(p.targetBalance) + " 🎉", "success");
+      pushToast("Goal raised to " + formatMoney(p.targetBalance) , "success");
     } else if (action === "plan_ease" && plan && payload && payload.months && payload.months.length) {
       const avgAll = avgSpendByCategory(customTransactions);
       const updates = {};
@@ -5103,7 +5180,7 @@ function App() {
     const mismatches = focus.filter((s) => s.status === "mismatch");
     if (mismatches.length) {
       const m = mismatches[mismatches.length - 1];
-      pushToast("⚠ " + m.bank + " statement doesn't balance — off by " + formatMoney(Math.abs(m.difference)) + ". Try uploading a statement covering a longer period to find what's missing.", "error");
+      pushToast(m.bank + " statement doesn't balance — off by " + formatMoney(Math.abs(m.difference)) + ". Try uploading a statement covering a longer period to find what's missing.", "error");
     } else if (focus.some((s) => s.status === "reconciled")) {
       pushToast("Balances check out ✓", "success");
     }
