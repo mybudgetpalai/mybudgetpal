@@ -2300,7 +2300,7 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
     const perMonth = keys.map((k) => spendByCategoryForMonth(transactions, k));
     const catSet = new Set();
     perMonth.forEach((o) => Object.keys(o).forEach((c) => catSet.add(c)));
-    categories = [...TX_CATEGORIES.filter((c) => catSet.has(c)), ...[...catSet].filter((c) => !TX_CATEGORIES.includes(c))];
+    categories = [...TX_CATEGORIES, ...[...catSet].filter((c) => !TX_CATEGORIES.includes(c))];
     if (!categories.length) categories = ["Uncategorized"];
     byCatByMonth = Object.fromEntries(categories.map((c) => [c, perMonth.map((o) => Math.round(o[c] || 0))]));
     incomeByMonth = keys.map((k) => Math.round(incomeForMonth(transactions, k)));
@@ -3307,7 +3307,9 @@ function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
 function TrendsCard({ transactions }) {
   const txs = transactions || [];
   const [cat, setCat] = useState(TX_CATEGORIES[0]);
-  const keys = lastNMonthKeys(latestMonthKey(txs), 6);
+  let keys = lastNMonthKeys(latestMonthKey(txs), 6);
+  keys = keys.filter((k) => incomeForMonth(txs, k) > 0 || spendForMonth(txs, k) > 0);
+  if (!keys.length) keys = lastNMonthKeys(latestMonthKey(txs), 1);
   const months = keys.map(monthLabelFromKey);
   const income = keys.map((k) => Math.round(incomeForMonth(txs, k)));
   const spend = keys.map((k) => Math.round(spendForMonth(txs, k)));
@@ -3614,7 +3616,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
               <span className="review-bignum">{formatMoney(actualSpend)}</span>
               <span className="review-biglabel">spent of {formatMoney(plannedSpend)} budgeted</span>
             </div>
-            {winCat && winCat.diff > 0 && <div className="review-win">✨ Nice one — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
+            {winCat && winCat.diff > 0 && <div className="review-win">✨ Top category win — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
             <div className="review-minibars">
               {TX_CATEGORIES.map((c) => {
                 const b = Number(budgets[c]) || 0, a = Math.round(byCat[c] || 0), o = a > b;
@@ -5501,8 +5503,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .budget-table tbody tr td { border-bottom: 1px solid rgba(255,255,255,0.06); }
   .bt-cat { text-align: left !important; color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 8px; background: transparent; padding: 5px 16px 5px 12px; }
   .bt-cell { padding: 1px 6px; }
-  .bt-input { width: 62px; background: transparent; border: none; border-radius: 7px; color: #fff; font-size: 13px; font-family: inherit; outline: none; text-align: center; padding: 5px 4px; transition: background 0.15s, box-shadow 0.15s; }
-  .bt-input:hover { background: rgba(255,255,255,0.05); }
+  .bt-input { width: 80px; background: transparent; border: none; border-radius: 7px; color: #fff; font-size: 13px; font-family: 'Courier New', monospace; outline: none; text-align: right; padding: 5px 8px; transition: background 0.15s, box-shadow 0.15s; cursor: pointer; }
+  .bt-input:hover { background: rgba(255,255,255,0.08); }
   .bt-input:focus { background: rgba(79,140,255,0.16); box-shadow: inset 0 0 0 1px rgba(79,140,255,0.6); }
   .bt-total-row td { border-top: 1px solid rgba(255,255,255,0.18); border-bottom: none !important; padding-top: 8px; background: rgba(255,255,255,0.02); }
   .bt-total-cell { color: #8fb4ff; font-size: 13px; font-weight: 700; white-space: nowrap; }
@@ -5653,7 +5655,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .app-shell { min-height: 100vh; font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: rgba(20, 22, 40, 0.75); backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); border-bottom: 1px solid rgba(255, 255, 255, 0.12); position: sticky; top: 0; z-index: 20; will-change: transform; transform: translateZ(0); }
   .topbar-left { display: flex; align-items: center; gap: 14px; }
-  .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 8px; font-size: 20px; }
   .hamburger, .hamburger::before, .hamburger::after { display: block; width: 18px; height: 2px; background: #fff; border-radius: 2px; position: relative; }
   .hamburger::before, .hamburger::after { content: ""; position: absolute; }
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
@@ -6405,4 +6407,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </style>
 </body>
 </html>
+
 
