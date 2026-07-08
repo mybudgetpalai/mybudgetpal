@@ -123,7 +123,7 @@ const GOALS = [
   "Save more each month", "Pay off debt", "Build an investment portfolio", "Track my spending",
   "Build my credit", "Plan for a big purchase", "Grow my business", "Just stay organised",
 ];
-const ONBOARD_STEPS = 6;
+const ONBOARD_STEPS = 7;
 const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "size-sm", 5: "size-md" };
 
 const VIEWS = [
@@ -261,6 +261,18 @@ const TERMS_SECTIONS = [
 const CURRENCIES = ["GBP", "AED", "USD", "EUR"];
 const CURRENCY_SYMBOLS = { GBP: "£", AED: "AED ", USD: "$", EUR: "€" };
 const UAE_BANKS = ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK"];
+const CURRENCY_META = {
+  GBP: { label: "British Pound", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
+  AED: { label: "UAE Dirham", flag: "\uD83C\uDDE6\uD83C\uDDEA" },
+  USD: { label: "US Dollar", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
+  EUR: { label: "Euro", flag: "\uD83C\uDDEA\uD83C\uDDFA" },
+};
+const CURRENCY_BANKS = {
+  GBP: ["HSBC", "Barclays", "Santander", "Monzo", "Revolut", "Wise", "Standard Chartered", "Citibank"],
+  AED: ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "HSBC", "Standard Chartered", "Wise"],
+  USD: ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citibank", "HSBC", "Revolut", "Wise"],
+  EUR: ["Deutsche Bank", "BNP Paribas", "N26", "Santander", "Revolut", "Wise"],
+};
 const FX_FALLBACK = { "GBP>AED": 4.65, "AED>GBP": 0.215, "GBP>USD": 1.27, "USD>GBP": 0.787, "GBP>EUR": 1.17, "EUR>GBP": 0.855, "USD>AED": 3.6725, "AED>USD": 0.2723, "EUR>AED": 3.97, "AED>EUR": 0.252, "USD>EUR": 0.92, "EUR>USD": 1.09 };
 /* Module-level FX state: home currency, per-bank currency, locked monthly rates */
 const FX = { ready: false, userId: null, home: "GBP", bankCurrency: {}, rates: {} };
@@ -1367,29 +1379,49 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError }) {
 function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, initialBanks }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(initialName || "");
-  const [banks, setBanks] = useState(initialBanks || []);
+  const [currencies, setCurrencies] = useState(["GBP"]);
+  const [multiCurrency, setMultiCurrency] = useState(false);
+  const [bankCurrency, setBankCurrency] = useState(() => {
+    const m = {}; (initialBanks || []).forEach((b) => { m[b] = UAE_BANKS.includes(b) ? "AED" : "GBP"; }); return m;
+  });
+  const banks = Object.keys(bankCurrency);
   const [savvy, setSavvy] = useState(null);
   const [tracking, setTracking] = useState(null);
   const [balanceCheck, setBalanceCheck] = useState(null);
   const [goals, setGoals] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
+  const currencyStepOk = currencies.length >= 1 && (!multiCurrency || currencies.length === 2);
   const canContinue = [
-    name.trim().length > 0, banks.length > 0, savvy !== null, tracking !== null, balanceCheck !== null, goals.length > 0,
+    name.trim().length > 0, currencyStepOk, banks.length > 0, savvy !== null, tracking !== null, balanceCheck !== null, goals.length > 0,
   ][step];
 
-  const toggleBank = (b) => setBanks((prev) => prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]);
+  const setPrimary = (c) => setCurrencies((prev) => (prev[1] === c ? [c] : (prev[1] ? [c, prev[1]] : [c])));
+  const setSecondary = (c) => setCurrencies((prev) => [prev[0], c]);
+  const onToggleMulti = (on) => { setMultiCurrency(on); if (!on) setCurrencies((prev) => [prev[0]]); };
+  const toggleBankCur = (b, cur) => setBankCurrency((prev) => {
+    const next = { ...prev };
+    if (next[b] === cur) delete next[b]; else next[b] = cur;
+    return next;
+  });
+  React.useEffect(() => {
+    setBankCurrency((prev) => {
+      const next = {}; let changed = false;
+      Object.entries(prev).forEach(([b, c]) => { if (currencies.includes(c)) next[b] = c; else changed = true; });
+      return changed ? next : prev;
+    });
+  }, [currencies]);
   const toggleGoal = (g) => setGoals((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
   const next = async () => {
     if (step === ONBOARD_STEPS - 1) {
       setSubmitting(true);
-      const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim() });
+      const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim(), home_currency: currencies[0] });
       const existingBanks = await fetchBanks(userId);
       const existingNames = existingBanks.map((r) => r.bank_name);
       const toAdd = banks.filter((b) => !existingNames.includes(b));
       const toRemove = existingNames.filter((n) => !banks.includes(n));
       let bErr = null;
-      if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: UAE_BANKS.includes(b) ? "AED" : "GBP" }))); bErr = error; }
+      if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: bankCurrency[b] || "GBP" }))); bErr = error; }
       if (toRemove.length) { try { await supabaseClient.from("banks").delete().eq("user_id", userId).in("bank_name", toRemove); } catch (e) {} }
       const check = await fetchProfile(userId);
       const savedBanks = await fetchBanks(userId);
@@ -1428,19 +1460,59 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
         )}
         {step === 1 && (
           <div className="step">
-            <h1 className="title">Who's your bank?</h1>
-            <p className="subtitle">Select all that apply. We'll get more specific by country later.</p>
-            <div className="bank-grid">
-              {BANKS.map((b) => (
-                <button key={b} className={"chip bank-chip " + (banks.includes(b) ? "chip-selected" : "")} onClick={() => toggleBank(b)}>
-                  <span>{b}</span>
-                  {banks.includes(b) && <span className="check-badge">✓</span>}
+            <h1 className="title">Which currency do you bank in?</h1>
+            <p className="subtitle">Pick your main currency — your totals and budgets will show in this.</p>
+            <div className="segmented">
+              {CURRENCIES.map((c) => (
+                <button key={c} className={"segment " + (currencies[0] === c ? "segment-active" : "")} onClick={() => setPrimary(c)}>
+                  <span>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</span>
+                  {currencies[0] === c && <span className="check-badge">✓</span>}
                 </button>
               ))}
             </div>
+            <label className="currency-multi">
+              <input type="checkbox" checked={multiCurrency} onChange={(e) => onToggleMulti(e.target.checked)} />
+              <span>I use more than one currency</span>
+            </label>
+            {multiCurrency && (
+              <div className="currency-second">
+                <p className="subtitle" style={{ marginBottom: 8 }}>And your second currency:</p>
+                <div className="segmented">
+                  {CURRENCIES.filter((c) => c !== currencies[0]).map((c) => (
+                    <button key={c} className={"segment " + (currencies[1] === c ? "segment-active" : "")} onClick={() => setSecondary(c)}>
+                      <span>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</span>
+                      {currencies[1] === c && <span className="check-badge">✓</span>}
+                    </button>
+                  ))}
+                </div>
+                <p className="currency-note">We support two currencies while we build out the rest — you can add more later in Settings.</p>
+              </div>
+            )}
           </div>
         )}
         {step === 2 && (
+          <div className="step">
+            <h1 className="title">{currencies.length > 1 ? "Which banks do you use?" : "Who's your bank?"}</h1>
+            <p className="subtitle">{currencies.length > 1 ? "Pick your bank(s) under each currency." : "Select all that apply. Don't see yours? Add more later in Settings."}</p>
+            {currencies.map((cur) => (
+              <div className="currency-bank-group" key={cur}>
+                {currencies.length > 1 && <div className="currency-bank-head">{CURRENCY_META[cur].flag} {cur} accounts</div>}
+                <div className="bank-grid">
+                  {(CURRENCY_BANKS[cur] || BANKS).map((b) => {
+                    const sel = bankCurrency[b] === cur;
+                    return (
+                      <button key={cur + b} className={"chip bank-chip " + (sel ? "chip-selected" : "")} onClick={() => toggleBankCur(b, cur)}>
+                        <span>{b}</span>
+                        {sel && <span className="check-badge">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {step === 3 && (
           <div className="step">
             <h1 className="title">How smart are you with your finances?</h1>
             <div className="segmented">
@@ -1453,7 +1525,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
             </div>
           </div>
         )}
-        {step === 3 && (
+        {step === 4 && (
           <div className="step">
             <h1 className="title">Do you currently track your spending?</h1>
             <div className="segmented">
@@ -1466,7 +1538,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
             </div>
           </div>
         )}
-        {step === 4 && (
+        {step === 5 && (
           <div className="step">
             <h1 className="title">How often do you check your bank balance?</h1>
             <div className="segmented">
@@ -1479,7 +1551,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
             </div>
           </div>
         )}
-        {step === 5 && (
+        {step === 6 && (
           <div className="step">
             <h1 className="title">What do you want to achieve?</h1>
             <p className="subtitle">Pick as many as apply.</p>
@@ -4439,6 +4511,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .goal-chip { border-radius: 999px; padding: 10px 16px; }
 
   .segmented { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .currency-multi { display: flex; align-items: center; gap: 10px; margin-top: 16px; cursor: pointer; font-size: 14px; color: rgba(255,255,255,0.85); }
+  .currency-multi input { width: 18px; height: 18px; accent-color: #5fb59a; cursor: pointer; }
+  .currency-second { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .currency-note { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 10px; line-height: 1.45; }
+  .currency-bank-group { margin-bottom: 18px; }
+  .currency-bank-head { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: rgba(255,255,255,0.6); text-transform: uppercase; margin: 4px 0 10px; }
+  .currency-bank-group .bank-grid { max-height: none; }
   .segment {
     font-family: inherit; font-size: 15px; font-weight: 500; color: #fff;
     background: rgba(255, 255, 255, 0.08); border: 1.5px solid rgba(255, 255, 255, 0.18);
