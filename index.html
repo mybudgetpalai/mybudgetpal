@@ -651,8 +651,14 @@ function typicalIncome(txs, uptoKey) {
 function totalEstimatedBalance(banks, accountData, txs) {
   const statements = (accountData && accountData.statements) || [];
   const bankRows = (accountData && accountData.bankRows) || [];
+  /* Union of the saved bank list and any bank tags present on transactions.
+     Demo/sample banks (and any tag mismatch) live only on the transactions,
+     so iterating just `banks` dropped their money from the combined balance
+     while month nets still counted it — balances went negative. */
+  const names = new Set(banks || []);
+  (txs || []).forEach((t) => { if (t.bank) names.add(t.bank); });
   let total = 0, any = false;
-  (banks || []).forEach((b) => {
+  names.forEach((b) => {
     const row = bankRows.find((r) => r.bank_name === b);
     const bal = computeBankBalance(b, statements, txs, row);
     if (bal !== null) { const cur = FX.bankCurrency[b] || "GBP"; total += (cur === FX.home ? bal : fxConvert(bal, cur, nowMonth())); any = true; }
