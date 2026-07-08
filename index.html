@@ -57,7 +57,8 @@
   .bt-total-row .bt-total-num { font-weight: 700; }
   
   .app-shell[data-theme="dark"] .review-win { background: rgba(61,214,140,0.12); border-color: rgba(61,214,140,0.35); color: #7BE0B0; }
-</style>
+
+  </style>
 </head>
 <body>
 <div id="root"></div>
@@ -1398,12 +1399,41 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
       </div>
 
       <div className="lp-hero lp-wrap">
-        <span className="hero-eyebrow">Now in early access</span>
-        <h1>See exactly where your money goes.</h1>
-        <p>Upload your bank statements, set monthly targets by category, and finally get a clear picture of your spending — without the spreadsheets.</p>
-        <div className="hero-actions">
-          <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
-          <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
+        <div className="lp-hero-copy">
+          <span className="hero-eyebrow">Now in early access</span>
+          <h1>See exactly where your money goes.</h1>
+          <p>Upload your bank statements, set monthly targets by category, and finally get a clear picture of your spending — without the spreadsheets.</p>
+          <div className="hero-actions">
+            <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
+            <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
+          </div>
+          <span className="hero-trust">No bank login, ever · works with PDF &amp; CSV statements · GBP + AED</span>
+        </div>
+        <div className="lp-hero-mock" aria-hidden="true">
+          <div className="hm-card hm-safe">
+            <span className="hm-label">Safe to spend today</span>
+            <span className="hm-big">&pound;42.10</span>
+            <div className="hm-track"><div className="hm-fill" style={{ width: "62%" }} /></div>
+            <span className="hm-sub">&pound;1,284 spent &middot; &pound;2,324 budget &middot; 23 days to go</span>
+          </div>
+          <div className="hm-card hm-budgets">
+            <span className="hm-label">Budgets &middot; July</span>
+            <div className="hm-row">
+              <span className="hm-ico" style={{ color: "#7C9AFF" }}><Icon name="groceries" size={14} /></span>
+              <div className="hm-cat"><div className="hm-cat-top"><span>Groceries</span><span>&pound;312 / &pound;400</span></div>
+                <div className="hm-track sm"><div className="hm-fill" style={{ width: "78%" }} /></div></div>
+            </div>
+            <div className="hm-row">
+              <span className="hm-ico" style={{ color: "#F2B25C" }}><Icon name="dining" size={14} /></span>
+              <div className="hm-cat"><div className="hm-cat-top"><span>Dining</span><span>&pound;238 / &pound;200</span></div>
+                <div className="hm-track sm"><div className="hm-fill warn" style={{ width: "100%" }} /></div></div>
+            </div>
+            <div className="hm-row">
+              <span className="hm-ico" style={{ color: "#57C6A0" }}><Icon name="transport" size={14} /></span>
+              <div className="hm-cat"><div className="hm-cat-top"><span>Transport</span><span>&pound;96 / &pound;180</span></div>
+                <div className="hm-track sm"><div className="hm-fill" style={{ width: "53%" }} /></div></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -6887,6 +6917,45 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .plan-table { max-height: 340px; overflow-y: auto; }
   @media (max-width: 560px) { .review-cards { grid-template-columns: 1fr; } }
 
+/* ---- step 4: product-forward hero ---- */
+  .lp-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; text-align: left; padding: 72px 24px 64px; }
+  .lp-hero-copy h1 { font-size: 52px; }
+  .lp-hero-copy p { max-width: 46ch; }
+  .hero-trust { display: block; margin-top: 18px; font-size: 12.5px; color: var(--ink-3); }
+  .lp-hero-mock { display: flex; flex-direction: column; gap: 14px; animation: heroMockIn 0.7s cubic-bezier(0.22, 0.8, 0.3, 1) both 0.15s; }
+  @keyframes heroMockIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .hm-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow-pop); }
+  .hm-card.hm-budgets { margin-left: 26px; }
+  .hm-label { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+  .hm-big { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .hm-sub { display: block; font-size: 12px; color: var(--ink-3); margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .hm-track { height: 8px; border-radius: 5px; background: var(--surface-2); overflow: hidden; margin-top: 12px; }
+  .hm-track.sm { height: 5px; margin-top: 6px; }
+  .hm-fill { height: 100%; border-radius: 5px; background: var(--accent); animation: barGrow 1s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .hm-fill.warn { background: #E8A23D; }
+  .hm-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; }
+  .hm-row + .hm-row { border-top: 1px solid var(--line); }
+  .hm-ico { width: 26px; height: 26px; border-radius: 8px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .hm-cat { flex: 1; min-width: 0; }
+  .hm-cat-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) {
+    .lp-hero { grid-template-columns: 1fr; gap: 34px; padding: 48px 20px 44px; }
+    .lp-hero-copy h1 { font-size: 36px; }
+    .hm-card.hm-budgets { margin-left: 0; }
+  }
+
+  /* ---- step 5: chart motion ---- */
+  @keyframes barUp { from { height: 0; } }
+  .trend-bar, .ltp-bar-col .ltp-bar, .lpd-trend-bar { animation: barUp 0.7s cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .bd-pie-svg { animation: pieIn 0.55s cubic-bezier(0.22, 0.8, 0.3, 1); transform-origin: center; }
+  @keyframes pieIn { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .trend-bar, .ltp-bar-col .ltp-bar, .lpd-trend-bar, .bd-pie-svg, .lp-hero-mock, .hm-fill { animation: none; }
+  }
+
+  .lp-hero-copy p { margin: 0 0 28px; }
+  .lp-hero-copy .hero-actions { justify-content: flex-start; }
+  @media (max-width: 900px) { .lp-hero-copy h1 { font-size: 36px; } }
 </style>
 </body>
 </html>
