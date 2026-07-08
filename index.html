@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  html, body { margin: 0; padding: 0; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+  html, body { margin: 0; padding: 0; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; scroll-behavior: smooth; }
   #root { min-height: 100vh; }
 </style>
 </head>
@@ -2293,7 +2293,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
 
 function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
   const hasReal = transactions && transactions.length > 0;
-  let categories, monthLabels, byCatByMonth, incomeByMonth;
+  let categories, monthLabels, byCatByMonth, incomeByMonth, openingByMonth, closingByMonth;
   if (hasReal) {
     const keys = lastNMonthKeys(latestMonthKey(transactions), 3);
     monthLabels = keys.map(monthLabelFromKey);
@@ -2310,10 +2310,12 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
     byCatByMonth = CATEGORY_MONTHLY;
     incomeByMonth = INCOME_MONTHLY;
   }
+  openingByMonth = [0, 0, 0]; closingByMonth = [0, 0, 0];
   const totalsByMonth = monthLabels.map((_, mi) =>
     categories.reduce((s, c) => s + byCatByMonth[c][mi], 0)
   );
   const netByMonth = monthLabels.map((_, mi) => incomeByMonth[mi] - totalsByMonth[mi]);
+  for (let mi = 0; mi < 3; mi++) { openingByMonth[mi] = mi === 0 ? 0 : closingByMonth[mi - 1]; closingByMonth[mi] = openingByMonth[mi] + netByMonth[mi]; }
 
   return (
     <div className="page stage-fade">
@@ -2332,6 +2334,10 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
               </tr>
             </thead>
             <tbody>
+              <tr className="opening-row">
+                <td className="row-label">Opening balance</td>
+                {openingByMonth.map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
+              </tr>
               {categories.map((c) => (
                 <tr key={c}>
                   <td className="row-label">
@@ -2356,6 +2362,10 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
                     {v >= 0 ? "+" : ""}{formatMoney(v)}
                   </td>
                 ))}
+              </tr>
+              <tr className="closing-row">
+                <td className="row-label">Closing balance</td>
+                {closingByMonth.map((v, i) => <td key={i}>{formatMoney(v)}</td>)}
               </tr>
             </tbody>
           </table>
@@ -5222,7 +5232,7 @@ function App() {
           const allTx = [...(parsedTxs || []), ...customTransactions];
           const allStmts = [...statements, ...(newStatements || [])];
           if (newStatements && newStatements.length) setStatements(allStmts);
-          if (parsedTxs && parsedTxs.length) { setCustomTransactions((prev) => [...parsedTxs, ...prev]); runAiFallback(parsedTxs); }
+          if (parsedTxs && parsedTxs.length) { setCustomTransactions(parsedTxs); runAiFallback(parsedTxs); }
           if (newStatements && newStatements.length) runReconciliation(allStmts, allTx, null);
           fetchBanks(userId).then((rows) => setBankRows(rows));
           setStage("processing");
@@ -5624,6 +5634,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .totals-row td { font-weight: 700; border-top: 1px solid rgba(255,255,255,0.18); }
   .income-row td { color: #4fe0c0; }
   .net-row td { font-weight: 700; border-top: 1px solid rgba(255,255,255,0.18); }
+  .opening-row td { color: rgba(255,255,255,0.6); border-top: 1px solid rgba(255,255,255,0.12); font-size: 13px; }
+  .closing-row td { color: #fff; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.18); }
   .net-positive { color: #4fe0c0; }
   .net-negative { color: #ff8b8b; }
 
@@ -5989,7 +6001,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .section-head h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 8px; color: #fff; }
   .section-head p { color: rgba(255,255,255,0.55); font-size: 14px; margin: 0; }
 
-  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.5s ease, transform 0.5s ease; will-change: opacity, transform; }
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; will-change: opacity, transform; }
   .reveal.in-view { opacity: 1; transform: translateY(0); will-change: auto; }
 
   /* --- immersive how-it-works --- */
@@ -6271,7 +6283,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* ---- coding-up animation ---- */
   .processing-anim-card { max-width: 440px; }
   .code-feed { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; width: 100%; min-height: 40px; }
-  .code-row { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 9px 12px; animation: codeRowIn 0.35s ease; }
+  .code-row { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 9px 12px; animation: codeRowIn 0.5s ease; }
   .code-name { color: #fff; font-size: 13px; font-weight: 500; flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .code-arrow { color: rgba(255,255,255,0.4); font-size: 14px; flex-shrink: 0; }
   .code-cat { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid; flex-shrink: 0; }
@@ -6393,3 +6405,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </style>
 </body>
 </html>
+
