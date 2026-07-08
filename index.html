@@ -3715,7 +3715,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
             ) : (
               <p className="subtitle" style={{ fontStyle: "italic" }}>Set a savings goal to see how each month affects your pace.</p>
             )}
-            <button className="glass-btn primary" onClick={() => setStep(2)}>{planOn ? (planBehind ? "What are my options?" : planAhead ? "What should I do with it?" : "Continue") : (over ? "How do I catch up?" : "What should I do with it?")}</button>
+            <button className="glass-btn primary" onClick={() => setStep(2)}>{planOn && !planBehind && !planAhead ? "Continue" : "See my options"}</button>
             <button className="glass-btn ghost" onClick={() => setStep(0)}>Back</button>
           </div>
         )}
