@@ -257,9 +257,84 @@ const TERMS_SECTIONS = [
   { h: "Liability", b: "Provided \"as is.\" We are not liable for financial decisions made based on app data, or losses from data inaccuracies." },
 ];
 
+/* ---------------- Multi-currency (FX) ---------------- */
+const CURRENCIES = ["GBP", "AED", "USD", "EUR"];
+const CURRENCY_SYMBOLS = { GBP: "£", AED: "AED ", USD: "$", EUR: "€" };
+const UAE_BANKS = ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK"];
+const FX_FALLBACK = { "GBP>AED": 4.65, "AED>GBP": 0.215, "GBP>USD": 1.27, "USD>GBP": 0.787, "GBP>EUR": 1.17, "EUR>GBP": 0.855, "USD>AED": 3.6725, "AED>USD": 0.2723, "EUR>AED": 3.97, "AED>EUR": 0.252, "USD>EUR": 0.92, "EUR>USD": 1.09 };
+/* Module-level FX state: home currency, per-bank currency, locked monthly rates */
+const FX = { ready: false, userId: null, home: "GBP", bankCurrency: {}, rates: {} };
+function fxKey(m, f, t) { return m + "|" + f + "|" + t; }
+function nowMonth() { return new Date().toISOString().slice(0, 7); }
+function txMonthKey(date) { const m = (date || "").slice(0, 7); return /^\d{4}-\d{2}$/.test(m) ? m : nowMonth(); }
+function homeSym() { return (CURRENCY_SYMBOLS[FX.home] || "£").trim(); }
+function fxRate(month, from, to) {
+  if (from === to) return 1;
+  const r = FX.rates[fxKey(month, from, to)];
+  if (r) return r;
+  const inv = FX.rates[fxKey(month, to, from)];
+  if (inv) return 1 / inv;
+  return FX_FALLBACK[from + ">" + to] || 1;
+}
+function fxConvert(amount, from, month) { return amount * fxRate(month || nowMonth(), from, FX.home); }
+async function initFx(userId, profile, bankRows) {
+  FX.userId = userId;
+  FX.home = (profile && profile.home_currency) || "GBP";
+  FX.bankCurrency = {};
+  (bankRows || []).forEach((b) => { FX.bankCurrency[b.bank_name] = b.currency || "GBP"; });
+  try {
+    const { data } = await supabaseClient.from("fx_rates").select("*").eq("user_id", userId);
+    FX.rates = {};
+    (data || []).forEach((r) => { FX.rates[fxKey(r.month, r.from_currency, r.to_currency)] = Number(r.rate); });
+  } catch (e) { FX.rates = FX.rates || {}; }
+  FX.ready = true;
+}
+/* Locked monthly rates: first time a month needs converting, fetch the live rate once and store it */
+async function ensureFxRates(userId, txRows) {
+  const needed = {};
+  (txRows || []).forEach((t) => {
+    const cur = FX.bankCurrency[t.bank] || "GBP";
+    if (cur === FX.home) return;
+    const m = txMonthKey(t.date);
+    if (!FX.rates[fxKey(m, cur, FX.home)]) needed[m + "|" + cur] = { month: m, from: cur };
+  });
+  const list = Object.values(needed);
+  if (!list.length) return;
+  const bases = [...new Set(list.map((n) => n.from))];
+  const latest = {};
+  await Promise.all(bases.map(async (b) => {
+    try {
+      const res = await fetch("https://open.er-api.com/v6/latest/" + b);
+      const j = await res.json();
+      if (j && j.rates) latest[b] = j.rates;
+    } catch (e) {}
+  }));
+  const inserts = [];
+  list.forEach((n) => {
+    const rate = (latest[n.from] && latest[n.from][FX.home]) || FX_FALLBACK[n.from + ">" + FX.home];
+    if (!rate) return;
+    FX.rates[fxKey(n.month, n.from, FX.home)] = rate;
+    inserts.push({ user_id: userId, month: n.month, from_currency: n.from, to_currency: FX.home, rate: rate, source: latest[n.from] ? "api" : "fallback" });
+  });
+  if (inserts.length) {
+    try { await supabaseClient.from("fx_rates").upsert(inserts, { onConflict: "user_id,month,from_currency,to_currency" }); } catch (e) {}
+  }
+}
+/* Keep native amount + currency on every transaction; convert amount into home currency for combined views */
+function applyFxToTx(t) {
+  const cur = FX.bankCurrency[t.bank] || "GBP";
+  const base = t.amountNative !== undefined ? t.amountNative : t.amount;
+  return { ...t, currency: cur, amountNative: base, amount: cur === FX.home ? base : base * fxRate(txMonthKey(t.date), cur, FX.home) };
+}
 function formatMoney(n) {
   const sign = n < 0 ? "-" : "";
-  return sign + "£" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const sym = CURRENCY_SYMBOLS[FX.home] || "£";
+  return sign + sym + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function formatMoneyNative(n, cur) {
+  const sign = n < 0 ? "-" : "";
+  const sym = CURRENCY_SYMBOLS[cur] || "£";
+  return sign + sym + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -413,7 +488,7 @@ function totalEstimatedBalance(banks, accountData, txs) {
   (banks || []).forEach((b) => {
     const row = bankRows.find((r) => r.bank_name === b);
     const bal = computeBankBalance(b, statements, txs, row);
-    if (bal !== null) { total += bal; any = true; }
+    if (bal !== null) { const cur = FX.bankCurrency[b] || "GBP"; total += (cur === FX.home ? bal : fxConvert(bal, cur, nowMonth())); any = true; }
   });
   return any ? total : null;
 }
@@ -618,7 +693,13 @@ function rowToTx(r) { return { id: r.id, date: r.tx_date || "", name: r.descript
 async function fetchTransactions(userId) {
   const { data, error } = await supabaseClient.from("transactions").select("*").eq("user_id", userId).order("tx_date", { ascending: false });
   if (error) return [];
-  return (data || []).map(rowToTx);
+  const raw = (data || []).map(rowToTx);
+  if (!FX.ready || FX.userId !== userId) {
+    const [p, b] = await Promise.all([fetchProfile(userId), fetchBanks(userId)]);
+    await initFx(userId, p, b);
+  }
+  await ensureFxRates(userId, raw);
+  return raw.map(applyFxToTx);
 }
 async function saveTransactionsToDb(userId, bankName, txs, statementId) {
   if (!userId || !txs.length) return txs;
@@ -629,7 +710,9 @@ async function saveTransactionsToDb(userId, bankName, txs, statementId) {
   }));
   const { data, error } = await supabaseClient.from("transactions").insert(rows).select();
   if (error) throw error;
-  return (data || []).map(rowToTx);
+  const mapped = (data || []).map(rowToTx);
+  if (FX.ready) { await ensureFxRates(userId, mapped); return mapped.map(applyFxToTx); }
+  return mapped;
 }
 async function updateTransactionCategoriesInDb(idToCat) {
   await Promise.all(Object.entries(idToCat).map(([id, category]) =>
@@ -699,7 +782,7 @@ function reconcileStatements(statements, transactions) {
     }
     const sum = transactions
       .filter((t) => t.bank === s.bank && t.date && t.date >= s.periodStart && t.date <= s.periodEnd)
-      .reduce((a, t) => a + t.amount, 0);
+      .reduce((a, t) => a + (t.amountNative !== undefined ? t.amountNative : t.amount), 0);
     const computed = Math.round((s.opening + sum) * 100) / 100;
     const difference = Math.round((s.closing - computed) * 100) / 100;
     results.push({ ...s, computed, difference, status: Math.abs(difference) <= 0.01 ? "reconciled" : "mismatch" });
@@ -719,7 +802,7 @@ function chainIssues(statements) {
         if (gapDays > 3) issues.push({ bank, type: "gap", text: "Possible missing statement between " + prev.periodEnd + " and " + cur.periodStart });
       }
       if (prev.closing !== null && cur.opening !== null && Math.abs(prev.closing - cur.opening) > 0.01) {
-        issues.push({ bank, type: "chain", text: "Closing balance (" + formatMoney(prev.closing) + ") doesn't match next opening (" + formatMoney(cur.opening) + ")" });
+        issues.push({ bank, type: "chain", text: "Closing balance (" + formatMoneyNative(prev.closing, FX.bankCurrency[bank] || "GBP") + ") doesn't match next opening (" + formatMoneyNative(cur.opening, FX.bankCurrency[bank] || "GBP") + ")" });
       }
     }
   });
@@ -741,12 +824,12 @@ function computeBankBalance(bank, statements, transactions, bankRow) {
   const withClosing = statements.filter((s) => s.bank === bank && s.closing !== null && s.periodEnd).sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
   if (withClosing.length) {
     const anchor = withClosing[withClosing.length - 1];
-    const after = transactions.filter((t) => t.bank === bank && t.date && t.date > anchor.periodEnd).reduce((a, t) => a + t.amount, 0);
+    const after = transactions.filter((t) => t.bank === bank && t.date && t.date > anchor.periodEnd).reduce((a, t) => a + (t.amountNative !== undefined ? t.amountNative : t.amount), 0);
     return Math.round((anchor.closing + after) * 100) / 100;
   }
   if (bankRow && bankRow.starting_balance !== null && bankRow.starting_balance !== undefined) {
     const from = bankRow.as_of_date || "";
-    const after = transactions.filter((t) => t.bank === bank && t.date && t.date >= from).reduce((a, t) => a + t.amount, 0);
+    const after = transactions.filter((t) => t.bank === bank && t.date && t.date >= from).reduce((a, t) => a + (t.amountNative !== undefined ? t.amountNative : t.amount), 0);
     return Math.round((Number(bankRow.starting_balance) + after) * 100) / 100;
   }
   return null;
@@ -1161,7 +1244,7 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
               <div className="balance-field">
                 <label className="field-label">Opening balance</label>
                 <div className="target-input-wrap" style={{ width: "100%" }}>
-                  <span className="target-currency">£</span>
+                  <span className="target-currency">{homeSym()}</span>
                   <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
                     value={openingInput} onChange={(e) => setOpeningInput(e.target.value)} />
                 </div>
@@ -1169,7 +1252,7 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
               <div className="balance-field">
                 <label className="field-label">Closing balance</label>
                 <div className="target-input-wrap" style={{ width: "100%" }}>
-                  <span className="target-currency">£</span>
+                  <span className="target-currency">{homeSym()}</span>
                   <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
                     value={closingInput} onChange={(e) => setClosingInput(e.target.value)} />
                 </div>
@@ -1306,7 +1389,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
       const toAdd = banks.filter((b) => !existingNames.includes(b));
       const toRemove = existingNames.filter((n) => !banks.includes(n));
       let bErr = null;
-      if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b }))); bErr = error; }
+      if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: UAE_BANKS.includes(b) ? "AED" : "GBP" }))); bErr = error; }
       if (toRemove.length) { try { await supabaseClient.from("banks").delete().eq("user_id", userId).in("bank_name", toRemove); } catch (e) {} }
       const check = await fetchProfile(userId);
       const savedBanks = await fetchBanks(userId);
@@ -1826,7 +1909,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
                 <div className="balance-field">
                   <label className="field-label">Opening balance</label>
                   <div className="target-input-wrap" style={{ width: "100%" }}>
-                    <span className="target-currency">£</span>
+                    <span className="target-currency">{homeSym()}</span>
                     <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
                       value={vals[p.bank].balance} onChange={(e) => setV(p.bank, "balance", e.target.value)} />
                   </div>
@@ -2283,7 +2366,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
           {list.map((t, i) => (
             <div className="tx-row" key={i}>
               <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
-              <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
+              <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
             </div>
           ))}
         </div>
@@ -2332,7 +2415,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
           <option value="out">Money out</option>
           <option value="in">Money in</option>
         </select>
-        <input className="tx-input tx-min" type="number" inputMode="numeric" placeholder="Min £" value={minAmt} onChange={(e) => setMinAmt(e.target.value)} />
+        <input className="tx-input tx-min" type="number" inputMode="numeric" placeholder={"Min " + homeSym()} value={minAmt} onChange={(e) => setMinAmt(e.target.value)} />
         <select className="bd-month-select" value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="new">Newest first</option>
           <option value="amt">Highest amount</option>
@@ -2345,7 +2428,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
         ) : filtered.map((t, i) => (
           <div className="tx-row" key={t.id || i}>
             <div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : t.category} {"\u00B7"} {formatTxDate(t.date)}</span></div>
-            <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{formatMoney(t.amount)}</span>
+            <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
           </div>
         ))}
       </div>
@@ -2629,14 +2712,14 @@ function GoalModal({ onClose, onSave }) {
         <div className="field-group">
           <label className="field-label">Target amount</label>
           <div className="target-input-wrap" style={{ width: "100%" }}>
-            <span className="target-currency">£</span>
+            <span className="target-currency">{homeSym()}</span>
             <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="10000" value={target} onChange={(e) => setTarget(e.target.value)} />
           </div>
         </div>
         <div className="field-group">
           <label className="field-label">Saved so far (optional)</label>
           <div className="target-input-wrap" style={{ width: "100%" }}>
-            <span className="target-currency">£</span>
+            <span className="target-currency">{homeSym()}</span>
             <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="0" value={saved} onChange={(e) => setSaved(e.target.value)} />
           </div>
         </div>
@@ -2685,7 +2768,7 @@ function GoalRow({ goal, onUpdate, onDelete }) {
       {adding ? (
         <div className="goal-add-row">
           <div className="target-input-wrap" style={{ flex: 1 }}>
-            <span className="target-currency">£</span>
+            <span className="target-currency">{homeSym()}</span>
             <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="Amount" value={addAmount} onChange={(e) => setAddAmount(e.target.value)} autoFocus />
           </div>
           <button className="glass-btn primary goal-add-btn" disabled={!(Number(addAmount) > 0)} onClick={() => {
@@ -2870,7 +2953,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
                   <span className="tx-name">{b}</span>
                   <span className="tx-category">{balance !== null ? "Estimated balance from statements" : "Add balances to see an estimate"}</span>
                 </div>
-                {balance !== null && <span className={"tx-amount " + (balance >= 0 ? "tx-positive" : "")}>{formatMoney(balance)}</span>}
+                {balance !== null && <span className={"tx-amount " + (balance >= 0 ? "tx-positive" : "")}>{formatMoneyNative(balance, FX.bankCurrency[b] || "GBP")}</span>}
               </div>
               {bankStmts.length > 0 && (
                 <div className="stmt-list">
@@ -2878,7 +2961,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
                     <div className="stmt-row" key={s.id}>
                       <span className="stmt-period">{s.periodStart && s.periodEnd ? s.periodStart + " → " + s.periodEnd : (s.fileName || "Statement")}</span>
                       {s.status === "reconciled" && <span className="stmt-badge stmt-ok">✓ Balances</span>}
-                      {s.status === "mismatch" && <span className="stmt-badge stmt-bad">⚠ Off by {formatMoney(Math.abs(s.difference))}</span>}
+                      {s.status === "mismatch" && <span className="stmt-badge stmt-bad">⚠ Off by {formatMoneyNative(Math.abs(s.difference), FX.bankCurrency[b] || "GBP")}</span>}
                       {s.status === "unverified" && <span className="stmt-badge stmt-na">○ Unchecked</span>}
                     </div>
                   ))}
@@ -3408,7 +3491,7 @@ const THEMES = [
   { key: "forest", label: "Forest", preview: "linear-gradient(135deg,#34d399,#059669)" },
   { key: "rose", label: "Rose", preview: "linear-gradient(135deg,#f472b6,#a855f7)" },
 ];
-function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme }) {
+function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
@@ -3430,6 +3513,31 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
       pushToast("Couldn't save profile", "error");
     }
     setSavingProfile(false);
+  };
+
+  const [homeCur, setHomeCur] = useState(FX.home);
+  const [bankCurs, setBankCurs] = useState(() => { const m = {}; (banks || []).forEach((b) => { m[b] = FX.bankCurrency[b] || "GBP"; }); return m; });
+  const [savingCur, setSavingCur] = useState(false);
+  const [showRates, setShowRates] = useState(false);
+  const [rateDrafts, setRateDrafts] = useState({});
+  const curDirty = homeCur !== FX.home || (banks || []).some((b) => (FX.bankCurrency[b] || "GBP") !== bankCurs[b]);
+  const saveCurrency = async () => {
+    setSavingCur(true);
+    try {
+      await onSaveCurrency(homeCur, bankCurs);
+      pushToast("Currency settings saved", "success");
+    } catch (e) { pushToast("Couldn't save currency settings", "error"); }
+    setSavingCur(false);
+  };
+  const fxEntries = Object.keys(FX.rates).map((k) => { const parts = k.split("|"); return { key: k, month: parts[0], from: parts[1], to: parts[2], rate: FX.rates[k] }; }).sort((a, b) => b.month.localeCompare(a.month) || a.from.localeCompare(b.from));
+  const saveRate = async (e) => {
+    const v = parseFloat(rateDrafts[e.key]);
+    if (!v || v <= 0) { pushToast("Enter a rate above 0", "error"); return; }
+    try {
+      await onSaveFxRate(e.month, e.from, e.to, v);
+      pushToast("Rate updated", "success");
+      setRateDrafts((p) => { const n = { ...p }; delete n[e.key]; return n; });
+    } catch (err) { pushToast("Couldn't save rate", "error"); }
   };
 
   const startEditTargets = () => { setTargetDrafts(targets || {}); setEditingTargets(true); };
@@ -3499,6 +3607,46 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
         </div>
 
         <div className="dash-card settings-section">
+          <span className="card-label">Currency</span>
+          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Each bank keeps its own currency. Combined views convert everything into your home currency using a rate locked per month (fetched automatically — editable below).</p>
+          <div className="field-group">
+            <label className="field-label">Home currency</label>
+            <select className="glass-input" value={homeCur} onChange={(e) => setHomeCur(e.target.value)}>
+              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="settings-bank-list">
+            {(banks || []).map((b) => (
+              <div className="settings-bank-row" key={b}>
+                <span>{b}</span>
+                <select className="glass-input" style={{ width: 100, padding: "6px 10px" }} value={bankCurs[b] || "GBP"} onChange={(e) => { const v = e.target.value; setBankCurs((p) => ({ ...p, [b]: v })); }}>
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <button className="glass-btn primary" style={{ marginTop: 14, flex: "none" }} disabled={!curDirty || savingCur} onClick={saveCurrency}>
+            {savingCur ? <span className="btn-spinner" /> : "Save"}
+          </button>
+          <button className="link-btn inline" style={{ marginTop: 10, display: "block" }} onClick={() => setShowRates((s) => !s)}>{showRates ? "Hide exchange rates" : "View / edit exchange rates"}</button>
+          {showRates && (
+            <div className="settings-bank-list" style={{ marginTop: 8 }}>
+              {fxEntries.length === 0 ? (
+                <p className="subtitle" style={{ margin: 0 }}>No rates stored yet — a rate is fetched and locked the first time a month needs converting.</p>
+              ) : fxEntries.map((e) => (
+                <div className="settings-bank-row" key={e.key}>
+                  <span>{e.month} · {e.from} → {e.to}</span>
+                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input className="target-input" type="number" step="0.0001" min="0" style={{ width: 90 }} value={rateDrafts[e.key] !== undefined ? rateDrafts[e.key] : e.rate} onChange={(ev) => { const v = ev.target.value; setRateDrafts((p) => ({ ...p, [e.key]: v })); }} />
+                    {rateDrafts[e.key] !== undefined && parseFloat(rateDrafts[e.key]) !== e.rate && <button className="link-btn inline" onClick={() => saveRate(e)}>Save</button>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="dash-card settings-section">
           <div className="settings-section-head">
             <span className="card-label">Monthly targets</span>
             {!editingTargets && categories.length > 0 && (
@@ -3511,7 +3659,7 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
                 <span><span className="cat-dot" style={{ background: CATEGORY_COLORS[c], marginRight: 8, display: "inline-block", verticalAlign: "middle" }} />{c}</span>
                 {editingTargets ? (
                   <div className="target-input-wrap">
-                    <span className="target-currency">£</span>
+                    <span className="target-currency">{homeSym()}</span>
                     <input
                       className="target-input"
                       type="number"
@@ -3792,8 +3940,8 @@ function App() {
       if (!profile?.name) {
         await supabaseClient.from("profiles").upsert({ id: uid, name: "Shezaad" });
         await supabaseClient.from("banks").insert([
-          { user_id: uid, bank_name: "HSBC" },
-          { user_id: uid, bank_name: "Emirates NBD" },
+          { user_id: uid, bank_name: "HSBC", currency: "GBP" },
+          { user_id: uid, bank_name: "Emirates NBD", currency: "AED" },
         ]);
         const rows = Object.keys(CATEGORY_MONTHLY).map((c) => ({
           user_id: uid, category: c, monthly_target: CATEGORY_MONTHLY[c][CATEGORY_MONTHLY[c].length - 1],
@@ -3823,6 +3971,32 @@ function App() {
       pushToast("Dev login failed — check connection", "error");
     }
     setCheckingSession(false);
+  };
+  const reloadFxData = async () => {
+    if (!userId) return;
+    FX.ready = false;
+    const bankRows2 = await fetchBanks(userId);
+    setBanks(bankRows2.map((b) => b.bank_name));
+    setBankRows(bankRows2);
+    const txRows2 = await fetchTransactions(userId);
+    setCustomTransactions(txRows2);
+  };
+  const handleSaveCurrency = async (homeCur, bankCurs) => {
+    if (!userId) return;
+    await supabaseClient.from("profiles").upsert({ id: userId, home_currency: homeCur });
+    await Promise.all(Object.entries(bankCurs).map(([bank, cur]) =>
+      supabaseClient.from("banks").update({ currency: cur }).eq("user_id", userId).eq("bank_name", bank)
+    ));
+    await reloadFxData();
+  };
+  const handleSaveFxRate = async (month, from, to, rate) => {
+    if (!userId) return;
+    const { error } = await supabaseClient.from("fx_rates").upsert(
+      { user_id: userId, month, from_currency: from, to_currency: to, rate, source: "manual" },
+      { onConflict: "user_id,month,from_currency,to_currency" }
+    );
+    if (error) throw error;
+    await reloadFxData();
   };
   const handleSaveName = async (newName) => {
     setName(newName);
@@ -4038,6 +4212,8 @@ function App() {
         onSaveTargets={handleSaveTargets}
         theme={theme}
         onChangeTheme={handleChangeTheme}
+        onSaveCurrency={handleSaveCurrency}
+        onSaveFxRate={handleSaveFxRate}
       />
     );
   } else {
@@ -4406,6 +4582,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .tx-name { color: #fff; font-size: 14px; font-weight: 500; }
   .tx-category { color: rgba(255,255,255,0.45); font-size: 12px; }
   .tx-amount { color: #fff; font-size: 14px; font-weight: 600; }
+  .tx-amt-stack { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+  .tx-amt-conv { font-size: 11px; color: rgba(255,255,255,0.45); font-weight: 500; }
+  select.glass-input { appearance: none; -webkit-appearance: none; cursor: pointer; }
   .tx-positive { color: #4fe0c0; }
   .tx-count { color: rgba(255,255,255,0.5); font-size: 12px; }
   .tx-instructions { color: rgba(255,255,255,0.55); font-size: 13px; margin: 6px 0 0; line-height: 1.5; }
