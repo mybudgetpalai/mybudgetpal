@@ -1573,7 +1573,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   return (
     <div className="page stage-fade">
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
-      <div className="glass-card onboard-card">
+      <div className={"glass-card onboard-card" + (step === 0 ? " onboard-compact" : "")}>
         <div className="progress-dots">
           {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
             <div key={i} className={"dot " + (i <= step ? "dot-active" : "")} />
@@ -1893,6 +1893,37 @@ function DemoUploadScreen({ currencies, onUseDemo, onSkipEmpty, onBack }) {
   const multi = curs.length > 1;
   const [dropped, setDropped] = useState({});
   const [over, setOver] = useState(false);
+  const [touchDrag, setTouchDrag] = useState(null);
+  const dropRef = React.useRef(null);
+  const touchStartRef = React.useRef(null);
+  const isOverDrop = (x, y) => {
+    const el = dropRef.current;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  };
+  const onFileTouchStart = (c) => (e) => {
+    if (dropped[c]) return;
+    const t = e.touches[0];
+    touchStartRef.current = { c, x: t.clientX, y: t.clientY };
+    setTouchDrag({ c, dx: 0, dy: 0 });
+  };
+  const onFileTouchMove = (e) => {
+    const s = touchStartRef.current;
+    if (!s) return;
+    const t = e.touches[0];
+    setTouchDrag({ c: s.c, dx: t.clientX - s.x, dy: t.clientY - s.y });
+    setOver(isOverDrop(t.clientX, t.clientY));
+  };
+  const onFileTouchEnd = (e) => {
+    const s = touchStartRef.current;
+    if (!s) return;
+    const t = e.changedTouches[0];
+    if (t && isOverDrop(t.clientX, t.clientY)) markDropped(s.c);
+    touchStartRef.current = null;
+    setTouchDrag(null);
+    setOver(false);
+  };
   const allDone = curs.every((c) => dropped[c]);
   const doneCount = curs.filter((c) => dropped[c]).length;
   const markDropped = (c) => {
@@ -1926,6 +1957,11 @@ function DemoUploadScreen({ currencies, onUseDemo, onSkipEmpty, onBack }) {
                    className={"demo-file" + (multi ? " demo-file-sm" : "") + (dropped[c] ? " demo-file-gone" : "")}
                    draggable={!dropped[c]}
                    onDragStart={(e) => { e.dataTransfer.setData("text/plain", c); e.dataTransfer.effectAllowed = "copy"; }}
+                   onTouchStart={onFileTouchStart(c)}
+                   onTouchMove={onFileTouchMove}
+                   onTouchEnd={onFileTouchEnd}
+                   onTouchCancel={onFileTouchEnd}
+                   style={touchDrag && touchDrag.c === c ? { transform: "translate(" + touchDrag.dx + "px, " + touchDrag.dy + "px)", transition: "none", zIndex: 5, position: "relative" } : undefined}
                    onClick={() => markDropped(c)}
                    title="Drag me into the box, or click">
                 <div className="demo-file-icon">📄</div>
@@ -1935,7 +1971,7 @@ function DemoUploadScreen({ currencies, onUseDemo, onSkipEmpty, onBack }) {
             ))}
           </div>
           <div className="demo-arrow">→</div>
-          <div className={"demo-drop" + (over ? " demo-drop-over" : "") + (allDone ? " demo-drop-done" : "")}
+          <div ref={dropRef} className={"demo-drop" + (over ? " demo-drop-over" : "") + (allDone ? " demo-drop-done" : "")}
                onDragOver={(e) => { e.preventDefault(); setOver(true); }}
                onDragLeave={() => setOver(false)}
                onDrop={onDropZone}
@@ -1946,7 +1982,7 @@ function DemoUploadScreen({ currencies, onUseDemo, onSkipEmpty, onBack }) {
 
         <div className="nav-row">
           {onBack && <button className="glass-btn ghost" onClick={onBack}>Back</button>}
-          <button className="glass-btn ghost demo-skip-empty" onClick={onSkipEmpty}>Start empty instead</button>
+          <button className="glass-btn ghost demo-skip-empty" style={{ flex: 1 }} onClick={onSkipEmpty}>Start empty instead</button>
         </div>
       </div>
     </div>
@@ -3665,11 +3701,19 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
 function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes }) {
   const revealed = !runTour || index <= tourStep;
   const active = runTour && index === tourStep;
+  const slotRef = React.useRef(null);
+  React.useEffect(() => {
+    if (active && slotRef.current) {
+      const el = slotRef.current;
+      const t = setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 120);
+      return () => clearTimeout(t);
+    }
+  }, [active]);
   if (runTour && !revealed) {
     return <div className="overview-slot overview-slot-coming"><span className="coming-soon">Coming up…</span></div>;
   }
   return (
-    <div className={"overview-slot" + (active ? " tour-active" : "")}>
+    <div ref={slotRef} className={"overview-slot" + (active ? " tour-active" : "")}>
       {!runTour && (
         <div className="overview-slot-head">
           <select className="slot-select" value={widgetKey} onChange={(e) => onChange(e.target.value)}>
@@ -4810,10 +4854,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .glass-card.size-md { max-width: 420px; min-height: 420px; }
   .glass-card.size-lg { max-width: 460px; min-height: 500px; }
   .glass-card.onboard-card { max-width: 460px; min-height: 480px; transition: none; }
+  .glass-card.onboard-card.onboard-compact { min-height: 0; }
   .glass-card.onboard-card .step { flex: 1; display: flex; flex-direction: column; justify-content: center; }
   .demo-badge { display: inline-block; margin-left: 10px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(79,140,255,0.18); color: #9bc0ff; border: 1px solid rgba(79,140,255,0.35); vertical-align: middle; }
   .demo-sim { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0 8px; }
-  .demo-file { flex: 0 0 auto; width: 150px; padding: 16px 12px; border-radius: 16px; background: linear-gradient(135deg, rgba(79,140,255,0.18), rgba(181,107,255,0.18)); border: 1px solid rgba(255,255,255,0.2); text-align: center; cursor: grab; transition: transform 0.15s, opacity 0.4s; box-shadow: 0 6px 20px rgba(0,0,0,0.25); user-select: none; }
+  .demo-file { touch-action: none; flex: 0 0 auto; width: 150px; padding: 16px 12px; border-radius: 16px; background: linear-gradient(135deg, rgba(79,140,255,0.18), rgba(181,107,255,0.18)); border: 1px solid rgba(255,255,255,0.2); text-align: center; cursor: grab; transition: transform 0.15s, opacity 0.4s; box-shadow: 0 6px 20px rgba(0,0,0,0.25); user-select: none; }
   .demo-file:hover { transform: translateY(-3px) scale(1.02); }
   .demo-file:active { cursor: grabbing; }
   .demo-file-gone { opacity: 0; transform: scale(0.85); pointer-events: none; }
@@ -4964,7 +5009,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bank-upload-count { color: rgba(255,255,255,0.45); font-size: 12px; }
   .count-good { color: #4fe0c0; }
   .balance-row { display: flex; gap: 10px; margin-top: 8px; padding: 0 2px; }
-  .balance-field { flex: 1; display: flex; flex-direction: column; }
+  .balance-field { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .balance-field .glass-input { min-width: 0; width: 100%; }
+  input[type="date"].glass-input { -webkit-appearance: none; appearance: none; }
 
   /* processing */
   .spinner {
@@ -5265,6 +5312,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .target-row { flex-wrap: wrap; gap: 8px; }
     .target-total-row { font-size: 13px; }
 
+    .balance-row { flex-direction: column; gap: 12px; }
+
     /* dashboard */
     .topbar { padding: 12px 14px; }
     .topbar-right { gap: 8px; }
@@ -5284,13 +5333,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
     /* side panel becomes an overlay drawer instead of pushing content */
     .side-panel {
-      position: fixed; top: 57px; left: 0; height: calc(100vh - 57px);
-      z-index: 16; box-shadow: 8px 0 24px rgba(0,0,0,0.4);
-      background: rgba(15, 15, 30, 0.85); backdrop-filter: blur(20px);
+      position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh;
+      z-index: 40; box-shadow: 8px 0 24px rgba(0,0,0,0.4);
+      background: rgba(15, 15, 30, 0.97); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     }
+    .side-panel.side-panel-open { padding-top: calc(20px + env(safe-area-inset-top)); }
     .side-panel-backdrop.backdrop-visible {
-      display: block; position: fixed; inset: 0; top: 57px;
-      background: rgba(0,0,0,0.5); z-index: 15;
+      display: block; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 39;
     }
 
     /* settings */
