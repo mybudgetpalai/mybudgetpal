@@ -4078,7 +4078,10 @@ function App() {
   }, [userId]);
 
   React.useEffect(() => {
-    if (stage !== "dashboard" || reviewMonth) return;
+    // Hold the month-end review until the user has finished the welcome tour and
+    // any first-run setup — it should never interrupt onboarding.
+    if (stage !== "dashboard" || reviewMonth || runTour || showExtraBanner) return;
+    if (!hasData) return;
     const done = completedMonthsWithData(customTransactions);
     if (!done.length) return;
     const reviewed = new Set(monthReviews.map((r) => r.month));
@@ -4089,7 +4092,7 @@ function App() {
       const hasBudget = TX_CATEGORIES.some((c) => Number(b[c]) > 0) || isDev;
       if (hasBudget) { setReviewManual(false); setReviewMonth(k); break; }
     }
-  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev]);
+  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev, runTour, showExtraBanner, hasData]);
 
   const reviewBudgets = (() => {
     if (!reviewMonth) return {};
