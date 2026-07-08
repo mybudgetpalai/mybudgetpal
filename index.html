@@ -238,6 +238,66 @@ function demoCategorize(name, amount) {
   return "Uncategorized";
 }
 
+const SAMPLE_BANK_BY_CUR = { GBP: "Sample UK Bank", AED: "Sample UAE Bank", USD: "Sample US Bank", EUR: "Sample EU Bank" };
+const DEMO_CSV_GBP = `Date,Description,Amount
+2026-05-01,SALARY BRIGHTWAVE LTD,3400.00
+2026-05-03,TESCO STORES 2841,-72.40
+2026-05-05,TFL TRAVEL CHARGE,-38.60
+2026-05-07,BRITISH GAS DD,-96.00
+2026-05-09,COSTA COFFEE HOLBORN,-4.85
+2026-05-11,NETFLIX.COM,-10.99
+2026-05-14,SAINSBURYS SUPERMKT,-58.20
+2026-05-17,AMAZON.CO.UK,-64.30
+2026-05-20,DELIVEROO LONDON,-27.50
+2026-05-23,SHELL PETROL,-70.00
+2026-05-26,SPOTIFY UK,-11.99
+2026-05-28,PUREGYM LTD,-24.99
+2026-06-01,SALARY BRIGHTWAVE LTD,3400.00
+2026-06-03,TESCO STORES 2841,-81.10
+2026-06-05,TFL TRAVEL CHARGE,-41.20
+2026-06-07,BRITISH GAS DD,-96.00
+2026-06-10,NETFLIX.COM,-10.99
+2026-06-13,SAINSBURYS SUPERMKT,-63.75
+2026-06-16,AMAZON.CO.UK,-118.00
+2026-06-19,DELIVEROO LONDON,-31.40
+2026-06-22,SHELL PETROL,-68.00
+2026-06-26,SPOTIFY UK,-11.99
+2026-06-28,PUREGYM LTD,-24.99
+2026-07-01,SALARY BRIGHTWAVE LTD,3400.00
+2026-07-03,TESCO STORES 2841,-69.90
+2026-07-04,TFL TRAVEL CHARGE,-22.30
+2026-07-05,COSTA COFFEE HOLBORN,-5.40`;
+const DEMO_CSV_AED = `Date,Description,Amount
+2026-05-01,SALARY ACME LLC,15000.00
+2026-05-02,DEWA PAYMENT,-305.00
+2026-05-03,CARREFOUR MOE,-452.00
+2026-05-05,UBER TRIP HELP.UBER.COM,-68.50
+2026-05-08,WAITROSE DUBAI MALL,-318.20
+2026-05-10,NETFLIX.COM,-46.00
+2026-05-12,COSTA COFFEE JBR,-29.00
+2026-05-14,AMAZON.AE ORDER,-540.00
+2026-05-15,SPOTIFY AB,-29.99
+2026-05-18,TALABAT DUBAI,-122.75
+2026-05-20,ENOC PETROL 1044,-340.00
+2026-05-28,FITNESS FIRST,-185.00
+2026-06-01,SALARY ACME LLC,15000.00
+2026-06-02,DEWA PAYMENT,-310.00
+2026-06-04,CARREFOUR MOE,-398.60
+2026-06-06,UBER TRIP HELP.UBER.COM,-82.00
+2026-06-09,SPINNEYS DUBAI,-274.00
+2026-06-10,NETFLIX.COM,-46.00
+2026-06-12,SHAKE SHACK MOE,-95.00
+2026-06-16,NOON.COM ORDER,-810.00
+2026-06-19,TALABAT DUBAI,-141.20
+2026-06-24,ENOC PETROL 1044,-325.00
+2026-06-28,FITNESS FIRST,-185.00
+2026-07-01,SALARY ACME LLC,15000.00
+2026-07-02,DEWA PAYMENT,-308.00
+2026-07-03,CARREFOUR MOE,-289.90
+2026-07-04,NETFLIX.COM,-46.00
+2026-07-05,STARBUCKS DIFC,-34.20`;
+function demoCsvForCurrency(cur) { return cur === "AED" ? DEMO_CSV_AED : DEMO_CSV_GBP; }
+
 const SAVINGS_GOAL = { label: "Emergency fund", target: 10000, current: 4200, months: 6 };
 
 const PRIVACY_SECTIONS = [
@@ -1435,7 +1495,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
         return;
       }
       setSubmitting(false);
-      onDone({ name: name.trim(), banks });
+      onDone({ name: name.trim(), banks, currencies });
     }
     else setStep((s) => s + 1);
   };
@@ -1759,35 +1819,59 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
   );
 }
 
-function DemoUploadScreen({ onUseDemo, onSkipEmpty, onBack }) {
+function DemoUploadScreen({ currencies, onUseDemo, onSkipEmpty, onBack }) {
+  const curs = (currencies && currencies.length ? currencies : ["GBP"]).slice(0, 2);
+  const multi = curs.length > 1;
+  const [dropped, setDropped] = useState({});
   const [over, setOver] = useState(false);
-  const [done, setDone] = useState(false);
-  const trigger = () => { if (done) return; setDone(true); setTimeout(onUseDemo, 500); };
+  const allDone = curs.every((c) => dropped[c]);
+  const doneCount = curs.filter((c) => dropped[c]).length;
+  const markDropped = (c) => {
+    if (dropped[c]) return;
+    setDropped((prev) => {
+      const next = { ...prev, [c]: true };
+      if (curs.every((x) => next[x])) setTimeout(() => onUseDemo(curs), 650);
+      return next;
+    });
+  };
+  const onDropZone = (e) => {
+    e.preventDefault(); setOver(false);
+    const c = e.dataTransfer.getData("text/plain");
+    if (c && curs.includes(c)) markDropped(c);
+    else { const nextC = curs.find((x) => !dropped[x]); if (nextC) markDropped(nextC); }
+  };
   return (
     <div className="page stage-fade">
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card upload-card">
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
-        <h1 className="title">No statement handy? Try it with sample data</h1>
-        <p className="subtitle">Drag the file into the box (or just click it) and we'll run the full setup on a demo statement, so you can see exactly how everything works.</p>
+        <h1 className="title">{multi ? "No statements handy? Try it with sample data" : "No statement handy? Try it with sample data"}</h1>
+        <p className="subtitle">{multi
+          ? "Drag both files into the box (or click each). We'll load a statement for each of your currencies so you can see how conversion works."
+          : "Drag the file into the box (or just click it) and we'll run the full setup on a demo statement, so you can see exactly how everything works."}</p>
 
         <div className="demo-sim">
-          <div className={"demo-file" + (done ? " demo-file-gone" : "")}
-               draggable={!done}
-               onDragStart={(e) => { e.dataTransfer.setData("text/plain", "demo"); e.dataTransfer.effectAllowed = "copy"; }}
-               onClick={trigger}
-               title="Drag me into the box, or click">
-            <div className="demo-file-icon">📄</div>
-            <div className="demo-file-name">MyBudgetPal_Dummy_Statement.csv</div>
-            <div className="demo-file-hint">drag me → or click</div>
+          <div className="demo-file-stack">
+            {curs.map((c) => (
+              <div key={c}
+                   className={"demo-file" + (multi ? " demo-file-sm" : "") + (dropped[c] ? " demo-file-gone" : "")}
+                   draggable={!dropped[c]}
+                   onDragStart={(e) => { e.dataTransfer.setData("text/plain", c); e.dataTransfer.effectAllowed = "copy"; }}
+                   onClick={() => markDropped(c)}
+                   title="Drag me into the box, or click">
+                <div className="demo-file-icon">📄</div>
+                <div className="demo-file-name">Sample_{c}_Statement.csv</div>
+                <div className="demo-file-hint">{multi ? c + " account" : "drag me → or click"}</div>
+              </div>
+            ))}
           </div>
           <div className="demo-arrow">→</div>
-          <div className={"demo-drop" + (over ? " demo-drop-over" : "") + (done ? " demo-drop-done" : "")}
+          <div className={"demo-drop" + (over ? " demo-drop-over" : "") + (allDone ? " demo-drop-done" : "")}
                onDragOver={(e) => { e.preventDefault(); setOver(true); }}
                onDragLeave={() => setOver(false)}
-               onDrop={(e) => { e.preventDefault(); setOver(false); trigger(); }}
-               onClick={trigger}>
-            {done ? "Got it ✓" : "Drop the file here"}
+               onDrop={onDropZone}
+               onClick={() => { const nextC = curs.find((x) => !dropped[x]); if (nextC) markDropped(nextC); }}>
+            {allDone ? "Got it ✓" : multi ? (doneCount + " of " + curs.length + " added") : "Drop the file here"}
           </div>
         </div>
 
@@ -3812,6 +3896,7 @@ function App() {
   const [theme, setTheme] = useState("midnight");
   const [runTour, setRunTour] = useState(false);
   const [usingDemo, setUsingDemo] = useState(false);
+  const [demoCurrencies, setDemoCurrencies] = useState(["GBP"]);
 
   const pushToast = (message, type) => {
     const id = Date.now() + Math.random();
@@ -3891,11 +3976,22 @@ function App() {
     pushToast("\u201C" + description + "\u201D \u2192 " + newCategory, "success");
   };
 
-  const startDemo = () => {
-    let parsed = [];
-    try { parsed = parseStatementCSV(DEMO_CSV).transactions; } catch (e) { parsed = []; }
-    const txs = parsed.map((t, i) => ({ ...t, id: "sample-" + i, bank: "Sample Data", category: demoCategorize(t.name, t.amount) }));
-    setCustomTransactions(txs);
+  const startDemo = (demoCurs) => {
+    const curs = (demoCurs && demoCurs.length ? demoCurs : [FX.home || "GBP"]).slice(0, 2);
+    const home = (FX.ready && FX.home) ? FX.home : curs[0];
+    FX.home = home; FX.ready = true;
+    const all = [];
+    curs.forEach((c) => {
+      const bank = SAMPLE_BANK_BY_CUR[c] || ("Sample " + c + " Bank");
+      FX.bankCurrency[bank] = c;
+      let parsed = [];
+      try { parsed = parseStatementCSV(demoCsvForCurrency(c)).transactions; } catch (e) { parsed = []; }
+      parsed.forEach((t, i) => {
+        const base = { ...t, id: "sample-" + c + "-" + i, bank, category: demoCategorize(t.name, t.amount) };
+        all.push(applyFxToTx(base));
+      });
+    });
+    setCustomTransactions(all);
     setUsingDemo(true);
     setStage("processing");
   };
@@ -4227,7 +4323,7 @@ function App() {
       />
     );
   } else if (stage === "onboarding") {
-    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} initialName={name} initialBanks={banks} onDone={(d) => { setName(d.name); setBanks(d.banks); setStage("upload"); }} />;
+    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} initialName={name} initialBanks={banks} onDone={(d) => { setName(d.name); setBanks(d.banks); setDemoCurrencies((d.currencies && d.currencies.length ? d.currencies : ["GBP"])); setStage("upload"); }} />;
   } else if (stage === "upload") {
     content = (
       <UploadScreen
@@ -4249,7 +4345,11 @@ function App() {
       />
     );
   } else if (stage === "demoUpload") {
-    content = <DemoUploadScreen onUseDemo={startDemo} onSkipEmpty={() => setStage("processing")} onBack={() => setStage("upload")} />;
+    {
+      const bankCurs = [...new Set((bankRows || []).map((r) => r.currency || "GBP"))];
+      const effDemoCurs = bankCurs.length ? bankCurs.slice(0, 2) : demoCurrencies;
+      content = <DemoUploadScreen currencies={effDemoCurs} onUseDemo={startDemo} onSkipEmpty={() => setStage("processing")} onBack={() => setStage("upload")} />;
+    }
   } else if (stage === "processing") {
     content = <ProcessingScreen transactions={customTransactions} onDone={() => setStage("confirmCategory")} />;
   } else if (stage === "confirmCategory") {
@@ -4416,6 +4516,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .demo-file:hover { transform: translateY(-3px) scale(1.02); }
   .demo-file:active { cursor: grabbing; }
   .demo-file-gone { opacity: 0; transform: scale(0.85); pointer-events: none; }
+  .demo-file-stack { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
+  .demo-file-sm { width: 160px; padding: 12px 10px; }
+  .demo-file-sm .demo-file-name { font-size: 12px; }
   .demo-file-icon { font-size: 34px; line-height: 1; }
   .demo-file-name { font-size: 11px; color: #fff; font-weight: 600; margin-top: 8px; word-break: break-word; }
   .demo-file-hint { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 6px; }
