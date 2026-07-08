@@ -31,6 +31,32 @@
   @media (prefers-reduced-motion: reduce) {
     .category-fill, .goal-fill, .pace-fill, .progress-fill, .safe-hero-fill, .lpd-progress-fill, .lpd-bar-fill { animation: none; }
   }
+
+  /* ---- fix batch: ask output, LTP grid, targets, review win ---- */
+  .ask-md { white-space: normal; }
+  .ask-md-h { font-weight: 700; font-size: 14px; margin: 10px 0 4px; }
+  .ask-md-p { margin: 6px 0; }
+  .ask-md-li { margin: 3px 0 3px 4px; padding-left: 12px; position: relative; }
+  .ask-md-li::before { content: ""; position: absolute; left: 0; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+  .ask-md-table { border-collapse: collapse; margin: 8px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .ask-md-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line-strong); }
+  .ask-md-table td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line); }
+  .ask-md-table tr:last-child td { border-bottom: none; }
+
+  .ltp-table { table-layout: fixed; min-width: 980px; }
+  .ltp-table .ltp-sticky { width: 148px; }
+  .ltp-table thead th { background: var(--surface-2); }
+  .ltp-table thead th.ltp-sticky { background: var(--surface-2); }
+  .ltp-net-row td { background: var(--surface-3) !important; }
+  .ltp-net-row td.ltp-sticky, .ltp-bal-row td.ltp-sticky { background: var(--surface-3); }
+  .ltp-bal-row.ltp-close-row td { border-top: 2px solid var(--line-strong); }
+
+  .targets-table td { border-bottom: 1px solid var(--line); }
+  .targets-table .bt-cell { padding: 5px 8px; }
+  .bt-total-row td { background: var(--surface-3); border-top: 2px solid var(--line-strong); }
+  .bt-total-row .bt-total-num { font-weight: 700; }
+  
+  .app-shell[data-theme="dark"] .review-win { background: rgba(61,214,140,0.12); border-color: rgba(61,214,140,0.35); color: #7BE0B0; }
 </style>
 </head>
 <body>
@@ -76,6 +102,43 @@ function Icon({ name, size = 16, strokeWidth = 2, className = "", style }) {
       {d.split("|").map((p, i) => <path key={i} d={p} />)}
     </svg>
   );
+}
+function renderAskAnswer(text) {
+  const bold = (s) => {
+    const parts = String(s).split("**");
+    return parts.map((p, i) => (i % 2 === 1 ? <strong key={i}>{p}</strong> : p));
+  };
+  const lines = String(text || "").split("\n");
+  const out = [];
+  let table = null;
+  const flushTable = () => {
+    if (!table || !table.length) { table = null; return; }
+    const [head, ...body] = table;
+    out.push(
+      <table className="ask-md-table" key={"t" + out.length}>
+        <thead><tr>{head.map((c, i) => <th key={i}>{bold(c)}</th>)}</tr></thead>
+        <tbody>{body.map((r, ri) => <tr key={ri}>{r.map((c, ci) => <td key={ci}>{bold(c)}</td>)}</tr>)}</tbody>
+      </table>
+    );
+    table = null;
+  };
+  lines.forEach((raw, idx) => {
+    const line = raw.trim();
+    if (line.startsWith("|")) {
+      const cells = line.split("|").map((c) => c.trim()).filter((c, i, a) => !(i === 0 && c === "") && !(i === a.length - 1 && c === ""));
+      if (cells.every((c) => /^:?-{2,}:?$/.test(c))) return; // separator row
+      table = table || [];
+      table.push(cells);
+      return;
+    }
+    flushTable();
+    if (!line) return;
+    if (/^#{1,4}\s/.test(line)) { out.push(<p className="ask-md-h" key={idx}>{bold(line.replace(/^#{1,4}\s*/, ""))}</p>); return; }
+    if (/^[-•]\s/.test(line)) { out.push(<p className="ask-md-li" key={idx}>{bold(line.replace(/^[-•]\s*/, ""))}</p>); return; }
+    out.push(<p className="ask-md-p" key={idx}>{bold(line)}</p>);
+  });
+  flushTable();
+  return out;
 }
 const CATEGORY_ICONS = {
   Groceries: "groceries", Dining: "dining", Transport: "transport", Shopping: "shopping",
@@ -2736,7 +2799,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
               ))}
               <tr className="bt-total-row">
                 <td className="bt-cat">Total spend</td>
-                {months.map((m) => <td key={m.key} className="bt-cell bt-total-cell"><span className="bt-total-disp"><span className="bt-cur">{homeSym()}</span><span className="bt-total-num">{formatNum(monthTotal(m.key))}</span></span></td>)}
+                {months.map((m) => <td key={m.key} className="bt-cell bt-total-cell"><span className="bt-total-disp"><span className="bt-total-num">{formatMoney(monthTotal(m.key))}</span></span></td>)}
               </tr>
               <tr className="bt-total-row">
                 <td className="bt-cat">Saved</td>
@@ -3046,7 +3109,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
         <div className="tx-list">
           {list.map((t, i) => (
             <div className="tx-row" key={i}>
-              <span className="tx-cat-ico" style={{ color: COLORS[t.category] || "var(--ink-3)" }}><Icon name={CATEGORY_ICONS[t.category] || "tag"} size={14} /></span><div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+              <span className="tx-cat-ico" style={{ color: catColor(t.category) }}><Icon name={CATEGORY_ICONS[t.category] || "tag"} size={14} /></span><div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
               <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
             </div>
           ))}
@@ -3108,7 +3171,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
           <div className="tx-empty">No transactions match your filters.</div>
         ) : filtered.map((t, i) => (
           <div className="tx-row" key={t.id || i}>
-            <span className="tx-cat-ico" style={{ color: COLORS[t.category] || "var(--ink-3)" }}><Icon name={CATEGORY_ICONS[t.category] || "tag"} size={14} /></span><div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
+            <span className="tx-cat-ico" style={{ color: catColor(t.category) }}><Icon name={CATEGORY_ICONS[t.category] || "tag"} size={14} /></span><div className="tx-info"><span className="tx-name">{t.name}</span><span className="tx-category">{onRecategorize ? (<CategoryEditor value={t.category} onChange={(c2) => onRecategorize(t.name, c2)} />) : displayCat(t.category)} {"\u00B7"} {formatTxDate(t.date)}</span></div>
             <span className={"tx-amount " + (t.amount > 0 ? "tx-positive" : "")}>{t.currency && t.currency !== FX.home ? (<span className="tx-amt-stack"><span>{formatMoneyNative(t.amountNative, t.currency)}</span><span className="tx-amt-conv">&asymp; {formatMoney(t.amount)}</span></span>) : formatMoney(t.amount)}</span>
           </div>
         ))}
@@ -3728,7 +3791,7 @@ function InsightsAsk({ transactions }) {
       )}
       {busy && <div className="ask-answer ask-loading">Looking through your transactions\u2026</div>}
       {err && <div className="ask-answer ask-error">{err}</div>}
-      {ans && !busy && <div className="ask-answer">{ans}</div>}
+      {ans && !busy && <div className="ask-answer ask-md">{renderAskAnswer(ans)}</div>}
     </div>
   );
 }
@@ -4251,13 +4314,13 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
                   {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " ltp-neg"}>{r.other ? "−" + formatMoney(r.other) : formatMoney(0)}</td>)}
                 </tr>
               )}
-              <tr className="ltp-net-row">
-                <td className="ltp-sticky">Saved this month</td>
-                {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " " + (r.net >= 0 ? "rv-under" : "rv-over")}>{formatMoney(r.net)}</td>)}
-              </tr>
               <tr className="ltp-bal-row ltp-close-row">
                 <td className="ltp-sticky">Closing balance</td>
                 {cols.map((r, i) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + (i === cols.length - 1 ? " ltp-goal-cell" : "")}>{formatMoney(r.close)}</td>)}
+              </tr>
+              <tr className="ltp-net-row">
+                <td className="ltp-sticky">Saved this month</td>
+                {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " " + (r.net >= 0 ? "rv-under" : "rv-over")}>{formatMoney(r.net)}</td>)}
               </tr>
             </tbody>
           </table>
@@ -5815,14 +5878,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catrev-sub { color: #9aa4b8; font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
   .catrev-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
   .catrev-row { border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); overflow: hidden; }
-  .catrev-row.catrev-open { border-color: rgba(143,180,255,0.4); }
+  .catrev-row.catrev-open { border-color: var(--accent); }
   .catrev-row-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 11px 14px; cursor: pointer; font-family: inherit; text-align: left; }
   .catrev-name { color: var(--ink); font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .catrev-meta { color: #9aa4b8; font-size: 12px; white-space: nowrap; }
+  .catrev-meta { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
   .catrev-caret { color: var(--accent); font-size: 12px; }
   .catrev-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 4px 14px 13px; }
-  .catrev-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); color: #e6ecf7; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s, transform 0.1s; }
-  .catrev-chip:hover { background: rgba(143,180,255,0.18); transform: translateY(-1px); }
+  .catrev-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--line-strong); color: var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s, transform 0.1s; }
+  .catrev-chip:hover { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-1px); }
   .catrev-done { text-align: center; padding: 18px 6px 6px; }
   .catrev-done-icon { font-size: 34px; margin-bottom: 8px; }
   .catrev-done p { color: #cfe0ff; font-size: 14px; margin: 0 0 16px; }
@@ -6595,7 +6658,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .insights-ask { border: 1px solid rgba(143,180,255,0.28); background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; }
   .ask-row { display: flex; gap: 8px; margin-top: 10px; }
   .ask-input { flex: 1; min-width: 0; }
-  .ask-btn { flex-shrink: 0; min-width: 74px; }
+  .ask-btn { flex: 0 0 auto; min-width: 84px; }
   .ask-examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .ask-chip { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 20px; cursor: pointer; }
   .ask-chip:hover { background: var(--surface-3); color: var(--ink); }
@@ -6615,7 +6678,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .review-bigstat { display: flex; flex-direction: column; margin: 6px 0 12px; }
   .review-bignum { font-size: 32px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
   .review-biglabel { font-size: 13px; color: var(--ink-2); }
-  .review-win { background: rgba(62,207,142,0.12); border: 1px solid rgba(62,207,142,0.3); color: #bff4dc; font-size: 13px; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .review-win { background: #E7F6EE; border: 1px solid #BFE7D2; color: #14713F; font-size: 13px; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
   .review-minibars { margin: 4px 0 16px; }
   .rmb-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
   .rmb-name { width: 82px; font-size: 11.5px; color: var(--ink-2); flex-shrink: 0; }
