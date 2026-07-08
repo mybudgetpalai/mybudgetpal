@@ -2756,7 +2756,7 @@ function PieChart({ slices, total }) {
     </div>
   );
 }
-function BreakdownPage({ transactions, targets }) {
+function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const txs = transactions || [];
   const monthsWithData = React.useMemo(() => {
     const set = new Set(txs.filter((t) => t.date && t.amount < 0).map((t) => t.date.slice(0, 7)));
@@ -2794,8 +2794,10 @@ function BreakdownPage({ transactions, targets }) {
   const spentTitle = isCurrentMonth ? "You've spent so far in " + monthLabelFromKey(activeKey) : "You spent in " + monthLabelFromKey(activeKey);
   const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
 
+  const monthUncat = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === activeKey).length;
   return (
     <div className="bd-page">
+      {onOpenCatReview && <UncatBanner count={monthUncat} onSort={onOpenCatReview} label={"in " + monthLabelFromKey(activeKey) + " aren\u2019t categorised"} />}
       <div className="glass-card dash-card bd-box">
         <div className="bd-header">
           <div>
@@ -3840,16 +3842,62 @@ function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks,
   );
 }
 
+function UncatBanner({ count, onSort, label }) {
+  const [hidden, setHidden] = useState(false);
+  if (!count || hidden) return null;
+  return (
+    <div className="catrev-banner uncat-banner-block">
+      <span className="catrev-banner-text">{"\ud83c\udff7\ufe0f"} <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"\u2014"} they’re left out of your budgets until sorted.</span>
+      <div className="catrev-banner-actions">
+        <button className="catrev-banner-btn" onClick={onSort}>Sort now</button>
+        <button className="catrev-banner-later" onClick={() => setHidden(true)}>Later</button>
+      </div>
+    </div>
+  );
+}
+
+function SafeToSpendHero({ targets, transactions, rollovers }) {
+  const key = currentMonthKey();
+  const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
+  if (budget <= 0) return null;
+  const roll = rolloverForMonth(rollovers, key);
+  const spent = spendForMonth(transactions, key);
+  const remaining = budget + roll - spent;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
+  const over = remaining < 0;
+  const perDay = over ? 0 : Math.floor(remaining / daysLeft);
+  const pctOfDay = budget > 0 ? Math.min(100, Math.max(0, (Math.max(0, remaining) / budget) * 100)) : 0;
+  return (
+    <div className="safe-hero">
+      <div className="safe-hero-row">
+        <div className="safe-hero-main">
+          <span className="safe-hero-label">Safe to spend today</span>
+          <span className={"safe-hero-num" + (over ? " safe-hero-over" : "")}>{formatMoney(perDay)}</span>
+        </div>
+        <div className="safe-hero-side">
+          {over
+            ? <span className="safe-hero-overtext">{formatMoney(Math.abs(remaining))} over budget this month</span>
+            : <span>{formatMoney(remaining)} left {"\u00b7"} {daysLeft} day{daysLeft !== 1 ? "s" : ""} to go</span>}
+          {roll !== 0 && <span className="safe-hero-roll">{roll < 0 ? "after " + formatMoney(Math.abs(roll)) + " rollover" : "incl. " + formatMoney(roll) + " rollover"}</span>}
+        </div>
+      </div>
+      {!over && <div className="safe-hero-track"><div className="safe-hero-fill" style={{ width: pctOfDay + "%" }} /></div>}
+    </div>
+  );
+}
+
 function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers }) {
   if (view === "overview") return (
     <>
-      <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…{!runTour && uncatCount > 0 && (
-        <button className="uncat-pill" onClick={onOpenCatReview}>{"\ud83c\udff7\ufe0f"} {uncatCount} to categorise</button>
-      )}</div>
+      <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
+      {!runTour && <UncatBanner count={uncatCount} onSort={onOpenCatReview} />}
+      {!runTour && hasData && <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />}
       <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} rollovers={rollovers} />
     </>
   );
-  if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -5838,6 +5886,19 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* ---- added: greeting / trends / customise / bills-edit ---- */
   .overview-greeting { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 2px 4px 16px; }
+  .uncat-banner-block { border-bottom: none; border: 1px solid rgba(143,180,255,0.28); border-radius: 14px; margin: 0 4px 14px; justify-content: space-between; }
+  .safe-hero { background: linear-gradient(150deg, rgba(79,140,255,0.16), rgba(127,107,255,0.10)); border: 1px solid rgba(79,140,255,0.28); border-radius: 18px; padding: 18px 20px; margin: 0 4px 18px; }
+  .safe-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .safe-hero-main { display: flex; flex-direction: column; gap: 2px; }
+  .safe-hero-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.6); font-weight: 700; }
+  .safe-hero-num { font-size: 38px; font-weight: 800; color: #fff; letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .safe-hero-over { color: #ff8a8a; }
+  .safe-hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 13px; color: rgba(255,255,255,0.7); text-align: right; }
+  .safe-hero-overtext { color: #ff8a8a; font-weight: 600; }
+  .safe-hero-roll { font-size: 11.5px; color: rgba(255,255,255,0.45); }
+  .safe-hero-track { height: 8px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-top: 14px; overflow: hidden; }
+  .safe-hero-fill { height: 100%; background: linear-gradient(90deg,#4f8cff,#7f6bff); border-radius: 5px; transition: width .4s ease; }
+  @media (max-width: 560px) { .safe-hero-side { align-items: flex-start; text-align: left; } .safe-hero-num { font-size: 34px; } }
   .trends-wrap { display: flex; flex-direction: column; gap: 16px; }
   .trend-cat-select { width: auto; min-width: 130px; }
   .side-customise-btn { margin-top: 8px; width: 100%; text-align: left; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
