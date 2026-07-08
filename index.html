@@ -774,6 +774,18 @@ async function parseStatementFile(file) {
 
 /* Supabase persistence for transactions */
 function rowToTx(r) { return { id: r.id, date: r.tx_date || "", name: r.description, amount: Number(r.amount), category: r.category || "Uncategorized", bank: r.bank_name }; }
+/* Dev-only test hook: forces 2 spend transactions per import into "Needs review" so the categorise flow can be tested. No effect for real accounts. */
+let DEV_MODE = false;
+const DEV_FORCED_NAMES = new Set();
+function devForceUncat(list) {
+  if (!DEV_MODE || !list || !list.length) return list;
+  let n = 0;
+  for (const t of list) {
+    if (n >= 2) break;
+    if (t.amount < 0 && t.category !== "Uncategorized") { t.category = "Uncategorized"; DEV_FORCED_NAMES.add(t.name); n++; }
+  }
+  return list;
+}
 async function fetchTransactions(userId) {
   const { data, error } = await supabaseClient.from("transactions").select("*").eq("user_id", userId).order("tx_date", { ascending: false });
   if (error) return [];
@@ -1838,6 +1850,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
         }
       }
     }
+    devForceUncat(allParsed);
     let saved = allParsed;
     if (allParsed.length) {
       try {
@@ -4342,7 +4355,7 @@ function App() {
     if (n > 0) pushToast(n + " transaction" + (n !== 1 ? "s" : "") + " couldn't be auto-categorised \u2014 use the tag on your Overview to sort them", "info");
   };
   const runAiFallback = async (txs) => {
-    const uncats = txs.filter((t) => t.category === "Uncategorized");
+    const uncats = txs.filter((t) => t.category === "Uncategorized" && !DEV_FORCED_NAMES.has(t.name));
     if (!uncats.length) return;
     try {
       const unique = [...new Set(uncats.map((t) => t.name))].slice(0, 200);
@@ -4427,6 +4440,7 @@ function App() {
         all.push(applyFxToTx(base));
       });
     });
+    devForceUncat(all);
     setCustomTransactions(all);
     setUsingDemo(true);
     setStage("processing");
@@ -4439,6 +4453,7 @@ function App() {
     base.forEach((t) => { if (!(t.name in overrideMap)) overrideMap[t.name] = t.category; });
     list.forEach((t) => { const o = overrideMap[t.name]; if (o && o !== "Uncategorized") t.category = o; });
     const { kept, skipped } = dedupeTransactions(list, base);
+    devForceUncat(kept);
     let stmtRow = null;
     if (bankName && meta) {
       try {
@@ -4480,6 +4495,7 @@ function App() {
         const uid = session.user.id;
         setUserId(uid);
         setIsDev(session.user.email === DEV_EMAIL);
+        DEV_MODE = session.user.email === DEV_EMAIL;
         const profile = await fetchProfile(uid);
         if (profile?.name) {
           const bankRows = await fetchBanks(uid);
@@ -4539,6 +4555,7 @@ function App() {
       const uid = signIn.data.user.id;
       setUserId(uid);
       setIsDev(true);
+      DEV_MODE = true;
 
       let profile = await fetchProfile(uid);
       if (!profile?.name) {
@@ -4695,6 +4712,7 @@ function App() {
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
     setIsDev(false);
+    DEV_MODE = false;
     setUserId(null); setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setStatements([]);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
