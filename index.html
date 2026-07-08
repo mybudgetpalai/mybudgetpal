@@ -1046,6 +1046,51 @@ function LpViewsDemo() {
   );
 }
 
+function LpCurrencyDemo() {
+  const [home, setHome] = useState("GBP");
+  const SYM = { GBP: "\u00a3", AED: "AED\u00a0" };
+  const RATE = { "GBP>AED": 4.65, "AED>GBP": 0.215 };
+  const conv = (n, from) => from === home ? n : Math.round(n * RATE[from + ">" + home]);
+  const fmt = (n, cur) => (n < 0 ? "-" : "") + SYM[cur] + Math.abs(n).toLocaleString();
+  const txs = [
+    { name: "SALARY \u00b7 BRIGHTWAVE", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: 3400 },
+    { name: "TESCO EXPRESS", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: -72 },
+    { name: "CARREFOUR MOE", bank: "Emirates NBD", flag: "\uD83C\uDDE6\uD83C\uDDEA", cur: "AED", native: -452 },
+    { name: "DEWA PAYMENT", bank: "Emirates NBD", flag: "\uD83C\uDDE6\uD83C\uDDEA", cur: "AED", native: -308 },
+  ];
+  const total = txs.reduce((s, t) => s + conv(t.native, t.cur), 0);
+  return (
+    <div className="lp-demo-card lpd-cur">
+      <div className="lpd-cur-head">
+        <span className="lpd-cur-label">Home currency</span>
+        <div className="lpd-cur-toggle">
+          {["GBP", "AED"].map((c) => (
+            <button key={c} className={"lpd-cur-opt" + (home === c ? " lpd-cur-opt-on" : "")} onClick={() => setHome(c)}>{c}</button>
+          ))}
+        </div>
+      </div>
+      <div className="lpd-cur-accounts">
+        <span className="lpd-cur-acc">🇬🇧 HSBC · GBP</span>
+        <span className="lpd-cur-acc">🇦🇪 Emirates NBD · AED</span>
+      </div>
+      {txs.map((t) => (
+        <div className="lpd-cur-tx" key={t.name}>
+          <span className="lpd-cur-tx-name">{t.flag} {t.name}</span>
+          <span className="lpd-cur-tx-amt">
+            <span className={t.native > 0 ? "lpd-cur-pos" : ""}>{fmt(t.native, t.cur)}</span>
+            {t.cur !== home && <span className="lpd-cur-conv">≈ {fmt(conv(t.native, t.cur), home)}</span>}
+          </span>
+        </div>
+      ))}
+      <div className="lpd-cur-total">
+        <span>Combined, in {home}</span>
+        <b className={total >= 0 ? "lpd-cur-pos" : ""}>{fmt(total, home)}</b>
+      </div>
+      <div className="lpd-views-hint">👆 Switch your home currency — every account converts at a rate locked per month.</div>
+    </div>
+  );
+}
+
 /* ---------------- Landing (marketing) ---------------- */
 
 function LandingScreen({ onSignup, onLogin, onSkip }) {
@@ -1117,8 +1162,21 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
       </div>
 
       <div className="lp-section lp-wrap">
+        <div className="section-head reveal"><h2>Two countries, one clear picture</h2><p>Bank in pounds and dirhams? Keep both. Each account stays in its own currency &mdash; your totals convert into whichever home currency you choose.</p></div>
+        <div className="lp-step lp-step-flip reveal">
+          <div className="lp-step-copy">
+            <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
+            <h3>Multi-currency, done properly</h3>
+            <p>Pick your currencies at sign-up and group your banks under each. Every transaction keeps its real amount, with the converted value alongside &mdash; so nothing gets distorted and your history stays honest.</p>
+          </div>
+          <LpCurrencyDemo />
+        </div>
+      </div>
+
+      <div className="lp-section lp-wrap">
         <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
         <div className="features">
+          <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Multi-currency</h3><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
           <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Spending breakdown</h3><p>See exactly what you spend by category, every month.</p></div>
           <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Monthly targets</h3><p>Set a budget per category and track how you're pacing.</p></div>
           <div className="feature-card reveal"><div className="feature-icon">◆</div><h3>Savings goals</h3><p>Plan toward a goal and see your progress over time.</p></div>
@@ -5360,6 +5418,23 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lpd-goal-top { display: flex; justify-content: space-between; color: #fff; font-size: 13px; font-weight: 600; }
   .lpd-goal-note { color: rgba(255,255,255,0.55); font-size: 12px; }
   .lpd-views-hint { color: rgba(255,255,255,0.45); font-size: 12px; margin-top: 16px; text-align: center; }
+  .lpd-cur-num { font-size: 20px; letter-spacing: -1px; }
+  .lpd-cur-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .lpd-cur-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); font-weight: 600; }
+  .lpd-cur-toggle { display: flex; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 3px; }
+  .lpd-cur-opt { font-family: inherit; font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.6); background: none; border: none; border-radius: 999px; padding: 6px 16px; cursor: pointer; transition: all .15s; }
+  .lpd-cur-opt-on { background: var(--grad-2, linear-gradient(135deg,#4f8cff,#7f6bff)); color: #fff; }
+  .lpd-cur-accounts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .lpd-cur-acc { font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 5px 10px; }
+  .lpd-cur-tx { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .lpd-cur-tx-name { font-size: 13px; color: rgba(255,255,255,0.82); }
+  .lpd-cur-tx-amt { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+  .lpd-cur-tx-amt > span:first-child { font-size: 14px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+  .lpd-cur-conv { font-size: 11px; color: rgba(255,255,255,0.42); font-weight: 500; }
+  .lpd-cur-pos { color: #4fe0c0 !important; }
+  .lpd-cur-total { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 13px 14px; background: rgba(79,140,255,0.1); border: 1px solid rgba(79,140,255,0.25); border-radius: 12px; }
+  .lpd-cur-total span { font-size: 13px; color: rgba(255,255,255,0.75); }
+  .lpd-cur-total b { font-size: 18px; color: #fff; font-variant-numeric: tabular-nums; }
   @media (max-width: 760px) {
     .lp-step { grid-template-columns: 1fr; gap: 20px; margin: 40px 0; }
     .lp-step-flip { direction: ltr; }
