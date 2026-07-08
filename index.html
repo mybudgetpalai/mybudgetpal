@@ -80,6 +80,17 @@ async function fetchAllTargets(userId) {
   rows.forEach((r) => { const k = r.month || null; if (!k) return; (map[k] = map[k] || {})[r.category] = r.monthly_target; });
   return map;
 }
+function rowToReview(r) { return { month: r.month, net: Number(r.net) || 0, action: r.action }; }
+function rowToRollover(r) { return { id: r.id, month: r.month, amount: Number(r.amount) || 0, source: r.source, note: r.note }; }
+async function fetchMonthReviews(userId) {
+  try { const { data } = await supabaseClient.from("month_reviews").select("*").eq("user_id", userId); return (data || []).map(rowToReview); }
+  catch (e) { return []; }
+}
+async function fetchRollovers(userId) {
+  try { const { data } = await supabaseClient.from("budget_rollovers").select("*").eq("user_id", userId); return (data || []).map(rowToRollover); }
+  catch (e) { return []; }
+}
+function rolloverForMonth(rollovers, monthKey) { return (rollovers || []).filter((r) => r.month === monthKey).reduce((s, r) => s + r.amount, 0); }
 function parseOverviewLayout(profile) {
   const valid = OVERVIEW_WIDGETS.map((w) => w.key);
   const raw = profile?.overview_layout;
@@ -3190,7 +3201,142 @@ function InsightsCard({ transactions, targets }) {
   );
 }
 
-function MonthlyReviewCard({ transactions, allTargets, isDev }) {
+function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onClose, isManual }) {
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const txs = transactions || [];
+  const byCat = spendByCategoryForMonth(txs, month);
+  const actualSpend = Math.round(spendForMonth(txs, month));
+  const plannedSpend = Math.round(TX_CATEGORIES.reduce((s, c) => s + (Number(budgets[c]) || 0), 0));
+  const net = plannedSpend - actualSpend; // + under (good), - over (tough)
+  const over = net < 0;
+  const label = monthLabelFromKey(month) + " " + month.slice(0, 4);
+  const winCat = TX_CATEGORIES.map((c) => ({ c, diff: (Number(budgets[c]) || 0) - Math.round(byCat[c] || 0) })).sort((a, b) => b.diff - a.diff)[0];
+  const max = Math.max(1, ...TX_CATEGORIES.map((c) => Math.max(Number(budgets[c]) || 0, Math.round(byCat[c] || 0))));
+
+  let monthsLeft = 4;
+  if (goal && goal.targetDate) {
+    const now = new Date(); const td = new Date(goal.targetDate);
+    const diff = (td.getFullYear() - now.getFullYear()) * 12 + (td.getMonth() - now.getMonth());
+    if (diff > 0) monthsLeft = diff; else monthsLeft = 1;
+  }
+  const perMonth = over ? Math.round(Math.abs(net) / monthsLeft) : 0;
+  const surplus = over ? 0 : net;
+
+  const act = async (action, payload) => {
+    setBusy(true);
+    await onAction(month, action, { net, ...payload });
+    setBusy(false);
+    setStep(3);
+  };
+
+  const pace = (() => {
+    if (!goal) return null;
+    const saved = Number(goal.saved) || 0, target = Number(goal.target) || 0;
+    const savedPct = target ? Math.min(100, (saved / target) * 100) : 0;
+    const projPct = target ? Math.max(0, Math.min(100, ((saved + net) / target) * 100)) : 0;
+    return { saved, target, savedPct, projPct };
+  })();
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="glass-card review-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose}>✕</button>
+        <div className="review-steps">
+          {[0, 1, 2, 3].map((i) => <div key={i} className={"review-step-dot " + (i <= step ? "rsd-on" : "")} />)}
+        </div>
+
+        {step === 0 && (
+          <div className="review-step">
+            <div className="card-label" style={{ color: "var(--accent)" }}>{label}</div>
+            <h2 className="review-h2">{label.split(" ")[0]} is done. Let’s see how it went.</h2>
+            <div className="review-bigstat">
+              <span className="review-bignum">{formatMoney(actualSpend)}</span>
+              <span className="review-biglabel">spent of {formatMoney(plannedSpend)} budgeted</span>
+            </div>
+            {winCat && winCat.diff > 0 && <div className="review-win">✨ Nice one — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
+            <div className="review-minibars">
+              {TX_CATEGORIES.map((c) => {
+                const b = Number(budgets[c]) || 0, a = Math.round(byCat[c] || 0), o = a > b;
+                return (
+                  <div className="rmb-row" key={c}>
+                    <span className="rmb-name">{c}</span>
+                    <div className="rmb-track">
+                      <div className="rmb-budget" style={{ width: (b / max) * 100 + "%" }} />
+                      <div className="rmb-spent" style={{ width: (a / max) * 100 + "%", background: o ? "#ff6b6b" : "var(--accent)" }} />
+                    </div>
+                    <span className="rmb-val" style={{ color: o ? "#ff6b6b" : "rgba(255,255,255,0.7)" }}>{formatMoney(a)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="glass-btn primary" onClick={() => setStep(1)}>See the verdict</button>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div className="review-step">
+            <div className="card-label" style={{ color: "var(--accent)" }}>The verdict</div>
+            <h2 className="review-h2">{over ? "You overspent by " : "You saved "}<span style={{ color: over ? "#ff6b6b" : "var(--accent)" }}>{formatMoney(Math.abs(net))}</span></h2>
+            <p className="subtitle">{over ? "Across all your accounts, in your home currency." : "Money left in the budget this month, in your home currency."}</p>
+            {pace ? (
+              <div className="pace-wrap">
+                <div className="pace-head"><span>{goal.name}</span><span style={{ color: over ? "#ff6b6b" : "var(--accent)", fontWeight: 700 }}>{over ? formatMoney(Math.abs(net)) + " behind" : formatMoney(net) + " ahead"}</span></div>
+                <div className="pace-track"><div className="pace-fill" style={{ width: pace.savedPct + "%" }} /><div className="pace-marker" style={{ left: pace.savedPct + "%" }} /></div>
+                <div className="pace-foot"><span>{formatMoney(pace.saved)} saved</span><span>target {formatMoney(pace.target)}</span></div>
+              </div>
+            ) : (
+              <p className="subtitle" style={{ fontStyle: "italic" }}>Set a savings goal to see how each month affects your pace.</p>
+            )}
+            <button className="glass-btn primary" onClick={() => setStep(2)}>{over ? "How do I catch up?" : "What should I do with it?"}</button>
+            <button className="glass-btn ghost" onClick={() => setStep(0)}>Back</button>
+          </div>
+        )}
+
+        {step === 2 && over && (
+          <div className="review-step">
+            <div className="card-label" style={{ color: "var(--accent)" }}>Stay on track</div>
+            <h2 className="review-h2">Trim the next {monthsLeft} month{monthsLeft > 1 ? "s" : ""} to stay on target?</h2>
+            <p className="subtitle">Spreading the {formatMoney(Math.abs(net))} out keeps {goal ? goal.name : "your plan"} on track without one painful month.</p>
+            <div className="plan-box">
+              <div className="plan-row"><span>Reduce monthly budgets by</span><b style={{ color: "#ff6b6b" }}>{formatMoney(perMonth)}/mo</b></div>
+              <div className="plan-row"><span>For</span><b>{monthsLeft} month{monthsLeft > 1 ? "s" : ""}</b></div>
+            </div>
+            <button className="glass-btn primary" disabled={busy} onClick={() => act("catchup", { perMonth, months: monthsLeft })}>{busy ? <span className="btn-spinner" /> : "Apply the plan"}</button>
+            <button className="glass-btn ghost" disabled={busy} onClick={() => act("full", {})}>Take it all next month instead</button>
+            <button className="review-skip" disabled={busy} onClick={() => act("skipped", {})}>Skip for now</button>
+          </div>
+        )}
+        {step === 2 && !over && (
+          <div className="review-step">
+            <div className="card-label" style={{ color: "var(--accent)" }}>Roll the win forward</div>
+            <h2 className="review-h2">Move your {formatMoney(surplus)} surplus into savings?</h2>
+            <p className="subtitle">{goal ? "Bank it toward " + goal.name + " and you’ll be ahead of pace." : "Roll it into next month, or set a savings goal to put it to work."}</p>
+            <div className="plan-box">
+              <div className="plan-row"><span>Add to</span><b>{goal ? goal.name : "next month"}</b></div>
+              <div className="plan-row"><span>Amount</span><b style={{ color: "var(--accent)" }}>{formatMoney(surplus)}</b></div>
+            </div>
+            {goal
+              ? <button className="glass-btn primary" disabled={busy} onClick={() => act("bank_surplus", { goalId: goal.id, amount: surplus })}>{busy ? <span className="btn-spinner" /> : "Add to savings"}</button>
+              : <button className="glass-btn primary" disabled={busy} onClick={() => act("roll_surplus", { amount: surplus })}>{busy ? <span className="btn-spinner" /> : "Roll into next month"}</button>}
+            <button className="review-skip" disabled={busy} onClick={() => act("skipped", {})}>Keep it in checking</button>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="review-step review-done">
+            <div className="review-check">✓</div>
+            <h2 className="review-h2" style={{ textAlign: "center" }}>All set</h2>
+            <p className="subtitle" style={{ textAlign: "center" }}>We’ve saved your {label} review. You can re-run it any time from the Monthly Review page.</p>
+            <button className="glass-btn primary" onClick={onClose}>Done</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
   const txs = transactions || [];
   const done = completedMonthsWithData(txs);
   const [monthKey, setMonthKey] = useState(done.length ? done[done.length - 1] : currentMonthKey());
@@ -3222,6 +3368,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev }) {
             {done.slice().reverse().map((k) => <option key={k} value={k}>{monthLabelFromKey(k) + " " + k.slice(0, 4)}</option>)}
           </select>
         </div>
+        {onOpenReview && <button className="link-btn inline" style={{ marginTop: 4 }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
         <p className="subtitle" style={{ margin: "2px 0 14px" }}>How {label} actually turned out, next to what you planned.</p>
         {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
         <div className="review-cards">
@@ -3490,7 +3637,7 @@ function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks,
   );
 }
 
-function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev }) {
+function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview }) {
   if (view === "overview") return (
     <>
       <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
@@ -3498,7 +3645,7 @@ function MainContent({ view, name, targets, banks, hasData, transactions, overvi
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
+  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
@@ -3578,7 +3725,7 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
-function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme }) {
+function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState("overview");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -3604,13 +3751,22 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
           <button className="demo-reminder-btn" onClick={() => setUploadOpen(true)}>Add your real bank statement</button>
         </div>
       )}
+      {!runTour && (() => {
+        const rb = rolloverForMonth(rollovers, currentMonthKey());
+        if (!rb) return null;
+        return (
+          <div className="rollover-banner">
+            <span>{rb < 0 ? "↓" : "↑"} Budget rollover this month: <strong>{formatMoney(rb)}</strong> {rb < 0 ? "trimmed from" : "added to"} your spendable</span>
+          </div>
+        );
+      })()}
       {showExtraBanner && !runTour && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -3897,6 +4053,11 @@ function App() {
   const [runTour, setRunTour] = useState(false);
   const [usingDemo, setUsingDemo] = useState(false);
   const [demoCurrencies, setDemoCurrencies] = useState(["GBP"]);
+  const [monthReviews, setMonthReviews] = useState([]);
+  const [rollovers, setRollovers] = useState([]);
+  const [reviewMonth, setReviewMonth] = useState(null);
+  const [reviewManual, setReviewManual] = useState(false);
+  const [sessionDismissed, setSessionDismissed] = useState([]);
 
   const pushToast = (message, type) => {
     const id = Date.now() + Math.random();
@@ -3905,6 +4066,71 @@ function App() {
   };
 
   const hasData = customTransactions.length > 0;
+
+  React.useEffect(() => {
+    if (!userId) { setMonthReviews([]); setRollovers([]); return; }
+    (async () => {
+      try {
+        const [mr, ro] = await Promise.all([fetchMonthReviews(userId), fetchRollovers(userId)]);
+        setMonthReviews(mr); setRollovers(ro);
+      } catch (e) {}
+    })();
+  }, [userId]);
+
+  React.useEffect(() => {
+    if (stage !== "dashboard" || reviewMonth) return;
+    const done = completedMonthsWithData(customTransactions);
+    if (!done.length) return;
+    const reviewed = new Set(monthReviews.map((r) => r.month));
+    for (let i = done.length - 1; i >= 0; i--) {
+      const k = done[i];
+      if (reviewed.has(k) || sessionDismissed.includes(k)) continue;
+      const b = (allTargets && allTargets[k]) || {};
+      const hasBudget = TX_CATEGORIES.some((c) => Number(b[c]) > 0) || isDev;
+      if (hasBudget) { setReviewManual(false); setReviewMonth(k); break; }
+    }
+  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev]);
+
+  const reviewBudgets = (() => {
+    if (!reviewMonth) return {};
+    const b = (allTargets && allTargets[reviewMonth]) || {};
+    const hasBudget = TX_CATEGORIES.some((c) => Number(b[c]) > 0);
+    return (!hasBudget && isDev) ? DEMO_TARGETS : b;
+  })();
+
+  const closeReview = () => {
+    if (reviewMonth && !reviewManual) setSessionDismissed((p) => [...p, reviewMonth]);
+    setReviewMonth(null); setReviewManual(false);
+  };
+  const openReviewManual = (monthKey) => { setReviewManual(true); setReviewMonth(monthKey); };
+
+  const handleReviewAction = async (month, action, payload) => {
+    const net = (payload && payload.net) || 0;
+    try { await supabaseClient.from("month_reviews").upsert({ user_id: userId, month, net, action }, { onConflict: "user_id,month" }); } catch (e) {}
+    setMonthReviews((prev) => [...prev.filter((r) => r.month !== month), { month, net, action }]);
+    const insertRollovers = async (rows) => {
+      try { const { data } = await supabaseClient.from("budget_rollovers").insert(rows).select(); if (data) setRollovers((p) => [...p, ...data.map(rowToRollover)]); }
+      catch (e) { setRollovers((p) => [...p, ...rows.map((r) => ({ ...r, id: "local-" + Math.random() }))]); }
+    };
+    if (action === "catchup" && payload && payload.perMonth > 0) {
+      const rows = [];
+      for (let i = 1; i <= payload.months; i++) rows.push({ user_id: userId, month: addMonths(month, i), amount: -Math.abs(payload.perMonth), source: "catchup" });
+      await insertRollovers(rows);
+      pushToast("Plan applied — budgets trimmed by " + formatMoney(payload.perMonth) + "/mo", "success");
+    } else if (action === "full" && net) {
+      await insertRollovers([{ user_id: userId, month: addMonths(month, 1), amount: net, source: "rollover" }]);
+      pushToast(formatMoney(Math.abs(net)) + " carried into next month", "success");
+    } else if (action === "bank_surplus" && payload && payload.goalId && payload.amount > 0) {
+      const g = goals.find((x) => x.id === payload.goalId);
+      if (g) await goalsApi.update(g.id, { saved: (Number(g.saved) || 0) + payload.amount });
+      pushToast(formatMoney(payload.amount) + " added to " + (g ? g.name : "your goal"), "success");
+    } else if (action === "roll_surplus" && payload && payload.amount > 0) {
+      await insertRollovers([{ user_id: userId, month: addMonths(month, 1), amount: Math.abs(payload.amount), source: "surplus" }]);
+      pushToast(formatMoney(payload.amount) + " rolled into next month", "success");
+    } else {
+      pushToast("Review saved", "info");
+    }
+  };
 
   const runAiFallback = async (txs) => {
     const uncats = txs.filter((t) => t.category === "Uncategorized");
@@ -4421,6 +4647,8 @@ function App() {
         runTour={runTour}
         onFinishTour={() => setRunTour(false)}
         theme={theme}
+        rollovers={rollovers}
+        onOpenReview={openReviewManual}
       />
     );
   }
@@ -4428,6 +4656,17 @@ function App() {
   return (
     <>
       {content}
+      {reviewMonth && (
+        <MonthEndReviewModal
+          month={reviewMonth}
+          transactions={customTransactions}
+          budgets={reviewBudgets}
+          goal={goals && goals.length ? goals[0] : null}
+          onAction={handleReviewAction}
+          onClose={closeReview}
+          isManual={reviewManual}
+        />
+      )}
       <ToastContainer toasts={toasts} />
     </>
   );
@@ -4439,6 +4678,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 <style>
   * { box-sizing: border-box; }
 :root {
+    --accent: #4f8cff;
     --grad-2: linear-gradient(135deg, #4f8cff, #7f6bff);
     --grad-3: linear-gradient(135deg, #4f8cff, #b56bff);
     --grad-nav: linear-gradient(135deg, rgba(79,140,255,0.3), rgba(181,107,255,0.3));
@@ -5165,6 +5405,43 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
 
   /* button loading spinner */
+  .rollover-banner { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 18px; font-size: 13.5px; color: #dfe8ff; background: linear-gradient(90deg, rgba(79,140,255,0.16), rgba(181,107,255,0.14)); border-bottom: 1px solid rgba(79,140,255,0.3); }
+  .rollover-banner strong { color: #fff; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(6,10,18,0.72); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 200; animation: mbFade .2s ease; }
+  @keyframes mbFade { from { opacity: 0; } to { opacity: 1; } }
+  .review-modal { position: relative; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; padding: 24px 22px; animation: mbPop .25s cubic-bezier(0.34,1.4,0.64,1); }
+  @keyframes mbPop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+  .modal-x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.6); font-size: 14px; cursor: pointer; }
+  .modal-x:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .review-steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 18px; }
+  .review-step-dot { width: 26px; height: 4px; border-radius: 3px; background: rgba(255,255,255,0.14); transition: background .3s; }
+  .rsd-on { background: var(--accent); }
+  .review-step { display: flex; flex-direction: column; }
+  .review-h2 { font-size: 21px; font-weight: 800; color: #fff; margin: 6px 0 8px; line-height: 1.28; letter-spacing: -0.01em; }
+  .review-bigstat { display: flex; flex-direction: column; margin: 6px 0 12px; }
+  .review-bignum { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+  .review-biglabel { font-size: 13px; color: rgba(255,255,255,0.55); }
+  .review-win { background: rgba(62,207,142,0.12); border: 1px solid rgba(62,207,142,0.3); color: #bff4dc; font-size: 13px; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .review-minibars { margin: 4px 0 16px; }
+  .rmb-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .rmb-name { width: 82px; font-size: 11.5px; color: rgba(255,255,255,0.6); flex-shrink: 0; }
+  .rmb-track { flex: 1; height: 15px; position: relative; background: rgba(255,255,255,0.05); border-radius: 4px; }
+  .rmb-budget { position: absolute; top: 0; left: 0; height: 100%; background: rgba(255,255,255,0.14); border-radius: 4px; }
+  .rmb-spent { position: absolute; top: 3px; left: 0; height: 9px; border-radius: 3px; }
+  .rmb-val { width: 52px; text-align: right; font-size: 11.5px; flex-shrink: 0; }
+  .pace-wrap { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; margin: 8px 0 14px; }
+  .pace-head { display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 10px; }
+  .pace-track { position: relative; height: 12px; background: rgba(255,255,255,0.07); border-radius: 6px; }
+  .pace-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--grad-2); border-radius: 6px; }
+  .pace-marker { position: absolute; top: -4px; width: 2px; height: 20px; background: #fff; transform: translateX(-1px); }
+  .pace-foot { display: flex; justify-content: space-between; font-size: 11.5px; color: rgba(255,255,255,0.5); margin-top: 8px; }
+  .plan-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; margin: 4px 0 14px; }
+  .plan-row { display: flex; justify-content: space-between; font-size: 13.5px; color: rgba(255,255,255,0.8); padding: 5px 0; }
+  .review-modal .glass-btn { margin-top: 8px; }
+  .review-skip { width: 100%; padding: 10px; background: none; border: none; color: rgba(255,255,255,0.45); font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; font-family: inherit; }
+  .review-skip:hover { color: rgba(255,255,255,0.7); }
+  .review-done { align-items: center; text-align: center; padding-top: 8px; }
+  .review-check { width: 56px; height: 56px; border-radius: 50%; background: rgba(62,207,142,0.15); border: 2px solid #3ecf8e; color: #3ecf8e; font-size: 28px; display: flex; align-items: center; justify-content: center; margin: 4px auto 12px; }
   .btn-spinner {
     display: inline-block; width: 16px; height: 16px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff;
