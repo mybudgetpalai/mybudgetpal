@@ -2808,8 +2808,8 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
                 {months.map((m) => (
                   <td key={m.key} className="bt-cell">
                     <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
-                      <input className="bt-input" type="number" min="0" value={budgets[m.key].Income}
-                        onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], Income: e.target.value } }))} />
+                      <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key].Income)} style={{ width: ((fmtBalInput(budgets[m.key].Income).length || 1) + 1.6) + "ch" }}
+                        onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], Income: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                     </span>
                   </td>
                 ))}
@@ -2820,8 +2820,8 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
                   {months.map((m) => (
                     <td key={m.key} className="bt-cell">
                       <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
-                        <input className="bt-input" type="number" min="0" value={budgets[m.key][c]}
-                          onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], [c]: e.target.value } }))} />
+                        <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key][c])} style={{ width: ((fmtBalInput(budgets[m.key][c]).length || 1) + 1.6) + "ch" }}
+                          onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], [c]: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                       </span>
                     </td>
                   ))}
@@ -2961,7 +2961,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
             <div className="inbox-menu">
               <div className="inbox-menu-head">Your tasks{taskList.length ? " \u00b7 " + taskList.length : ""}</div>
               {taskList.length === 0 ? (
-                <div className="inbox-empty"><Icon name="checkcircle" size={15} /> All caught up \u2014 nothing to do right now.</div>
+                <div className="inbox-empty"><Icon name="checkcircle" size={15} /> All caught up &mdash; nothing to do right now.</div>
               ) : taskList.map((t) => (
                 <button key={t.id} className="inbox-item" onClick={() => { setInboxOpen(false); t.action(); }}>
                   <span className="inbox-item-icon"><Icon name={t.icon} size={16} /></span>
@@ -3819,7 +3819,7 @@ function InsightsAsk({ transactions }) {
           {examples.map((ex) => <button key={ex} className="ask-chip" onClick={() => ask(ex)}>{ex}</button>)}
         </div>
       )}
-      {busy && <div className="ask-answer ask-loading">Looking through your transactions\u2026</div>}
+      {busy && <div className="ask-answer ask-loading">Looking through your transactions&hellip;</div>}
       {err && <div className="ask-answer ask-error">{err}</div>}
       {ans && !busy && <div className="ask-answer ask-md">{renderAskAnswer(ans)}</div>}
     </div>
@@ -4390,7 +4390,7 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
             <div className="catrev-list">
               {rows.map((r) => (
                 <div className={"catrev-row" + (expandedName === r.name ? " catrev-open" : "")} key={r.name}>
-                  <button className="catrev-row-head" onClick={() => setExpandedName(expandedName === r.name ? null : r.name)}>
+                  <button className="catrev-row-head" onClick={(e) => { const row = e.currentTarget.closest(".catrev-row"); const opening = expandedName !== r.name; setExpandedName(opening ? r.name : null); if (opening && row) setTimeout(() => row.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80); }}>
                     <span className="catrev-name">{r.name}</span>
                     <span className="catrev-meta">{r.count > 1 ? r.count + " \u00d7 \u00b7 " : ""}{formatMoney(r.total)}{r.latest ? " \u00b7 " + formatTxDate(r.latest) : ""}</span>
                     <span className="catrev-caret">{expandedName === r.name ? "\u25be" : "\u25b8"}</span>
@@ -4613,8 +4613,8 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
                   <td key={k} className="bt-cell">
                     {editing ? (
                       <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
-                        <input className="bt-input" type="number" min="0" value={drafts[k] ? drafts[k][c] : ""}
-                          onChange={(e) => setDrafts((prev) => ({ ...prev, [k]: { ...prev[k], [c]: e.target.value } }))} />
+                        <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(drafts[k] ? drafts[k][c] : "")} style={{ width: ((fmtBalInput(drafts[k] ? drafts[k][c] : "").length || 1) + 1.6) + "ch" }}
+                          onChange={(e) => setDrafts((prev) => ({ ...prev, [k]: { ...prev[k], [c]: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                       </span>
                     ) : <span className="bt-read-num">{formatMoney(cellVal(k, c))}</span>}
                   </td>
@@ -5905,7 +5905,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .uncat-pill { margin-left: 12px; vertical-align: middle; background: rgba(143,180,255,0.14); border: 1px solid rgba(143,180,255,0.35); color: var(--accent); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s; }
   .uncat-pill:hover { background: rgba(143,180,255,0.24); }
   .catrev-card { max-width: 520px; width: 100%; max-height: 82vh; display: flex; flex-direction: column; }
-  .catrev-sub { color: #9aa4b8; font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+  .catrev-sub { color: var(--ink-2); font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
   .catrev-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
   .catrev-row { border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); overflow: hidden; }
   .catrev-row.catrev-open { border-color: var(--accent); }
@@ -5913,12 +5913,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catrev-name { color: var(--ink); font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .catrev-meta { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
   .catrev-caret { color: var(--accent); font-size: 12px; }
-  .catrev-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 4px 14px 13px; }
+  .catrev-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 4px 14px 16px; }
   .catrev-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--line-strong); color: var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s, transform 0.1s; }
   .catrev-chip:hover { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-1px); }
   .catrev-done { text-align: center; padding: 18px 6px 6px; }
   .catrev-done-icon { font-size: 34px; margin-bottom: 8px; }
-  .catrev-done p { color: #cfe0ff; font-size: 14px; margin: 0 0 16px; }
+  .catrev-done p { color: var(--ink-2); font-size: 14px; margin: 0 0 16px; }
   @media (max-width: 560px) {
     .demo-sim { flex-direction: column; }
     .demo-arrow { transform: rotate(90deg); animation: demoNudgeV 1.4s ease-in-out infinite; }
@@ -5945,7 +5945,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bt-input-wrap:hover { background: var(--surface-2); }
   .bt-input-wrap:focus-within { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-shadow); }
   .bt-cur { color: var(--ink-3); font-size: 13px; font-weight: 500; }
-  .bt-input { width: 54px; background: transparent; border: none; color: var(--ink); font-size: 13px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
+  .bt-input { min-width: 2.6ch; background: transparent; border: none; color: var(--ink); font-size: 13px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
   .bt-input::-webkit-outer-spin-button, .bt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .bt-total-row td { border-top: 1px solid var(--line); border-bottom: none !important; padding-top: 8px; background: var(--surface-2); }
   .bt-total-cell { color: var(--accent); font-size: 13px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -6613,8 +6613,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pw-goal-line b { color: var(--ink); }
   .pw-summary { font-size: 13px; color: var(--ink-2); line-height: 1.55; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 14px; margin: 10px 0 0; }
   .pw-summary b { color: var(--ink); }
-  .bt-income-row .bt-input, .bt-income-row .bt-cur { color: #4fe0c0; }
-  .bt-net-pos { color: #4fe0c0 !important; }
+  .bt-income-row .bt-input, .bt-income-row .bt-cur { color: var(--pos); }
+  .bt-net-pos { color: var(--pos) !important; }
   .bt-net-neg { color: #ff6b6b !important; }
 
   /* ---- month-end review plan options ---- */
@@ -6688,7 +6688,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .insights-ask { border: 1px solid rgba(143,180,255,0.28); background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; }
   .ask-row { display: flex; gap: 8px; margin-top: 10px; }
   .ask-input { flex: 1; min-width: 0; }
-  .ask-btn { flex: 0 0 auto; min-width: 84px; }
+  .ask-btn { flex: 0 0 auto; min-width: 0; padding: 10px 20px; font-size: 14px; border-radius: 12px; }
   .ask-examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .ask-chip { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 20px; cursor: pointer; }
   .ask-chip:hover { background: var(--surface-3); color: var(--ink); }
