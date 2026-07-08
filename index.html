@@ -3648,6 +3648,63 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData }) {
   );
 }
 
+function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
+  const [expandedName, setExpandedName] = useState(null);
+  const [sortedCount, setSortedCount] = useState(0);
+  const uncats = (transactions || []).filter((t) => t.category === "Uncategorized");
+  const byName = {};
+  uncats.forEach((t) => { (byName[t.name] = byName[t.name] || []).push(t); });
+  const rows = Object.keys(byName).map((name) => {
+    const list = byName[name];
+    return { name, count: list.length, total: list.reduce((s, t) => s + Math.abs(t.amount), 0), latest: list.map((t) => t.date).sort().reverse()[0] || "" };
+  }).sort((a, b) => b.total - a.total);
+  const chipCats = [...TX_CATEGORIES, "Income", "Other"];
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="glass-card modal-card catrev-card" onClick={(e) => e.stopPropagation()}>
+        <div className="brand-row" style={{ marginBottom: 6, justifyContent: "space-between" }}>
+          <span className="brand-name">Categorise transactions</span>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "#fff" }}>{"\u00d7"}</button>
+        </div>
+        {rows.length === 0 ? (
+          <div className="catrev-done">
+            <div className="catrev-done-icon">{"\ud83c\udf89"}</div>
+            <p>All sorted {"\u2014"} every transaction now has a category.</p>
+            <button className="glass-btn primary" onClick={onClose}>Done</button>
+          </div>
+        ) : (
+          <>
+            <p className="catrev-sub">{uncats.length} transaction{uncats.length !== 1 ? "s" : ""} across {rows.length} merchant{rows.length !== 1 ? "s" : ""} {"\u2014"} pick a category and it applies to that merchant everywhere.{sortedCount > 0 ? " " + sortedCount + " sorted so far \u2713" : ""}</p>
+            <div className="catrev-list">
+              {rows.map((r) => (
+                <div className={"catrev-row" + (expandedName === r.name ? " catrev-open" : "")} key={r.name}>
+                  <button className="catrev-row-head" onClick={() => setExpandedName(expandedName === r.name ? null : r.name)}>
+                    <span className="catrev-name">{r.name}</span>
+                    <span className="catrev-meta">{r.count > 1 ? r.count + " \u00d7 \u00b7 " : ""}{formatMoney(r.total)}{r.latest ? " \u00b7 " + formatTxDate(r.latest) : ""}</span>
+                    <span className="catrev-caret">{expandedName === r.name ? "\u25be" : "\u25b8"}</span>
+                  </button>
+                  {expandedName === r.name && (
+                    <div className="catrev-chips">
+                      {chipCats.map((c) => (
+                        <button key={c} className="catrev-chip" onClick={() => { onRecategorize(r.name, c); setSortedCount((s) => s + r.count); setExpandedName(null); }}>
+                          <span className="cat-dot" style={{ background: catColor(c) }} />{c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="nav-row" style={{ marginTop: 12 }}>
+              <button className="glass-btn primary" onClick={onClose}>Finish later</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ text, title }) {
   return (
     <div className="glass-card dash-card empty-state">
@@ -3739,10 +3796,12 @@ function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks,
   );
 }
 
-function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview }) {
+function MainContent({ view, name, targets, banks, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview }) {
   if (view === "overview") return (
     <>
-      <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
+      <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…{!runTour && uncatCount > 0 && (
+        <button className="uncat-pill" onClick={onOpenCatReview}>{"\ud83c\udff7\ufe0f"} {uncatCount} to categorise</button>
+      )}</div>
       <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} />
     </>
   );
@@ -3833,6 +3892,8 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [customiseOpen, setCustomiseOpen] = useState(false);
+  const [catReviewOpen, setCatReviewOpen] = useState(false);
+  const [uncatDismissedAt, setUncatDismissedAt] = useState(null);
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
@@ -3844,6 +3905,8 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
   const viewTransactions = demoActive ? DEMO_TRANSACTIONS : transactions;
   const viewTargets = demoActive ? DEMO_TARGETS : targets;
   const viewHasData = demoActive ? true : hasData;
+  const uncatCount = (viewTransactions || []).filter((t) => t.category === "Uncategorized").length;
+  const showCatBanner = !runTour && uncatCount > 0 && (uncatDismissedAt === null || uncatCount > uncatDismissedAt) && (effectiveView === "overview" || effectiveView === "breakdown");
 
   return (
     <div className="app-shell stage-fade" data-theme={theme || "midnight"}>
@@ -3863,12 +3926,21 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
         );
       })()}
       {showExtraBanner && !runTour && <ExtraInfoBanner onComplete={onCompleteExtra} onDismiss={onDismissExtra} />}
+      {showCatBanner && (
+        <div className="catrev-banner">
+          <span className="catrev-banner-text">{"\ud83c\udff7\ufe0f"} <strong>{uncatCount}</strong> transaction{uncatCount !== 1 ? "s" : ""} still need{uncatCount === 1 ? "s" : ""} a category {"\u2014"} your breakdown may be incomplete.</span>
+          <span className="catrev-banner-actions">
+            <button className="catrev-banner-btn" onClick={() => setCatReviewOpen(true)}>Review now</button>
+            <button className="catrev-banner-later" onClick={() => setUncatDismissedAt(uncatCount)}>Later</button>
+          </span>
+        </div>
+      )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -3883,6 +3955,9 @@ function DashboardScreen({ name, targets, banks, onOpenSettings, onOpenMapping, 
       )}
       {customiseOpen && (
         <CustomiseMenuModal current={navKeys} onClose={() => setCustomiseOpen(false)} onSave={onChangeNavViews} />
+      )}
+      {catReviewOpen && (
+        <CategoriseReviewModal transactions={viewTransactions} onRecategorize={onRecategorize} onClose={() => setCatReviewOpen(false)} />
       )}
       {uploadOpen && (
         <UploadStatementModal
@@ -4237,13 +4312,16 @@ function App() {
     }
   };
 
+  const notifyUncategorized = (n) => {
+    if (n > 0) pushToast(n + " transaction" + (n !== 1 ? "s" : "") + " couldn't be auto-categorised \u2014 use the tag on your Overview to sort them", "info");
+  };
   const runAiFallback = async (txs) => {
     const uncats = txs.filter((t) => t.category === "Uncategorized");
     if (!uncats.length) return;
     try {
       const unique = [...new Set(uncats.map((t) => t.name))].slice(0, 200);
       const mapping = await aiCategorize(unique);
-      if (!mapping || !Object.keys(mapping).length) return;
+      if (!mapping || !Object.keys(mapping).length) { notifyUncategorized(uncats.length); return; }
       setCustomTransactions((prev) => prev.map((t) =>
         t.category === "Uncategorized" && mapping[t.name] ? { ...t, category: mapping[t.name] } : t
       ));
@@ -4251,7 +4329,8 @@ function App() {
       txs.forEach((t) => { if (t.id && t.category === "Uncategorized" && mapping[t.name]) idToCat[t.id] = mapping[t.name]; });
       if (Object.keys(idToCat).length) await updateTransactionCategoriesInDb(idToCat);
       pushToast("AI categorized " + Object.keys(idToCat).length + " transactions", "success");
-    } catch (e) { /* stays Uncategorized if AI unavailable */ }
+      notifyUncategorized(uncats.filter((t) => !mapping[t.name]).length);
+    } catch (e) { notifyUncategorized(uncats.length); }
   };
 
   const goalsApi = {
@@ -4879,6 +4958,30 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .demo-reminder-text strong { color: #ffb84f; }
   .demo-reminder-btn { background: #ffb84f; color: #1a1205; border: none; border-radius: 999px; padding: 7px 16px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: transform 0.15s, filter 0.15s; }
   .demo-reminder-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .catrev-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 16px; padding: 10px 18px; background: linear-gradient(90deg, rgba(143,180,255,0.14), rgba(79,224,192,0.12)); border-bottom: 1px solid rgba(143,180,255,0.28); }
+  .catrev-banner-text { color: #cfe0ff; font-size: 13px; }
+  .catrev-banner-text strong { color: #8fb4ff; }
+  .catrev-banner-actions { display: flex; align-items: center; gap: 10px; }
+  .catrev-banner-btn { background: #8fb4ff; color: #0b1220; border: none; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
+  .catrev-banner-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .catrev-banner-later { background: none; border: none; color: #9aa4b8; font-size: 12.5px; font-family: inherit; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
+  .uncat-pill { margin-left: 12px; vertical-align: middle; background: rgba(143,180,255,0.14); border: 1px solid rgba(143,180,255,0.35); color: #8fb4ff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s; }
+  .uncat-pill:hover { background: rgba(143,180,255,0.24); }
+  .catrev-card { max-width: 520px; width: 100%; max-height: 82vh; display: flex; flex-direction: column; }
+  .catrev-sub { color: #9aa4b8; font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+  .catrev-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .catrev-row { border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; background: rgba(255,255,255,0.04); overflow: hidden; }
+  .catrev-row.catrev-open { border-color: rgba(143,180,255,0.4); }
+  .catrev-row-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none; padding: 11px 14px; cursor: pointer; font-family: inherit; text-align: left; }
+  .catrev-name { color: #fff; font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .catrev-meta { color: #9aa4b8; font-size: 12px; white-space: nowrap; }
+  .catrev-caret { color: #8fb4ff; font-size: 12px; }
+  .catrev-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 4px 14px 13px; }
+  .catrev-chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #e6ecf7; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s, transform 0.1s; }
+  .catrev-chip:hover { background: rgba(143,180,255,0.18); transform: translateY(-1px); }
+  .catrev-done { text-align: center; padding: 18px 6px 6px; }
+  .catrev-done-icon { font-size: 34px; margin-bottom: 8px; }
+  .catrev-done p { color: #cfe0ff; font-size: 14px; margin: 0 0 16px; }
   @media (max-width: 560px) {
     .demo-sim { flex-direction: column; }
     .demo-arrow { transform: rotate(90deg); animation: demoNudgeV 1.4s ease-in-out infinite; }
