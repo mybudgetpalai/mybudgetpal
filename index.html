@@ -96,7 +96,7 @@ function rolloverForMonth(rollovers, monthKey) { return (rollovers || []).filter
 const FLEX_CATEGORIES = ["Dining", "Shopping", "Subscriptions"];
 function planFromProfile(profile) {
   if (!profile || profile.plan_target_balance == null || !profile.plan_target_month) return null;
-  return { targetBalance: Math.round(Number(profile.plan_target_balance) || 0), targetMonth: profile.plan_target_month, method: profile.plan_method || "manual" };
+  return { targetBalance: Math.round(Number(profile.plan_target_balance) || 0), targetMonth: profile.plan_target_month, method: profile.plan_method || "manual", openingBalance: Number(profile.plan_opening_balance) || null };
 }
 async function savePlanToDb(userId, plan) {
   if (!userId) return;
@@ -105,6 +105,7 @@ async function savePlanToDb(userId, plan) {
     plan_target_balance: plan ? plan.targetBalance : null,
     plan_target_month: plan ? plan.targetMonth : null,
     plan_method: plan ? plan.method : null,
+    plan_opening_balance: plan ? plan.openingBalance : null,
   });
 }
 function monthKeysBetween(fromKey, toKey) {
@@ -2447,7 +2448,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
 
   const handleFinish = async () => {
     setSubmitting(true);
-    const plan = { targetBalance: Math.round(projectedEnd), targetMonth: lastKey, method: method || "manual" };
+    const plan = { targetBalance: Math.round(projectedEnd), targetMonth: lastKey, method: method || "manual", openingBalance: Number(curBal) || 0 };
     try {
       const keys = months.map((m) => m.key);
       await supabaseClient.from("targets").delete().eq("user_id", userId).in("month", keys);
@@ -3900,7 +3901,8 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
   const balNow = haveBalance ? Math.round(balNowRaw) : 0;
   const sumPastNet = past.reduce((s, k) => s + (incM(k) - spM(k)), 0);
   const curNetSoFar = incM(curKey) - spM(curKey);
-  const startBal = balNow - sumPastNet - curNetSoFar;
+  const calcStartBal = balNow - sumPastNet - curNetSoFar;
+  const startBal = planActive && plan && plan.openingBalance !== null ? plan.openingBalance : calcStartBal;
 
   let run = startBal;
   const cols = monthsAll.map((k) => {
@@ -6407,5 +6409,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </style>
 </body>
 </html>
+
 
 
