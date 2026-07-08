@@ -1011,6 +1011,15 @@ function computeBankBalance(bank, statements, transactions, bankRow) {
     const after = transactions.filter((t) => t.bank === bank && t.date && t.date >= from).reduce((a, t) => a + (t.amountNative !== undefined ? t.amountNative : t.amount), 0);
     return Math.round((Number(bankRow.starting_balance) + after) * 100) / 100;
   }
+  /* No statement close and no starting balance to anchor on. Rather than dropping
+     the bank entirely (which made combined balances understate reality and could
+     even go negative), assume it opened at 0 across the data we have and use the
+     net of its transactions — the same lenient basis the summary screen uses. */
+  const bankTx = transactions.filter((t) => t.bank === bank && t.date);
+  if (bankTx.length) {
+    const net = bankTx.reduce((a, t) => a + (t.amountNative !== undefined ? t.amountNative : t.amount), 0);
+    return Math.round(net * 100) / 100;
+  }
   return null;
 }
 
