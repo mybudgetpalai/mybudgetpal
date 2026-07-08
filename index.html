@@ -181,8 +181,11 @@ function parseNavLayout(profile) {
   const valid = VIEWS.map((v) => v.key);
   const raw = profile?.nav_layout;
   let arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : null);
-  if (!Array.isArray(arr) || !arr.length || !arr.includes("overview") || !arr.every((k) => valid.includes(k))) return valid;
-  return valid.filter((k) => arr.includes(k));
+  if (!Array.isArray(arr) || !arr.length || !arr.includes("overview")) return valid;
+  /* "targets" was added after early layouts were saved — default it to visible */
+  const wanted = arr.includes("targets") ? arr : [...arr, "targets"];
+  const out = valid.filter((k) => wanted.includes(k));
+  return out.includes("overview") ? out : valid;
 }
 function parseBillExcludes(profile) {
   const raw = profile?.bill_excludes;
@@ -219,6 +222,7 @@ const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "
 const VIEWS = [
   { key: "overview", label: "Overview" },
   { key: "breakdown", label: "Spending Breakdown" },
+  { key: "targets", label: "Targets" },
   { key: "monthlyreview", label: "Monthly Review" },
   { key: "longterm", label: "Long-Term Plan" },
   { key: "transactions", label: "Transactions" },
@@ -2292,7 +2296,8 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
 
 /* ---------------- Monthly breakdown table ---------------- */
 
-function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
+function MonthlyBreakdownScreen({ onDone, transactions, onBack, bankRows }) {
+  const startingBal = (bankRows || []).reduce((s, r) => s + (Number(r.starting_balance) || 0), 0);
   const hasReal = transactions && transactions.length > 0;
   let categories, monthLabels, byCatByMonth, incomeByMonth, openingByMonth, closingByMonth;
   if (hasReal) {
@@ -2316,7 +2321,7 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack }) {
     categories.reduce((s, c) => s + byCatByMonth[c][mi], 0)
   );
   const netByMonth = monthLabels.map((_, mi) => incomeByMonth[mi] - totalsByMonth[mi]);
-  for (let mi = 0; mi < 3; mi++) { openingByMonth[mi] = mi === 0 ? 0 : closingByMonth[mi - 1]; closingByMonth[mi] = openingByMonth[mi] + netByMonth[mi]; }
+  for (let mi = 0; mi < 3; mi++) { openingByMonth[mi] = mi === 0 ? startingBal : closingByMonth[mi - 1]; closingByMonth[mi] = openingByMonth[mi] + netByMonth[mi]; }
 
   return (
     <div className="page stage-fade">
@@ -2388,8 +2393,13 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
   const avg = React.useMemo(() => avgSpendByCategory(transactions), [transactions]);
   const typInc = React.useMemo(() => Math.round(typicalIncome(transactions, null)) || 0, [transactions]);
   const balEst = React.useMemo(() => {
+    /* Balance at the START of the current month — the plan's first month begins
+       from this opening, so back out anything that's already happened this month. */
     const b = totalEstimatedBalance(banks, accountData, transactions);
-    return b === null ? null : Math.round(b);
+    if (b === null) return null;
+    const ck = currentMonthKey();
+    const curNet = incomeForMonth(transactions || [], ck) - spendForMonth(transactions || [], ck);
+    return Math.round(b - curNet);
   }, [banks, accountData, transactions]);
   const curKey = currentMonthKey();
 
@@ -2504,7 +2514,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
         <h1 className="title">{method === "balance" ? "Where do you want to be?" : "How much do you want to save?"}</h1>
         <p className="subtitle">Amounts are in your home currency, across all your accounts.</p>
         <div className="field-group">
-          <label className="field-label">Your balance today {balEst != null ? "(estimated from your statements)" : ""}</label>
+          <label className="field-label">Your balance at the start of {currentMonthName()} {balEst != null ? "(estimated from your statements)" : ""}</label>
           <input className="glass-input" type="number" placeholder="e.g. 9000" value={curBal} onChange={(e) => setCurBal(e.target.value)} />
         </div>
         {method === "balance" && (
@@ -2992,9 +3002,10 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   avgKeys.forEach((k) => { const o = spendByCategoryForMonth(txs, k); Object.keys(o).forEach((c) => { avgByCat[c] = (avgByCat[c] || 0) + o[c]; }); });
   Object.keys(avgByCat).forEach((c) => { avgByCat[c] = avgByCat[c] / avgKeys.length; });
 
-  const cats = Object.keys(byCat).filter((c) => byCat[c] > 0).sort((a, b) => byCat[b] - byCat[a]);
-  const total = cats.reduce((s, c) => s + byCat[c], 0);
-  const topAmount = cats.length ? byCat[cats[0]] : 0;
+  const catSet = new Set([...TX_CATEGORIES, ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
+  const cats = [...catSet].sort((a, b) => (byCat[b] || 0) - (byCat[a] || 0));
+  const total = cats.reduce((s, c) => s + (byCat[c] || 0), 0);
+  const topAmount = cats.length ? (byCat[cats[0]] || 0) : 0;
   const prevTotal = Object.values(byCatPrev).reduce((s, v) => s + v, 0);
   const totalDiff = total - prevTotal;
   const totalPct = prevTotal > 0 ? Math.round((totalDiff / prevTotal) * 100) : null;
@@ -3006,7 +3017,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
     .slice(0, 4);
   const showTrend = !isCurrentMonth && movers.length > 0;
 
-  const pieSlices = cats.map((c) => ({ name: displayCat(c), value: byCat[c], color: catColor(c) }));
+  const pieSlices = cats.filter((c) => (byCat[c] || 0) > 0).map((c) => ({ name: displayCat(c), value: byCat[c], color: catColor(c) }));
   const spentTitle = isCurrentMonth ? "You've spent so far in " + monthLabelFromKey(activeKey) : "You spent in " + monthLabelFromKey(activeKey);
   const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
 
@@ -3043,9 +3054,9 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
           </div>
           <div className="category-list bd-list">
             {cats.map((name) => {
-              const amount = byCat[name];
+              const amount = byCat[name] || 0;
               const color = catColor(name);
-              const sharePct = total > 0 ? Math.round((amount / total) * 100) : 0;
+              const sharePct = total > 0 && amount > 0 ? Math.round((amount / total) * 100) : 0;
               const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
               const isOpen = openCat === name;
               let fillPct, amtLabel, noTarget = false, over = false, shareLabel;
@@ -3059,8 +3070,8 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
                   fillPct = 0; amtLabel = formatMoney(amount); noTarget = true; shareLabel = null;
                 }
               } else {
-                fillPct = topAmount > 0 ? Math.max(4, (amount / topAmount) * 100) : 0;
-                amtLabel = formatMoney(amount); shareLabel = sharePct + "%";
+                fillPct = topAmount > 0 && amount > 0 ? Math.max(4, (amount / topAmount) * 100) : 0;
+                amtLabel = formatMoney(amount); shareLabel = amount > 0 ? sharePct + "%" : null;
               }
               const catTxs = txs
                 .filter((t) => t.amount < 0 && t.category === name && t.date.slice(0, 7) === activeKey)
@@ -3897,12 +3908,14 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
   const spM = (k) => Math.round(spendForMonth(txs, k));
 
   const balNowRaw = totalEstimatedBalance(banks, accountData, txs);
-  const haveBalance = balNowRaw !== null;
-  const balNow = haveBalance ? Math.round(balNowRaw) : 0;
   const sumPastNet = past.reduce((s, k) => s + (incM(k) - spM(k)), 0);
   const curNetSoFar = incM(curKey) - spM(curKey);
-  const calcStartBal = balNow - sumPastNet - curNetSoFar;
-  const startBal = planActive && plan && plan.openingBalance !== null ? plan.openingBalance : calcStartBal;
+  /* plan.openingBalance = balance at the start of the current month when the plan was made.
+     Used only as a fallback anchor when statements can't give us a balance. */
+  const planAnchor = planActive && plan && plan.openingBalance != null ? Math.round(plan.openingBalance) + curNetSoFar : null;
+  const haveBalance = balNowRaw !== null || planAnchor !== null;
+  const balNow = balNowRaw !== null ? Math.round(balNowRaw) : (planAnchor !== null ? planAnchor : 0);
+  const startBal = balNow - sumPastNet - curNetSoFar;
 
   let run = startBal;
   const cols = monthsAll.map((k) => {
@@ -4240,6 +4253,37 @@ function SafeToSpendHero({ targets, transactions, rollovers }) {
   );
 }
 
+function TargetsPage({ targets, transactions, onEditPlan }) {
+  const byCat = spendByCategoryForMonth(transactions || [], currentMonthKey());
+  const entries = TX_CATEGORIES.map((c) => ({ c, v: Number((targets || {})[c]) || 0, spent: Math.round(byCat[c] || 0) }));
+  const total = entries.reduce((s, e) => s + e.v, 0);
+  const totalSpent = entries.reduce((s, e) => s + e.spent, 0);
+  return (
+    <div className="glass-card dash-card">
+      <div className="summary-head">
+        <span className="card-label">Monthly targets — {currentMonthName()}</span>
+        <button className="link-btn inline" onClick={onEditPlan}>Edit plan</button>
+      </div>
+      <p className="subtitle" style={{ margin: "4px 0 10px" }}>Your spending targets for this month, with what you've spent so far against each. Editing your plan updates every month's targets.</p>
+      <div className="tx-list">
+        {entries.map(({ c, v, spent }) => (
+          <div className="tx-row" key={c}>
+            <div className="tx-info">
+              <span className="tx-name"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
+              <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " — over target" : ""}</span>
+            </div>
+            <span className="tx-amount" style={v > 0 && spent > v ? { color: "#ff8b8b" } : null}>{formatMoney(v)}</span>
+          </div>
+        ))}
+        <div className="tx-row">
+          <div className="tx-info"><span className="tx-name" style={{ fontWeight: 700 }}>Total</span><span className="tx-category">{formatMoney(totalSpent)} spent so far</span></div>
+          <span className="tx-amount" style={{ fontWeight: 700 }}>{formatMoney(total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers }) {
   if (view === "overview") return (
     <>
@@ -4250,6 +4294,7 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
+  if (view === "targets") return <TargetsPage targets={targets} transactions={transactions} onEditPlan={onEditPlan} />;
   if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} plan={plan} onEditPlan={onEditPlan} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -5256,7 +5301,7 @@ function App() {
   } else if (stage === "openingBalance") {
     content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
-    content = <MonthlyBreakdownScreen transactions={customTransactions} onBack={() => setStage("openingBalance")} onDone={() => setStage("targets")} />;
+    content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => setStage("targets")} />;
   } else if (stage === "targets") {
     content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage("breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
@@ -6409,6 +6454,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </style>
 </body>
 </html>
+
 
 
 
