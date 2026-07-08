@@ -3045,7 +3045,9 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   avgKeys.forEach((k) => { const o = spendByCategoryForMonth(txs, k); Object.keys(o).forEach((c) => { avgByCat[c] = (avgByCat[c] || 0) + o[c]; }); });
   Object.keys(avgByCat).forEach((c) => { avgByCat[c] = avgByCat[c] / avgKeys.length; });
 
+  const monthUncat0 = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === activeKey).length;
   const catSet = new Set([...TX_CATEGORIES, ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
+  if (monthUncat0 > 0) catSet.add("Uncategorized");
   const cats = [...catSet].sort((a, b) => (byCat[b] || 0) - (byCat[a] || 0));
   const total = cats.reduce((s, c) => s + (byCat[c] || 0), 0);
   const topAmount = cats.length ? (byCat[cats[0]] || 0) : 0;
@@ -3192,9 +3194,12 @@ function BreakdownCard({ transactions, targets }) {
   const monthKey = latestMonthKey(txs);
   const isCurrentMonth = monthKey === currentMonthKey();
   const byCat = spendByCategoryForMonth(txs, monthKey);
-  const cats = Object.keys(byCat).filter((c) => byCat[c] > 0).sort((a, b) => byCat[b] - byCat[a]);
-  const total = cats.reduce((s, c) => s + byCat[c], 0);
-  const topAmount = cats.length ? byCat[cats[0]] : 0;
+  const monthUncat = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === monthKey).length;
+  const catSet = new Set([...TX_CATEGORIES, ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
+  if (monthUncat > 0) catSet.add("Uncategorized");
+  const cats = [...catSet].sort((a, b) => (byCat[b] || 0) - (byCat[a] || 0));
+  const total = cats.reduce((s, c) => s + (byCat[c] || 0), 0);
+  const topAmount = cats.length ? (byCat[cats[0]] || 0) : 0;
   const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
   return (
     <div className="glass-card dash-card">
@@ -3207,9 +3212,9 @@ function BreakdownCard({ transactions, targets }) {
       </div>
       <div className="category-list bd-list breakdown-scroll">
         {cats.map((name) => {
-          const amount = byCat[name];
+          const amount = byCat[name] || 0;
           const color = catColor(name);
-          const sharePct = total > 0 ? Math.round((amount / total) * 100) : 0;
+          const sharePct = total > 0 && amount > 0 ? Math.round((amount / total) * 100) : 0;
           const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
           let fillPct, amtLabel, noTarget = false, over = false, shareLabel;
           if (compareTargets) {
@@ -3222,8 +3227,8 @@ function BreakdownCard({ transactions, targets }) {
               fillPct = 0; amtLabel = formatMoney(amount); noTarget = true; shareLabel = null;
             }
           } else {
-            fillPct = topAmount > 0 ? Math.max(4, (amount / topAmount) * 100) : 0;
-            amtLabel = formatMoney(amount); shareLabel = sharePct + "%";
+            fillPct = topAmount > 0 && amount > 0 ? Math.max(4, (amount / topAmount) * 100) : 0;
+            amtLabel = formatMoney(amount); shareLabel = amount > 0 ? sharePct + "%" : null;
           }
           return (
             <div className="category-row" key={name}>
@@ -4282,38 +4287,108 @@ function SafeToSpendHero({ targets, transactions, rollovers }) {
   );
 }
 
-function TargetsPage({ targets, transactions, onEditPlan }) {
-  const byCat = spendByCategoryForMonth(transactions || [], currentMonthKey());
-  const entries = TX_CATEGORIES.map((c) => ({ c, v: Number((targets || {})[c]) || 0, spent: Math.round(byCat[c] || 0) }));
-  const total = entries.reduce((s, e) => s + e.v, 0);
-  const totalSpent = entries.reduce((s, e) => s + e.spent, 0);
+function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, initialEdit }) {
+  const cats = ["Income", ...TX_CATEGORIES];
+  const monthKeys = React.useMemo(() => {
+    const ks = Object.keys(allTargets || {}).filter((k) => /^\d{4}-\d{2}$/.test(k)).sort();
+    return ks.length ? ks : [currentMonthKey()];
+  }, [allTargets]);
+  const [editing, setEditing] = useState(!!initialEdit);
+  const [saving, setSaving] = useState(false);
+  const [drafts, setDrafts] = useState({});
+  React.useEffect(() => {
+    if (!editing) return;
+    const d = {};
+    monthKeys.forEach((k) => { d[k] = {}; cats.forEach((c) => { const raw = ((allTargets || {})[k] || {})[c]; d[k][c] = raw == null ? "0" : String(raw); }); });
+    setDrafts(d);
+  }, [editing]);
+  const curKey = currentMonthKey();
+  const byCat = spendByCategoryForMonth(transactions || [], curKey);
+  const cellVal = (k, c) => editing ? (drafts[k] ? drafts[k][c] : 0) : (((allTargets || {})[k] || {})[c] || 0);
+  const monthTotal = (k) => TX_CATEGORIES.reduce((s, c) => s + (Number(cellVal(k, c)) || 0), 0);
+
+  const doSave = async () => {
+    setSaving(true);
+    const clean = {};
+    monthKeys.forEach((k) => { clean[k] = {}; cats.forEach((c) => { clean[k][c] = Number(drafts[k] && drafts[k][c]) || 0; }); });
+    try { if (onSaveAllTargets) await onSaveAllTargets(clean); } catch (e) {}
+    setSaving(false); setEditing(false);
+  };
+
   return (
     <div className="glass-card dash-card">
       <div className="summary-head">
-        <span className="card-label">Monthly targets — {currentMonthName()}</span>
-        <button className="link-btn inline" onClick={onEditPlan}>Edit plan</button>
+        <span className="card-label">Monthly targets {"\u2014"} all months</span>
+        {!editing && <button className="link-btn inline" onClick={() => setEditing(true)}>Edit</button>}
       </div>
-      <p className="subtitle" style={{ margin: "4px 0 10px" }}>Your spending targets for this month, with what you've spent so far against each. Editing your plan updates every month's targets.</p>
-      <div className="tx-list">
-        {entries.map(({ c, v, spent }) => (
-          <div className="tx-row" key={c}>
-            <div className="tx-info">
-              <span className="tx-name"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
-              <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " — over target" : ""}</span>
-            </div>
-            <span className="tx-amount" style={v > 0 && spent > v ? { color: "#ff8b8b" } : null}>{formatMoney(v)}</span>
-          </div>
-        ))}
-        <div className="tx-row">
-          <div className="tx-info"><span className="tx-name" style={{ fontWeight: 700 }}>Total</span><span className="tx-category">{formatMoney(totalSpent)} spent so far</span></div>
-          <span className="tx-amount" style={{ fontWeight: 700 }}>{formatMoney(total)}</span>
+      <p className="subtitle" style={{ margin: "4px 0 12px" }}>Your category targets across every month. {editing ? "Adjust any cell, then save." : "Tap Edit to change any month."}</p>
+
+      <div className="budget-table-wrap">
+        <table className="budget-table">
+          <thead>
+            <tr>
+              <th className="bt-corner">Category</th>
+              {monthKeys.map((k) => (
+                <th key={k} className={"bt-month-head " + (k === curKey ? "bt-month-current" : "")}>{monthLabelFromKey(k)}{k === curKey ? " \u2022" : ""}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {cats.map((c) => (
+              <tr key={c} className={c === "Income" ? "bt-income-row" : ""}>
+                <td className="bt-cat"><span className="cat-dot" style={{ background: c === "Income" ? "#4fe0c0" : catColor(c) }} />{c}</td>
+                {monthKeys.map((k) => (
+                  <td key={k} className="bt-cell">
+                    {editing ? (
+                      <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
+                        <input className="bt-input" type="number" min="0" value={drafts[k] ? drafts[k][c] : ""}
+                          onChange={(e) => setDrafts((prev) => ({ ...prev, [k]: { ...prev[k], [c]: e.target.value } }))} />
+                      </span>
+                    ) : formatMoney(cellVal(k, c))}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr className="bt-total-row">
+              <td className="bt-cat">Total spend</td>
+              {monthKeys.map((k) => <td key={k} className="bt-cell bt-total-cell">{formatMoney(monthTotal(k))}</td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {editing && (
+        <div className="nav-row" style={{ marginTop: 14 }}>
+          <button className="glass-btn ghost" disabled={saving} onClick={() => setEditing(false)}>Cancel</button>
+          <button className="glass-btn primary" disabled={saving} onClick={doSave}>{saving ? <span className="btn-spinner" /> : "Save targets"}</button>
         </div>
-      </div>
+      )}
+
+      {!editing && (
+        <div style={{ marginTop: 18 }}>
+          <span className="card-label">This month so far {"\u2014"} {currentMonthName()}</span>
+          <div className="tx-list" style={{ marginTop: 8 }}>
+            {TX_CATEGORIES.map((c) => {
+              const v = Number(((allTargets || {})[curKey] || {})[c]) || 0;
+              const spent = Math.round(byCat[c] || 0);
+              return (
+                <div className="tx-row" key={c}>
+                  <div className="tx-info">
+                    <span className="tx-name"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
+                    <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " \u2014 over target" : ""}</span>
+                  </div>
+                  <span className="tx-amount" style={v > 0 && spent > v ? { color: "#ff8b8b" } : null}>{formatMoney(v)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers }) {
+function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit }) {
   if (view === "overview") return (
     <>
       <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
@@ -4323,7 +4398,7 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
     </>
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
-  if (view === "targets") return <TargetsPage targets={targets} transactions={transactions} onEditPlan={onEditPlan} />;
+  if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} />;
   if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} plan={plan} onEditPlan={onEditPlan} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
@@ -4404,13 +4479,15 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
-  const [view, setView] = useState("overview");
+  const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
+  const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [catReviewOpen, setCatReviewOpen] = useState(false);
+  React.useEffect(() => { if (openTargetsEdit && onConsumeTargetsEdit) onConsumeTargetsEdit(); }, []);
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
@@ -4433,11 +4510,11 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard 👋{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => setView("overview")} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => setView(v)} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} /></div>
+        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -4477,7 +4554,7 @@ const THEMES = [
   { key: "forest", label: "Forest", preview: "linear-gradient(135deg,#34d399,#059669)" },
   { key: "rose", label: "Rose", preview: "linear-gradient(135deg,#f472b6,#a855f7)" },
 ];
-function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra }) {
+function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
@@ -4641,8 +4718,8 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
         <div className="dash-card settings-section">
           <div className="settings-section-head">
             <span className="card-label">Monthly targets</span>
-            {!editingTargets && categories.length > 0 && (
-              <button className="link-btn inline" onClick={startEditTargets}>Edit</button>
+            {categories.length > 0 && (
+              <button className="link-btn inline" onClick={onEditTargetsPage}>Edit</button>
             )}
           </div>
           <div className="settings-bank-list">
@@ -4721,6 +4798,7 @@ function App() {
   const [overviewSlots, setOverviewSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
   const [allTargets, setAllTargets] = useState({});
+  const [targetsEditReq, setTargetsEditReq] = useState(false);
   const [billExcludes, setBillExcludes] = useState([]);
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
@@ -5165,6 +5243,21 @@ function App() {
       return next;
     });
   };
+  const handleSaveAllTargets = async (byMonth) => {
+    const keys = Object.keys(byMonth || {}).filter((k) => /^\d{4}-\d{2}$/.test(k));
+    if (!keys.length) return;
+    setAllTargets((prev) => ({ ...prev, ...byMonth }));
+    const curKey = currentMonthKey();
+    if (byMonth[curKey]) setTargets(byMonth[curKey]);
+    if (userId) {
+      try {
+        await supabaseClient.from("targets").delete().eq("user_id", userId).in("month", keys);
+        const rows = [];
+        keys.forEach((k) => { Object.entries(byMonth[k]).forEach(([category, monthly_target]) => { rows.push({ user_id: userId, category, month: k, monthly_target: Number(monthly_target) || 0 }); }); });
+        if (rows.length) await supabaseClient.from("targets").insert(rows);
+      } catch (e) { pushToast("Couldn't save targets", "error"); }
+    }
+  };
   const handleSaveTargets = async (newTargets) => {
     const key = currentMonthKey();
     const cleaned = Object.fromEntries(Object.entries(newTargets).map(([c, v]) => [c, Number(v) || 0]));
@@ -5364,6 +5457,7 @@ function App() {
         onChangeTheme={handleChangeTheme}
         onSaveCurrency={handleSaveCurrency}
         onSaveFxRate={handleSaveFxRate}
+        onEditTargetsPage={() => { setTargetsEditReq(true); setStage("dashboard"); }}
       />
     );
   } else {
@@ -5403,6 +5497,9 @@ function App() {
         theme={theme}
         rollovers={rollovers}
         onOpenReview={openReviewManual}
+        onSaveAllTargets={handleSaveAllTargets}
+        openTargetsEdit={targetsEditReq}
+        onConsumeTargetsEdit={() => setTargetsEditReq(false)}
       />
     );
   }
