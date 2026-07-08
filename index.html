@@ -2393,13 +2393,23 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
   const avg = React.useMemo(() => avgSpendByCategory(transactions), [transactions]);
   const typInc = React.useMemo(() => Math.round(typicalIncome(transactions, null)) || 0, [transactions]);
   const balEst = React.useMemo(() => {
-    /* Balance at the START of the current month — the plan's first month begins
-       from this opening, so back out anything that's already happened this month. */
-    const b = totalEstimatedBalance(banks, accountData, transactions);
-    if (b === null) return null;
+    /* Balance at the START of the current month. Built the SAME way as the
+       "last 3 months" summary screen (opening balances + net over the same
+       trailing window), so the number here always reconciles with what the
+       customer just saw — then back out the current month's net to land on
+       the opening. Using the per-bank estimate here diverged from the summary
+       whenever a bank had no starting balance or a mismatched tag. */
+    const bankRows = (accountData && accountData.bankRows) || [];
+    const startingBal = bankRows.reduce((s, r) => s + (Number(r.starting_balance) || 0), 0);
+    const hasTx = transactions && transactions.length > 0;
+    const hasStart = bankRows.some((r) => r.starting_balance !== null && r.starting_balance !== undefined && r.starting_balance !== "");
+    if (!hasTx && !hasStart) return null;
+    const keys = hasTx ? lastNMonthKeys(latestMonthKey(transactions), 3) : [];
+    const netWindow = keys.reduce((s, k) => s + (incomeForMonth(transactions, k) - spendForMonth(transactions, k)), 0);
+    const runningNow = startingBal + netWindow;
     const ck = currentMonthKey();
     const curNet = incomeForMonth(transactions || [], ck) - spendForMonth(transactions || [], ck);
-    return Math.round(b - curNet);
+    return Math.round(runningNow - curNet);
   }, [banks, accountData, transactions]);
   const curKey = currentMonthKey();
 
