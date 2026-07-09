@@ -96,6 +96,7 @@ const APP_NAME = "MyBudgetPal";
 
 /* ---------------- Icons (inline SVG, stroke = currentColor) ---------------- */
 const ICON_PATHS = {
+  refresh: "M23 4v6h-6|M1 20v-6h6|M3.51 9a9 9 0 0 1 14.85-3.36L23 10|M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
   groceries: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z|M3 6h18|M16 10a4 4 0 0 1-8 0",
   dining: "M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2|M7 2v20|M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3|M21 15v7",
   transport: "M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L17 10l-2.2-3.5c-.4-.6-1-.9-1.7-.9H9c-.6 0-1.2.3-1.6.8L4.8 10l-2.3 1.1C1.6 11.5 1 12.3 1 13.2V16c0 .6.4 1 1 1h2|M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0|M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
@@ -4755,13 +4756,47 @@ function TourTarget({ active, className, children }) {
 
 function InsightPill({ transactions, targets }) {
   const ins = buildInsights(transactions || [], targets || {});
+  const [idx, setIdx] = useState(0);
   if (!ins.length) return null;
-  const top = ins[0];
+  const top = ins[idx % ins.length];
   const icon = top.type === "warning" ? "alert" : (top.type === "positive" ? "trending" : "sparkles");
   return (
     <div className={"oh-pill oh-pill-" + top.type}>
       <span className="oh-pill-icon"><Icon name={icon} size={17} /></span>
       <span className="oh-pill-text">{top.text}</span>
+      {ins.length > 1 && <button className="oh-pill-refresh" onClick={() => setIdx((i) => i + 1)} aria-label="Show another insight"><Icon name="refresh" size={14} /></button>}
+    </div>
+  );
+}
+
+function SpentSoFarHero({ transactions }) {
+  const key = currentMonthKey();
+  const txs = transactions || [];
+  const spent = spendForMonth(txs, key);
+  const income = incomeForMonth(txs, key);
+  const kept = income - spent;
+  return (
+    <div className="safe-hero">
+      <div className="safe-hero-row">
+        <div className="safe-hero-main">
+          <span className="safe-hero-label">Spent so far {"\u00b7"} {currentMonthName()}</span>
+          <span className="safe-hero-num"><CountUp value={spent} format={formatMoney} /></span>
+        </div>
+        <div className="safe-hero-side">
+          <span>{income > 0 ? formatMoney(income) + " in \u00b7 " + formatMoney(kept) + " kept" : "day " + today().getDate() + " of " + daysInCurrentMonth()}</span>
+          {income > 0 && <span className="safe-hero-roll">day {today().getDate()} of {daysInCurrentMonth()}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SetupPushBand({ onResumeSetup }) {
+  return (
+    <div className="oh-setup-band">
+      <span className="oh-setup-ic"><Icon name="sparkles" size={17} /></span>
+      <span className="oh-setup-text"><strong>Want sharper insights?</strong> You're only seeing part of what {APP_NAME} can do {"\u2014"} set your targets to unlock safe-to-spend, pacing alerts and tailored tips. It takes 3 minutes.</span>
+      <button className="oh-setup-cta" onClick={onResumeSetup}>Set up {"\u203a"}</button>
     </div>
   );
 }
@@ -4926,7 +4961,7 @@ function EditViewModal({ layout, onSave, onClose }) {
   );
 }
 
-function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout }) {
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
@@ -4935,6 +4970,8 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
   const widgetProps = { transactions, banks, accountData, goals, billExcludes };
   const [editOpen, setEditOpen] = useState(false);
+  const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
+  const noBudget = totalBudget <= 0;
 
   const needs = [];
   if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
@@ -4983,8 +5020,18 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
       <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} {"\u00b7"} day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
 
       <TourTarget active={runTour && tourStep === 0}>
-        <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />
-        <InsightPill transactions={transactions} targets={targets} />
+        {noBudget ? (
+          <>
+            <InsightPill transactions={transactions} targets={targets} />
+            <SpentSoFarHero transactions={transactions} />
+            <SetupPushBand onResumeSetup={onResumeSetup} />
+          </>
+        ) : (
+          <>
+            <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />
+            <InsightPill transactions={transactions} targets={targets} />
+          </>
+        )}
       </TourTarget>
 
       {layout.month.length > 0 && (!runTour || tourStep >= 1) && (
@@ -5165,9 +5212,9 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
   );
 }
 
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
+function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
   if (view === "overview") return (
-    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} />
+    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -5345,7 +5392,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -7994,6 +8041,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bdg-spinner { display: flex; justify-content: center; margin-top: 8px; }
   .bdg-spinner .btn-spinner { border-color: var(--accent); border-top-color: transparent; }
   .bdg-badge { display: inline-flex; align-items: center; gap: 7px; margin: 6px auto 0; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 999px; }
+
+  .oh-pill-refresh { margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: none; background: rgba(46,91,255,0.10); color: var(--accent); cursor: pointer; transition: transform 0.25s, background 0.15s; }
+  .oh-pill-refresh:hover { background: rgba(46,91,255,0.18); transform: rotate(90deg); }
+  .oh-pill { margin-bottom: 12px; }
+  .oh-setup-band { display: flex; align-items: center; gap: 12px; background: var(--accent-soft); border: 1px dashed var(--accent); border-radius: 14px; padding: 13px 16px; margin: 0 4px 6px; }
+  .oh-setup-ic { color: var(--accent); display: flex; flex-shrink: 0; }
+  .oh-setup-text { flex: 1; font-size: 13px; color: var(--ink); line-height: 1.5; }
+  .oh-setup-cta { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--on-accent); background: var(--accent-solid); border: none; border-radius: 12px; padding: 9px 16px; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px var(--accent-shadow); }
 </style>
 </body>
 </html>
