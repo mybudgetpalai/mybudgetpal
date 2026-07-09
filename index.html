@@ -1763,6 +1763,12 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card auth-card">
         <div className="brand-row">{onBack && <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>}<div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
+        {isSignup && (
+          <div className="beta-callout">
+            <span className="beta-callout-tag">BETA</span>
+            <span>Please don't use a real password. For now, just use <strong>123456</strong>.</span>
+          </div>
+        )}
         {isForgot ? (
           <><h1 className="title">Reset your password</h1><p className="subtitle">We'll send a reset link to your email.</p></>
         ) : (
@@ -2195,6 +2201,10 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
         <h1 className="title">Upload your bank statements</h1>
         <p className="subtitle">Add at least 3 months per bank so we can spot regular patterns.</p>
+        <div className="beta-callout">
+          <span className="beta-callout-tag">BETA</span>
+          <span>No need for a real statement — just hit <strong>Skip for now</strong> and we'll load dummy data so you can test.</span>
+        </div>
 
         <div className="bank-upload-list">
           {banks.map((b) => (
@@ -5977,8 +5987,6 @@ function App() {
     <>
       {isAdmin && inApp && <AdminBar onOpen={() => setStage("admin")} />}
       {isDev && inApp && <TestingBar />}
-      {stage === "signup" && <SetupBar label="Beta" text="Please don\u2019t use a real password \u2014 for now, use 123456" />}
-      {stage === "upload" && <SetupBar label="Tip" text="No statement handy? Hit \u2018Skip for now\u2019 and we\u2019ll load dummy data so you can test." />}
       {stage === "dashboard" && <NotificationBanner notes={notifications} onDismiss={dismissNote} />}
       {content}
       {reviewMonth && (
@@ -7245,6 +7253,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .admin-act:hover { background: var(--surface-2); }
   .admin-act-danger { color: var(--neg); border-color: rgba(217,45,32,0.35); }
   .admin-act-danger:hover { background: rgba(217,45,32,0.08); }
+  .beta-callout { display: flex; align-items: center; gap: 10px; background: #FFE44D; color: #3a2d00; border: 1.5px solid #E0B400; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 600; line-height: 1.4; margin: 4px 0 16px; box-shadow: 0 2px 10px rgba(224,180,0,0.25); }
+  .beta-callout-tag { background: #3a2d00; color: #FFE44D; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
+  .beta-callout strong { font-weight: 800; }
 </style>
 </body>
 </html>
