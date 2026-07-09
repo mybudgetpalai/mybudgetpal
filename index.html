@@ -2562,8 +2562,8 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack, bankRows }) {
     perMonth.forEach((o) => Object.keys(o).forEach((c) => catSet.add(c)));
     categories = [...TX_CATEGORIES, ...[...catSet].filter((c) => !TX_CATEGORIES.includes(c))];
     if (!categories.length) categories = ["Uncategorized"];
-    byCatByMonth = Object.fromEntries(categories.map((c) => [c, perMonth.map((o) => Math.round(o[c] || 0))]));
-    incomeByMonth = keys.map((k) => Math.round(incomeForMonth(transactions, k)));
+    byCatByMonth = Object.fromEntries(categories.map((c) => [c, perMonth.map((o) => (o[c] || 0))]));
+    incomeByMonth = keys.map((k) => incomeForMonth(transactions, k));
   } else {
     categories = Object.keys(CATEGORY_MONTHLY);
     monthLabels = MONTH_LABELS;
@@ -3113,7 +3113,7 @@ function SummaryCard({ targets, transactions, rollovers }) {
   const dataMonth = (transactions && transactions.length > 0) ? latestMonthKey(transactions) : null;
   const isCurrentMonth = dataMonth === currentMonthKey();
   const projected = isCurrentMonth ? projectMonthEnd(spent) : null;
-  const overPace = projected !== null ? projected > target : pct > expectedPct;
+  const overPace = projected !== null ? projected > target : spent > target;
   const paceNote = projected !== null
     ? (projected > target
       ? "At this rate you'll spend ~" + formatMoney(projected) + " — " + formatMoney(projected - target) + " over target"
@@ -3126,8 +3126,8 @@ function SummaryCard({ targets, transactions, rollovers }) {
   return (
     <div className="glass-card dash-card">
       <div className="summary-head">
-        <span className="card-label">This month</span>
-        <span className={"pace-badge " + (overPace ? "pace-over" : "pace-good")}>{overPace ? "Over pace" : "On track"}</span>
+        <span className="card-label">{isCurrentMonth ? "This month" : (dataMonth ? monthLabelFromKey(dataMonth) : "This month")}</span>
+        <span className={"pace-badge " + (overPace ? "pace-over" : "pace-good")}>{isCurrentMonth ? (overPace ? "Over pace" : "On track") : (overPace ? "Over budget" : "Within budget")}</span>
       </div>
       <BudgetRing spent={spent} target={target} />
       {overspent && <div className="overspend-alert"><Icon name="alert" size={13} /> Over budget — {formatMoney(spent - target)} over your {formatMoney(target)} target</div>}
@@ -4263,14 +4263,14 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
     const open = run;
     const inc = isActual(k) ? incM(k) : plannedIncomeFor(allTargets, k, txs);
     const cats = {};
-    TX_CATEGORIES.forEach((c) => { cats[c] = isActual(k) ? Math.round(spendByCategoryForMonth(txs, k)[c] || 0) : plannedCatFor(allTargets, k, c, avg); });
+    TX_CATEGORIES.forEach((c) => { cats[c] = isActual(k) ? (spendByCategoryForMonth(txs, k)[c] || 0) : plannedCatFor(allTargets, k, c, avg); });
     const catSum = TX_CATEGORIES.reduce((s, c) => s + cats[c], 0);
     const other = isActual(k) ? spM(k) - catSum : 0;
     const net = inc - catSum - other;
     run += net;
     return { k, open, inc, cats, other, net, close: run, actual: isActual(k) };
   });
-  const hasOther = cols.some((c) => c.other !== 0);
+  const hasOther = cols.some((c) => Math.round(c.other) > 0);
   const endBal = cols.length ? cols[cols.length - 1].close : startBal;
   const gap = planActive ? Math.round(plan.targetBalance) - endBal : 0;
   const word = haveBalance ? "balance" : "total saved";
@@ -4705,7 +4705,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
 function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit }) {
   if (view === "overview") return (
     <>
-      <div className="overview-greeting">Hi {name || "there"}, here's how {currentMonthName()} is looking…</div>
+      <div className="overview-greeting">Hi {name || "there"}, {(() => { const lk = transactions && transactions.length ? latestMonthKey(transactions) : null; return lk && lk !== currentMonthKey() ? "here's how " + monthLabelFromKey(lk) + " went…" : "here's how " + currentMonthName() + " is looking…"; })()}</div>
       {!runTour && <UncatBanner count={uncatCount} onSort={onOpenCatReview} />}
       {!runTour && hasData && <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />}
       <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} rollovers={rollovers} />
