@@ -1802,28 +1802,29 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
           try {
             if (isForgot) {
               const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+              setSubmitting(false);
               if (error) return onError(error.message);
               onError("Check your email for a reset link.", "success");
               return;
             }
             if (mode === "signup") {
               const { data, error } = await supabaseClient.auth.signUp({ email, password });
-              if (error) return onError(error.message);
+              if (error) { setSubmitting(false); return onError(error.message); }
               if (!data.session) {
+                setSubmitting(false);
                 onError("Account created. Check your email to confirm before logging in.", "success");
                 return;
               }
               onDone(mode, data.user?.id, null);
             } else {
               const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-              if (error) return onError(error.message);
+              if (error) { setSubmitting(false); return onError(error.message); }
               const profile = await fetchProfile(data.user.id);
               onDone(mode, data.user.id, profile);
             }
           } catch (e) {
-            onError("Something went wrong: " + (e?.message || "please try again"));
-          } finally {
             setSubmitting(false);
+            onError("Something went wrong: " + (e?.message || "please try again"));
           }
         }}>
           {submitting ? <span className="btn-spinner" /> : isForgot ? "Send reset link" : isLogin ? "Log in" : "Sign up"}
@@ -2855,7 +2856,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
                 {months.map((m) => (
                   <td key={m.key} className="bt-cell">
                     <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
-                      <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key].Income)} style={{ width: ((fmtBalInput(budgets[m.key].Income).length || 1) + 1.6) + "ch" }}
+                      <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key].Income)}
                         onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], Income: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                     </span>
                   </td>
@@ -2867,7 +2868,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
                   {months.map((m) => (
                     <td key={m.key} className="bt-cell">
                       <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
-                        <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key][c])} style={{ width: ((fmtBalInput(budgets[m.key][c]).length || 1) + 1.6) + "ch" }}
+                        <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key][c])}
                           onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], [c]: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                       </span>
                     </td>
@@ -4126,7 +4127,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
   );
 }
 
-function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
+function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, signupMonth }) {
   const txs = transactions || [];
   const done = completedMonthsWithData(txs);
   const [monthKey, setMonthKey] = useState(done.length ? done[done.length - 1] : currentMonthKey());
@@ -4159,7 +4160,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview }) {
             {done.slice().reverse().map((k) => <option key={k} value={k}>{monthLabelFromKey(k) + " " + k.slice(0, 4)}</option>)}
           </select>
         </div>
-        {onOpenReview && <button className="link-btn inline" style={{ marginTop: 4 }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
+        {onOpenReview && monthKey >= (signupMonth || new Date().toISOString().slice(0, 7)) && <button className="link-btn inline" style={{ marginTop: 4 }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
         <p className="subtitle" style={{ margin: "2px 0 14px" }}>How {label} actually turned out, next to what you planned.</p>
         {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
         <div className="review-cards">
@@ -4664,7 +4665,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
                   <td key={k} className="bt-cell">
                     {editing ? (
                       <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
-                        <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(drafts[k] ? drafts[k][c] : "")} style={{ width: ((fmtBalInput(drafts[k] ? drafts[k][c] : "").length || 1) + 1.6) + "ch" }}
+                        <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(drafts[k] ? drafts[k][c] : "")}
                           onChange={(e) => setDrafts((prev) => ({ ...prev, [k]: { ...prev[k], [c]: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                       </span>
                     ) : <span className="bt-read-num">{formatMoney(cellVal(k, c))}</span>}
@@ -4674,7 +4675,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
             ))}
             <tr className="bt-total-row">
               <td className="bt-cat">Total spend</td>
-              {monthKeys.map((k) => <td key={k} className="bt-cell bt-total-cell"><span className="bt-total-disp"><span className="bt-cur">{homeSym()}</span><span className="bt-total-num">{formatNum(monthTotal(k))}</span></span></td>)}
+              {monthKeys.map((k) => <td key={k} className="bt-cell bt-total-cell">{editing ? <span className="bt-total-disp"><span className="bt-cur">{homeSym()}</span><span className="bt-total-num">{formatNum(monthTotal(k))}</span></span> : <span className="bt-read-num" style={{ fontWeight: 700 }}>{formatMoney(monthTotal(k))}</span>}</td>)}
             </tr>
           </tbody>
         </table>
@@ -4711,7 +4712,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
   );
 }
 
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit }) {
+function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
   if (view === "overview") return (
     <>
       <div className="overview-greeting">Hi {name || "there"}, {(() => { const lk = transactions && transactions.length ? latestMonthKey(transactions) : null; return lk && lk !== currentMonthKey() ? "here's how " + monthLabelFromKey(lk) + " went…" : "here's how " + currentMonthName() + " is looking…"; })()}</div>
@@ -4722,7 +4723,7 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
-  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
+  if (view === "monthlyreview") return hasData ? <MonthlyReviewCard transactions={transactions} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} signupMonth={signupMonth} /> : <EmptyState text="No data yet — upload a statement to see your monthly review." />;
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} plan={plan} onEditPlan={onEditPlan} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
@@ -4843,7 +4844,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -6197,7 +6198,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bt-input-wrap:hover { background: var(--surface-2); }
   .bt-input-wrap:focus-within { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-shadow); }
   .bt-cur { color: var(--ink-3); font-size: 13px; font-weight: 500; }
-  .bt-input { min-width: 2.6ch; background: transparent; border: none; color: var(--ink); font-size: 13px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
+  .bt-input { width: 6.5ch; background: transparent; border: none; color: var(--ink); font-size: 13px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
   .bt-input::-webkit-outer-spin-button, .bt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .bt-total-row td { border-top: 1px solid var(--line); border-bottom: none !important; padding-top: 8px; background: var(--surface-2); }
   .bt-total-cell { color: var(--accent); font-size: 13px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -6374,6 +6375,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .side-item { display: block; width: 100%; text-align: left; font-family: inherit; background: none; border: none; color: var(--ink-2); font-size: 14px; font-weight: 500; padding: 10px 12px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; white-space: nowrap; }
   .side-item:hover { background: var(--surface-2); color: var(--ink); }
   .side-item-active { background: var(--grad-nav); color: var(--on-accent); }
+  .side-item.side-item-active:hover, .side-item-accounts.side-item-active:hover { background: var(--grad-nav); color: var(--on-accent); }
   .brand-clickable { cursor: pointer; }
   .side-accounts-wrap { margin-top: auto; }
   .side-divider { height: 1px; background: var(--surface-2); margin: 10px 4px; }
@@ -6920,6 +6922,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .targets-rebuild-btn { padding: 7px 12px; font-size: 12.5px; white-space: nowrap; }
   .targets-table th.bt-month-head { text-align: right; }
   .targets-table td.bt-cell { text-align: right; }
+  .budget-table td.bt-cell { text-align: right; }
+  .budget-table th.bt-month-head { text-align: right; }
   .targets-table tbody tr:hover td { background: var(--surface-2); }
   .bt-read-num { font-variant-numeric: tabular-nums; color: var(--ink); }
 
