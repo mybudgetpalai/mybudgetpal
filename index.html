@@ -599,7 +599,10 @@ const FX_FALLBACK = { "GBP>AED": 4.65, "AED>GBP": 0.215, "GBP>USD": 1.27, "USD>G
 /* Module-level FX state: home currency, per-bank currency, locked monthly rates */
 const FX = { ready: false, userId: null, home: "GBP", bankCurrency: {}, rates: {} };
 function fxKey(m, f, t) { return m + "|" + f + "|" + t; }
-function nowMonth() { return new Date().toISOString().slice(0, 7); }
+let DEV_NOW = null; // dev-only: override for "today" to test month-end triggers
+const DEV_FLAG = (typeof window !== "undefined") && new URLSearchParams(window.location.search).get("dev") === "1";
+function today() { return DEV_NOW ? new Date(DEV_NOW + "T12:00:00") : new Date(); }
+function nowMonth() { return today().toISOString().slice(0, 7); }
 function txMonthKey(date) { const m = (date || "").slice(0, 7); return /^\d{4}-\d{2}$/.test(m) ? m : nowMonth(); }
 function homeSym() { return (CURRENCY_SYMBOLS[FX.home] || "£").trim(); }
 function fxRate(month, from, to) {
@@ -776,7 +779,7 @@ function spendByCategoryForMonth(txs, k) {
 function catColor(c) { return CATEGORY_COLORS[c] || "#9aa4b8"; }
 function displayCat(c) { return c === "Uncategorized" ? "Needs review" : c; }
 function addMonths(key, n) { let y = +key.slice(0, 4), m = +key.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + "-" + pad2(m); }
-function isMidMonth() { const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return d.getDate() < last; }
+function isMidMonth() { const d = today(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return d.getDate() < last; }
 function avgSpendByCategory(transactions) {
   const out = {};
   const has = transactions && transactions.length > 0;
@@ -814,11 +817,11 @@ function dedupeTransactions(incoming, existing) {
 
 /* Pacing projection helpers */
 function currentMonthKey() {
-  const d = new Date();
+  const d = today();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
 }
 function currentMonthName() {
-  return new Date().toLocaleString("en-US", { month: "long" });
+  return today().toLocaleString("en-US", { month: "long" });
 }
 function completedMonthsWithData(txs) {
   const set = new Set((txs || []).filter((t) => t.date).map((t) => t.date.slice(0, 7)));
@@ -848,11 +851,11 @@ function totalEstimatedBalance(banks, accountData, txs) {
   return any ? total : null;
 }
 function daysInCurrentMonth() {
-  const d = new Date();
+  const d = today();
   return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
 }
 function projectMonthEnd(spentSoFar) {
-  const day = new Date().getDate();
+  const day = today().getDate();
   if (day <= 0) return spentSoFar;
   return (spentSoFar / day) * daysInCurrentMonth();
 }
@@ -1060,15 +1063,7 @@ function rowToTx(r) { return { id: r.id, date: r.tx_date || "", name: r.descript
 /* Dev-only test hook: forces 2 spend transactions per import into "Needs review" so the categorise flow can be tested. No effect for real accounts. */
 let DEV_MODE = false;
 const DEV_FORCED_NAMES = new Set();
-function devForceUncat(list) {
-  if (!DEV_MODE || !list || !list.length) return list;
-  let n = 0;
-  for (const t of list) {
-    if (n >= 2) break;
-    if (t.amount < 0 && t.category !== "Uncategorized") { t.category = "Uncategorized"; DEV_FORCED_NAMES.add(t.name); n++; }
-  }
-  return list;
-}
+function devForceUncat(list) { return list; } // disabled: no longer forces test transactions into Uncategorised
 async function fetchTransactions(userId) {
   const { data, error } = await supabaseClient.from("transactions").select("*").eq("user_id", userId).order("tx_date", { ascending: false });
   if (error) return [];
@@ -3144,7 +3139,7 @@ function SummaryCard({ targets, transactions, rollovers }) {
     </div>
   );
 }
-function DAYS_INTO_MONTH() { return new Date().getDate(); }
+function DAYS_INTO_MONTH() { return today().getDate(); }
 
 function CategoryEditor({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -4571,7 +4566,7 @@ function SafeToSpendHero({ targets, transactions, rollovers }) {
   const roll = rolloverForMonth(rollovers, key);
   const spent = spendForMonth(transactions, key);
   const remaining = budget + roll - spent;
-  const now = new Date();
+  const now = today();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
   const over = remaining < 0;
@@ -5342,6 +5337,8 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [rollovers, setRollovers] = useState([]);
   const [reviewMonth, setReviewMonth] = useState(null);
+  const [devNow, setDevNow] = useState(null);
+  const setDevDate = (val) => { DEV_NOW = val || null; setDevNow(val || null); };
   const [reviewManual, setReviewManual] = useState(false);
   const [sessionDismissed, setSessionDismissed] = useState([]);
 
@@ -5372,17 +5369,17 @@ function App() {
     // any first-run setup — it should never interrupt onboarding.
     if (stage !== "dashboard" || reviewMonth || runTour) return;
     if (!hasData) return;
+    // Real month-end: only review the month that has JUST completed (previous month
+    // relative to today), never retrospectively surface older months.
+    const prev = addMonths(currentMonthKey(), -1);
     const done = completedMonthsWithData(customTransactions);
-    if (!done.length) return;
+    if (!done.includes(prev)) return;
     const reviewed = new Set(monthReviews.map((r) => r.month));
-    for (let i = done.length - 1; i >= 0; i--) {
-      const k = done[i];
-      if (reviewed.has(k) || sessionDismissed.includes(k)) continue;
-      const b = (allTargets && allTargets[k]) || {};
-      const hasBudget = TX_CATEGORIES.some((c) => Number(b[c]) > 0) || isDev || !!plan;
-      if (hasBudget) { setReviewManual(false); setReviewMonth(k); break; }
-    }
-  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev, runTour, showExtraBanner, hasData, plan]);
+    if (reviewed.has(prev) || sessionDismissed.includes(prev)) return;
+    const b = (allTargets && allTargets[prev]) || {};
+    const hasBudget = TX_CATEGORIES.some((c) => Number(b[c]) > 0) || !!plan;
+    if (hasBudget) { setReviewManual(false); setReviewMonth(prev); }
+  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev, runTour, showExtraBanner, hasData, plan, devNow]);
 
   const reviewBudgets = (() => {
     if (!reviewMonth) return {};
@@ -5795,7 +5792,7 @@ function App() {
       const { data, error } = await supabaseClient.auth.signInAnonymously();
       if (error || !data?.user) { pushToast("TEST login failed: " + (error?.message || "no session") + " (enable Anonymous sign-ins in Supabase)", "error"); return; }
       setUserId(data.user.id);
-      setIsDev(false); setIsAdmin(false); DEV_MODE = false;
+      setIsDev(false); setIsAdmin(false); DEV_MODE = false; DEV_NOW = null; setDevNow(null);
       setStage("onboarding");
     } catch (e) { pushToast("TEST login error: " + (e?.message || e), "error"); }
   };
@@ -5999,6 +5996,13 @@ function App() {
     <>
       {isAdmin && inApp && <AdminBar onOpen={() => setStage("admin")} />}
       {isDev && inApp && <TestingBar />}
+      {(isDev || DEV_FLAG) && inApp && (
+        <div style={{ position: "fixed", bottom: 12, left: 12, zIndex: 9999, background: "#1a1f2b", color: "#e8edf4", padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", gap: 8, alignItems: "center", boxShadow: "0 4px 16px rgba(0,0,0,.3)" }}>
+          <span style={{ opacity: 0.7 }}>DEV date:</span>
+          <input type="date" value={devNow || ""} onChange={(e) => setDevDate(e.target.value)} style={{ fontSize: 12, padding: "2px 4px", borderRadius: 4, border: "1px solid #3a4356", background: "#0f1420", color: "#e8edf4" }} />
+          {devNow && <button onClick={() => setDevDate("")} style={{ fontSize: 11, cursor: "pointer", background: "none", border: "none", color: "#8fa3bd", textDecoration: "underline" }}>reset</button>}
+        </div>
+      )}
       {stage === "dashboard" && <NotificationBanner notes={notifications} onDismiss={dismissNote} />}
       {content}
       {reviewMonth && (
