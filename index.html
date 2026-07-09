@@ -4854,9 +4854,9 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
       <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="brand-row" style={{ marginBottom: 4, justifyContent: "space-between" }}>
           <span className="brand-name">Share your feedback</span>
-          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>\u00d7</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"\u00d7"}</button>
         </div>
-        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 14px" }}>A few quick thoughts help shape what comes next \u2014 all optional.</p>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 14px" }}>A few quick thoughts help shape what comes next {"\u2014"} all optional.</p>
         <div className="field-group">
           <label className="field-label">What do you like?</label>
           <textarea className="glass-input" style={ta} value={likes} onChange={(e) => setLikes(e.target.value)} autoFocus />
