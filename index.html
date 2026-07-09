@@ -2885,6 +2885,83 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
 
 /* ---------------- In-app overview setup (post-CWJ) ---------------- */
 
+/* ---------------- Persona engine ---------------- */
+
+function scorePersona({ savvy, tracking, balanceCheck, goals }) {
+  let lit = 0;
+  if (savvy === "intermediate") lit += 1; else if (savvy === "confident") lit += 2;
+  if (tracking === "sometimes") lit += 1; else if (tracking === "yes") lit += 2;
+  if (balanceCheck === "weekly") lit += 1; else if (balanceCheck === "daily") lit += 2;
+  const literacy = lit <= 2 ? "beginner" : (lit <= 4 ? "comfortable" : "pro");
+  const g = goals || [];
+  let focus = "organiser";
+  if (g.includes("Save more each month") || g.includes("Plan for a big purchase")) focus = "saver";
+  else if (g.includes("Pay off debt")) focus = "debt";
+  else if (g.includes("Track my spending") || g.includes("Just stay organised")) focus = "budgeter";
+  else if (g.includes("Build an investment portfolio") || g.includes("Grow my business")) focus = "optimiser";
+  if (literacy === "beginner") return "fresh_start";
+  if (focus === "saver" || focus === "debt") return "goal_getter";
+  if (literacy === "pro" && focus === "optimiser") return "power_view";
+  return "budget_hawk";
+}
+
+const PERSONA_TEMPLATES = {
+  fresh_start: {
+    name: "Fresh Start",
+    blurb: "A simple, clear view \u2014 what you can spend, where it's going, and one thing to act on.",
+    layout: { month: ["breakdown_mini", "in_out"], big: ["goal"] },
+  },
+  goal_getter: {
+    name: "Goal Getter",
+    blurb: "Your goal front and centre, with the month's money-in vs money-out feeding it.",
+    layout: { month: ["in_out", "breakdown_mini"], big: ["goal", "net_worth"] },
+  },
+  budget_hawk: {
+    name: "Budget Hawk",
+    blurb: "Built around pacing \u2014 where the money's going and what's left, category by category.",
+    layout: { month: ["breakdown_mini", "bills", "in_out"], big: ["net_worth", "goal"] },
+  },
+  power_view: {
+    name: "Power View",
+    blurb: "The dense view \u2014 merchants, trends, bills and balances, all on one screen.",
+    layout: { month: ["breakdown_mini", "in_out", "merchants", "trend"], big: ["net_worth", "accounts", "goal"] },
+  },
+};
+
+function BuildingDashboardScreen({ personaKey, onDone }) {
+  const t = PERSONA_TEMPLATES[personaKey] || PERSONA_TEMPLATES.budget_hawk;
+  const [phase, setPhase] = useState(0);
+  React.useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 1400);
+    const t2 = setTimeout(() => setPhase(2), 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card size-md" style={{ minHeight: 0, textAlign: "center" }}>
+        {phase < 2 ? (
+          <>
+            <div className="bdg-spinner"><span className="btn-spinner" style={{ width: 26, height: 26 }} /></div>
+            <h1 className="title" style={{ marginTop: 18 }}>{phase === 0 ? "Reading your answers\u2026" : "Building your dashboard\u2026"}</h1>
+            <p className="subtitle">Shaping your overview around your goals.</p>
+          </>
+        ) : (
+          <>
+            <div className="bdg-badge"><Icon name="sparkles" size={15} /> {t.name}</div>
+            <h1 className="title" style={{ marginTop: 14 }}>We've set you up with the {t.name} view</h1>
+            <p className="subtitle">{t.blurb}</p>
+            <p className="subtitle" style={{ fontSize: 12.5, opacity: 0.85 }}>Don't worry {"\u2014"} you can change any widget later with "Edit view" on your overview.</p>
+            <div className="nav-row" style={{ marginTop: 18 }}>
+              <button className="glass-btn primary" onClick={onDone}>Show me around</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SetupIntroModal({ name, onStart, onSkip }) {
   return (
     <div className="modal-overlay setup-intro-overlay">
@@ -5783,6 +5860,8 @@ function App() {
   const [showSetupBanner, setShowSetupBanner] = useState(false);
   const [setupResume, setSetupResume] = useState(false);
   const [setupIntroOpen, setSetupIntroOpen] = useState(false);
+  const [setupAnswers, setSetupAnswers] = useState(null);
+  const [personaKey, setPersonaKey] = useState(null);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
   const [allTargets, setAllTargets] = useState({});
   const [targetsEditReq, setTargetsEditReq] = useState(false);
@@ -6243,7 +6322,7 @@ function App() {
       await supabaseClient.from("goals").delete().eq("user_id", userId);
       await supabaseClient.from("statements").delete().eq("user_id", userId);
       await supabaseClient.from("banks").delete().eq("user_id", userId);
-      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null, home_layout: null, savvy: null, tracking: null, balance_check: null, fin_goals: null, setup_completed: null });
+      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null, home_layout: null, savvy: null, tracking: null, balance_check: null, fin_goals: null, setup_completed: null, persona: null });
       try {
         const { data: topLevel } = await supabaseClient.storage.from("statements").list(userId);
         const toRemove = [];
@@ -6259,7 +6338,7 @@ function App() {
       } catch (e) {}
       setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setPlan(null);
       setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
-      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false); setSetupIntroOpen(false);
+      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false); setSetupIntroOpen(false); setSetupAnswers(null); setPersonaKey(null);
       pushToast("Dev account reset \u2014 starting fresh", "success");
       setStage("onboarding");
     } catch (e) {
@@ -6396,9 +6475,30 @@ function App() {
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => { setSetupIntroOpen(true); setStage("dashboard"); }} />;
   } else if (stage === "setupQuestions") {
-    content = <SetupQuestionsScreen userId={userId} pushToast={pushToast} onBack={() => { setStage("dashboard"); if (!setupResume) setSetupIntroOpen(true); }} onDone={() => { setShowSetupBanner(false); setStage("targets"); }} />;
+    content = <SetupQuestionsScreen userId={userId} pushToast={pushToast} onBack={() => { setStage("dashboard"); if (!setupResume) setSetupIntroOpen(true); }} onDone={(ans) => { setSetupAnswers(ans); setShowSetupBanner(false); setStage("targets"); }} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); if (!setupResume) setSignupMonth(new Date().toISOString().slice(0, 7)); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setShowExtraBanner(true); if (!setupResume) setRunTour(true); setSetupResume(false); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => {
+      setTargets(t); setPlan(p || null);
+      if (!setupResume) setSignupMonth(new Date().toISOString().slice(0, 7));
+      if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {});
+      setShowExtraBanner(true);
+      if (setupAnswers) {
+        const pk = scorePersona(setupAnswers);
+        const tpl = PERSONA_TEMPLATES[pk];
+        if (tpl) {
+          setHomeLayout(tpl.layout);
+          if (userId) supabaseClient.from("profiles").upsert({ id: userId, home_layout: tpl.layout, persona: pk }).then(() => {}, () => {});
+        }
+        setPersonaKey(pk);
+        setStage("buildingDashboard");
+      } else {
+        if (!setupResume) setRunTour(true);
+        setSetupResume(false);
+        setStage("dashboard");
+      }
+    }} />;
+  } else if (stage === "buildingDashboard") {
+    content = <BuildingDashboardScreen personaKey={personaKey} onDone={() => { const first = !setupResume; setSetupResume(false); setSetupAnswers(null); if (first) setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -7880,6 +7980,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ev-add-chip { font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: none; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
 
   .setup-intro-overlay { backdrop-filter: blur(3px); background: rgba(16,24,40,0.35); }
+
+  .bdg-spinner { display: flex; justify-content: center; margin-top: 8px; }
+  .bdg-spinner .btn-spinner { border-color: var(--accent); border-top-color: transparent; }
+  .bdg-badge { display: inline-flex; align-items: center; gap: 7px; margin: 6px auto 0; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 999px; }
 </style>
 </body>
 </html>
