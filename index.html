@@ -5090,11 +5090,31 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
 
 function AdminBar({ onOpen }) {
   return (
-    <div className="admin-bar">
+    <div className="admin-bar" style={{ background: "#6D28D9" }}>
       <span className="admin-bar-dot" />
       <span className="admin-bar-label">Admin account</span>
       <span className="admin-bar-sub">Logged in as master</span>
       <button className="admin-bar-btn" onClick={onOpen}>Admin tools</button>
+    </div>
+  );
+}
+
+function TestingBar() {
+  return (
+    <div className="admin-bar" style={{ background: "#C2410C" }}>
+      <span className="admin-bar-dot" />
+      <span className="admin-bar-label">Testing account</span>
+      <span className="admin-bar-sub">Use RESET in the sidebar to restart onboarding anytime</span>
+    </div>
+  );
+}
+
+function SetupBar({ label, text }) {
+  return (
+    <div className="admin-bar" style={{ background: "#2E5BFF" }}>
+      <span className="admin-bar-dot" />
+      <span className="admin-bar-label">{label}</span>
+      <span className="admin-bar-sub">{text}</span>
     </div>
   );
 }
@@ -5105,7 +5125,7 @@ function NotificationBanner({ notes, onDismiss }) {
   return (
     <div className="notif-banner">
       <span className="notif-banner-text">{n.body}</span>
-      <button className="notif-banner-x" onClick={() => onDismiss(n.id)} aria-label="Dismiss">\u00d7</button>
+      <button className="notif-banner-x" onClick={() => onDismiss(n.id)} aria-label="Dismiss">×</button>
     </div>
   );
 }
@@ -5178,11 +5198,11 @@ function AdminScreen({ onBack, pushToast }) {
           <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", fontWeight: 700 }}>{APP_NAME}</div>
           <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--ink)" }}>Admin tools</div>
         </div>
-        <button className="btn" onClick={onBack}>\u2190 Back to app</button>
+        <button className="btn" onClick={onBack}>← Back to app</button>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", color: "var(--ink-3)", padding: 60 }}>Loading\u2026</div>
+        <div style={{ textAlign: "center", color: "var(--ink-3)", padding: 60 }}>Loading…</div>
       ) : (
         <>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
@@ -5776,6 +5796,8 @@ function App() {
 
   if (checkingSession) return null;
 
+  const inApp = ["dashboard", "settings", "mapping", "planSetup", "admin"].includes(stage);
+
   let content;
   if (stage === "landing") {
     content = (
@@ -5953,7 +5975,10 @@ function App() {
 
   return (
     <>
-      {isAdmin && stage !== "landing" && stage !== "welcome" && stage !== "login" && stage !== "signup" && <AdminBar onOpen={() => setStage("admin")} />}
+      {isAdmin && inApp && <AdminBar onOpen={() => setStage("admin")} />}
+      {isDev && inApp && <TestingBar />}
+      {stage === "signup" && <SetupBar label="Beta" text="Please don\u2019t use a real password \u2014 for now, use 123456" />}
+      {stage === "upload" && <SetupBar label="Tip" text="No statement handy? Hit \u2018Skip for now\u2019 and we\u2019ll load dummy data so you can test." />}
       {stage === "dashboard" && <NotificationBanner notes={notifications} onDismiss={dismissNote} />}
       {content}
       {reviewMonth && (
