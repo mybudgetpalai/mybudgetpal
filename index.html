@@ -2952,9 +2952,9 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
         <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview">{APP_NAME}</div>
       </div>
       <div className="topbar-right">
-        <button className="btn btn-ghost upload-statement-btn" onClick={onOpenUpload}>Upload statement</button>
+        <button className="btn btn-ghost upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }}>Upload statement</button>
         <div className="inbox-wrap">
-          <button className="inbox-btn" onClick={() => setInboxOpen((v) => !v)} aria-label="Tasks" title="Tasks">
+          <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="inbox" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
           </button>
           {inboxOpen && (
@@ -2972,7 +2972,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
           )}
         </div>
         <div className="avatar-wrap">
-        <button className="avatar" onClick={() => setMenuOpen((v) => !v)}>{initial}</button>
+        <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
         {menuOpen && (
           <div className="avatar-menu">
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>Settings</button>
@@ -2985,13 +2985,16 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     </div>
   );
 }
-function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise }) {
+function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose }) {
   const list = views || VIEWS;
   return (
     <div className={"side-panel " + (open ? "side-panel-open" : "")}>
       <div className="side-panel-label-row">
         <span className="side-panel-label">Views</span>
-        {onCustomise && <button className="side-edit-views" onClick={onCustomise} aria-label="Customise menu" title="Customise menu"><Icon name="edit" size={13} /></button>}
+        <div className="side-panel-label-actions">
+          {onCustomise && <button className="side-edit-views" onClick={onCustomise} aria-label="Customise menu" title="Customise menu"><Icon name="edit" size={13} /></button>}
+          <button className="side-close-btn" onClick={onClose} aria-label="Close menu" title="Close menu">×</button>
+        </div>
       </div>
       {list.filter((v) => v.key !== "accounts").map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
@@ -4790,7 +4793,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} />
+        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
         <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
       </div>
       {runTour && (
@@ -6956,6 +6959,75 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lp-hero-copy p { margin: 0 0 28px; }
   .lp-hero-copy .hero-actions { justify-content: flex-start; }
   @media (max-width: 900px) { .lp-hero-copy h1 { font-size: 36px; } }
+
+  /* ================= mobile usability fixes (2026-07-09_) ================= */
+
+  /* Fix: wide tables were forcing the whole page/card wide instead of scrolling
+     within the table. Stop flex children from expanding to content width. */
+  .body-row { min-width: 0; }
+  .main-content, .main-content-wide { min-width: 0; }
+  .main-content > *, .main-content-wide > * { min-width: 0; max-width: 100%; }
+  .glass-card, .dash-card { min-width: 0; }
+  .table-wrap, .ltp-wrap, .budget-table-wrap { min-width: 0; max-width: 100%; -webkit-overflow-scrolling: touch; }
+
+  /* Freeze the first (label) column so it stays visible while scrolling right */
+  .month-table th:first-child, .month-table td:first-child {
+    position: sticky; left: 0; z-index: 2; background: var(--card);
+  }
+  .budget-table th:first-child, .budget-table td:first-child {
+    position: sticky; left: 0; z-index: 2;
+  }
+  .budget-table thead th:first-child, .budget-table .bt-total-row td:first-child { background: var(--surface-2); }
+  .budget-table tbody td:first-child { background: var(--card); }
+  .budget-table tbody tr:hover td:first-child { background: var(--surface-2); }
+
+  /* LTP banners: allow long lines to wrap instead of running off-screen */
+  .plan-verdict, .plan-sub, .plan-headline { overflow-wrap: anywhere; word-break: break-word; }
+
+  /* Sidebar close (x) — only shows on mobile where the hamburger sits behind the drawer */
+  .side-panel-label-actions { display: flex; align-items: center; gap: 4px; }
+  .side-close-btn { display: none; background: none; border: none; color: var(--ink-2); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 6px; border-radius: 6px; }
+  .side-close-btn:hover { color: var(--ink); background: var(--surface-2); }
+
+  /* Modals: never let the top get clipped; scroll inside the card if it's tall */
+  .modal-overlay { overflow-y: auto; }
+  .modal-card { max-height: calc(100dvh - 40px); overflow-y: auto; }
+
+  @media (max-width: 640px) {
+    /* Header: keep logo + buttons from colliding / wrapping */
+    .topbar { gap: 10px; }
+    .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
+    .topbar-left .brand { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar-right { flex-shrink: 0; }
+    .upload-statement-btn { white-space: nowrap; }
+
+    /* Sidebar drawer: show close control, allow it to scroll */
+    .side-close-btn { display: inline-flex; align-items: center; justify-content: center; }
+    .side-panel.side-panel-open { overflow-y: auto; }
+
+    /* "Ask about your money": stack field + button so the placeholder isn't cramped */
+    .ask-row { flex-direction: column; align-items: stretch; }
+    .ask-btn { width: 100%; }
+  }
+
+  @media (max-width: 460px) {
+    /* Landing nav on very small screens */
+    .lp-nav { padding: 14px 16px; gap: 10px; }
+    .lp-nav .brand-row { min-width: 0; }
+    .lp-nav .brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lp-nav-actions { flex-shrink: 0; gap: 8px; }
+    .lp-nav-actions .btn { padding: 9px 12px; font-size: 13px; }
+  }
+
+  @media (max-width: 720px) {
+    /* Landing page: tighten oversized, uneven vertical gaps */
+    .lp-section { padding: 40px 20px; }
+    .section-head { margin-bottom: 24px; }
+    .lp-step { margin: 32px 0; }
+    .lp-final-cta { padding: 48px 20px 64px; }
+  }
+  /* ============= end mobile usability fixes ============= */
+
 </style>
 </body>
 </html>
