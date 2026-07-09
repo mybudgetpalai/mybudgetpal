@@ -1275,6 +1275,19 @@ function LpCategoriseDemo() {
   );
 }
 
+function LpAskDemo() {
+  return (
+    <div className="lp-demo-card lpd-ask">
+      <div className="lpd-ask-q">How much did I spend on coffee last month?</div>
+      <div className="lpd-ask-a">
+        <span className="lpd-ask-spark"><Icon name="sparkles" size={15} /></span>
+        <p>You spent <strong>&pound;68.40</strong> on coffee across <strong>19 visits</strong> in June &mdash; mostly <strong>Starbucks</strong> and <strong>&#37; Arabica</strong>. That&rsquo;s &pound;12 more than May.</p>
+      </div>
+      <div className="lpd-ask-bar"><span>Ask about your money&hellip;</span><span className="lpd-ask-send">&rarr;</span></div>
+    </div>
+  );
+}
+
 function LpViewsDemo() {
   const [tab, setTab] = useState("breakdown");
   const tabs = [
@@ -1500,6 +1513,15 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           </div>
           <LpViewsDemo />
         </div>
+
+        <div className="lp-step lp-step-flip reveal">
+          <div className="lp-step-copy">
+            <div className="step-num">4</div>
+            <h3>Just ask, in plain English</h3>
+            <p>&ldquo;How much did I spend on coffee last month?&rdquo; Ask a question and get a straight answer worked out from your own transactions &mdash; no filters, no formulas.</p>
+          </div>
+          <LpAskDemo />
+        </div>
       </div>
 
       <div className="lp-section lp-wrap">
@@ -1517,6 +1539,9 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       <div className="lp-section lp-wrap">
         <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
         <div className="features">
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="sparkles" size={17} /></div><h4>Ask about your money</h4><p>Ask a plain-English question and get an answer from your own transactions.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="calendar" size={17} /></div><h4>Month-end review</h4><p>Close out each month, then catch up or roll over what you didn&rsquo;t spend.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h4>Long-term plan</h4><p>Plan months ahead and reconcile your actual spending against the plan.</p></div>
           <div className="feature-card reveal"><div className="feature-icon"><Icon name="income" size={17} /></div><h4>Multi-currency</h4><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
           <div className="feature-card reveal"><div className="feature-icon"><Icon name="chart" size={17} /></div><h4>Spending breakdown</h4><p>See exactly what you spend by category, every month.</p></div>
           <div className="feature-card reveal"><div className="feature-icon"><Icon name="target" size={17} /></div><h4>Monthly targets</h4><p>Set a budget per category and track how you're pacing.</p></div>
@@ -7336,6 +7361,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-goal-cell { background: rgba(18,161,80,0.12) !important; color: var(--pos) !important; font-weight: 800; }
   .rt-good .rt-verdict { color: var(--pos) !important; }
   .rt-bad .rt-verdict { color: var(--neg) !important; }
+  .lpd-ask { display: flex; flex-direction: column; gap: 12px; }
+  .lpd-ask-q { align-self: flex-end; max-width: 88%; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 16px 16px 4px 16px; opacity: 0; transform: translateY(8px); }
+  .in-view .lpd-ask-q { animation: lpdShow 0.5s ease 0.2s forwards; }
+  .lpd-ask-a { display: flex; gap: 10px; align-items: flex-start; max-width: 94%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px 16px 16px 4px; padding: 12px 14px; opacity: 0; transform: translateY(8px); }
+  .in-view .lpd-ask-a { animation: lpdShow 0.5s ease 0.95s forwards; }
+  .lpd-ask-a p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+  .lpd-ask-a strong { color: var(--ink); font-weight: 700; }
+  .lpd-ask-spark { color: var(--accent); flex-shrink: 0; display: inline-flex; margin-top: 1px; }
+  .lpd-ask-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 7px 7px 16px; color: var(--ink-3); font-size: 13px; margin-top: auto; opacity: 0; }
+  .in-view .lpd-ask-bar { animation: lpdShow 0.5s ease 1.5s forwards; }
+  .lpd-ask-send { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; flex-shrink: 0; }
 </style>
 </body>
 </html>
