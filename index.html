@@ -2625,7 +2625,7 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack, bankRows }) {
 
         <div className="nav-row">
           {onBack && <button className="glass-btn ghost" onClick={onBack}>Back</button>}
-          <button className="glass-btn primary" onClick={onDone}>Set my monthly targets</button>
+          <button className="glass-btn primary" onClick={onDone}>Take me to my dashboard</button>
         </div>
       </div>
     </div>
@@ -2885,13 +2885,12 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
 
 /* ---------------- In-app overview setup (post-CWJ) ---------------- */
 
-function SetupIntroScreen({ name, onStart, onSkip }) {
+function SetupIntroModal({ name, onStart, onSkip }) {
   return (
-    <div className="page stage-fade">
-      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
-      <div className="glass-card size-md" style={{ minHeight: 0 }}>
-        <h1 className="title">Hi {name || "there"}, welcome to {APP_NAME}</h1>
-        <p className="subtitle">Let's take 3 minutes to set up your overview around your financial goals. We'll ask a few quick questions, then help you set your monthly targets.</p>
+    <div className="modal-overlay setup-intro-overlay">
+      <div className="glass-card modal-card" style={{ maxWidth: 480 }}>
+        <h1 className="title" style={{ marginTop: 4 }}>Hi {name || "there"}, welcome to {APP_NAME}</h1>
+        <p className="subtitle">This is your overview {"\u2014"} here's a first look behind this card. Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
         <div className="nav-row" style={{ marginTop: 22 }}>
           <button className="glass-btn ghost" onClick={onSkip}>I'll fill this in later</button>
           <button className="glass-btn primary" onClick={onStart}>Let's go</button>
@@ -5221,7 +5220,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -5286,6 +5285,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
         <CategoriseReviewModal transactions={viewTransactions} onRecategorize={onRecategorize} onClose={() => setCatReviewOpen(false)} />
       )}
       {feedbackOpen && <FeedbackModal name={name} pushToast={pushToast} onClose={() => setFeedbackOpen(false)} onSubmitted={() => { setFeedbackDone(true); setFeedbackOpen(false); }} />}
+      {setupIntroOpen && <SetupIntroModal name={name} onStart={onSetupStart} onSkip={onSetupSkip} />}
       {uploadOpen && (
         <UploadStatementModal
           onClose={() => setUploadOpen(false)}
@@ -5782,6 +5782,7 @@ function App() {
   const [homeLayout, setHomeLayout] = useState(DEFAULT_HOME_LAYOUT);
   const [showSetupBanner, setShowSetupBanner] = useState(false);
   const [setupResume, setSetupResume] = useState(false);
+  const [setupIntroOpen, setSetupIntroOpen] = useState(false);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
   const [allTargets, setAllTargets] = useState({});
   const [targetsEditReq, setTargetsEditReq] = useState(false);
@@ -6258,7 +6259,7 @@ function App() {
       } catch (e) {}
       setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setPlan(null);
       setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
-      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false);
+      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false); setSetupIntroOpen(false);
       pushToast("Dev account reset \u2014 starting fresh", "success");
       setStage("onboarding");
     } catch (e) {
@@ -6393,17 +6394,9 @@ function App() {
   } else if (stage === "openingBalance") {
     content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
-    content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => setStage("setupIntro")} />;
-  } else if (stage === "setupIntro") {
-    content = <SetupIntroScreen name={name} onStart={() => setStage("setupQuestions")} onSkip={() => {
-      setSignupMonth(new Date().toISOString().slice(0, 7));
-      setShowSetupBanner(true); setShowExtraBanner(true);
-      if (userId) supabaseClient.from("profiles").upsert({ id: userId, setup_completed: false }).then(() => {}, () => {});
-      pushToast("No problem — you can finish this anytime from your Profile in Settings", "info");
-      setRunTour(true); setStage("dashboard");
-    }} />;
+    content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => { setSetupIntroOpen(true); setStage("dashboard"); }} />;
   } else if (stage === "setupQuestions") {
-    content = <SetupQuestionsScreen userId={userId} pushToast={pushToast} onBack={() => setStage(setupResume ? "dashboard" : "setupIntro")} onDone={() => { setShowSetupBanner(false); setStage("targets"); }} />;
+    content = <SetupQuestionsScreen userId={userId} pushToast={pushToast} onBack={() => { setStage("dashboard"); if (!setupResume) setSetupIntroOpen(true); }} onDone={() => { setShowSetupBanner(false); setStage("targets"); }} />;
   } else if (stage === "targets") {
     content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); if (!setupResume) setSignupMonth(new Date().toISOString().slice(0, 7)); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setShowExtraBanner(true); if (!setupResume) setRunTour(true); setSetupResume(false); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
@@ -6469,6 +6462,16 @@ function App() {
         onChangeHomeLayout={handleChangeHomeLayout}
         setupPending={showSetupBanner}
         onResumeSetup={() => { setSetupResume(true); setStage("setupQuestions"); }}
+        setupIntroOpen={setupIntroOpen}
+        onSetupStart={() => { setSetupIntroOpen(false); setStage("setupQuestions"); }}
+        onSetupSkip={() => {
+          setSetupIntroOpen(false);
+          setSignupMonth(new Date().toISOString().slice(0, 7));
+          setShowSetupBanner(true); setShowExtraBanner(true);
+          if (userId) supabaseClient.from("profiles").upsert({ id: userId, setup_completed: false }).then(() => {}, () => {});
+          pushToast("No problem — you can finish this anytime from your Profile in Settings", "info");
+          setRunTour(true);
+        }}
         onChangeOverviewSlots={handleChangeOverviewSlots}
         navViews={navViews}
         onChangeNavViews={handleChangeNavViews}
@@ -7875,6 +7878,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ev-remove { color: var(--neg); }
   .ev-add-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .ev-add-chip { font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: none; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+
+  .setup-intro-overlay { backdrop-filter: blur(3px); background: rgba(16,24,40,0.35); }
 </style>
 </body>
 </html>
