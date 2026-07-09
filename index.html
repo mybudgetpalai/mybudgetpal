@@ -398,7 +398,7 @@ const GOALS = [
   "Save more each month", "Pay off debt", "Build an investment portfolio", "Track my spending",
   "Build my credit", "Plan for a big purchase", "Grow my business", "Just stay organised",
 ];
-const ONBOARD_STEPS = 7;
+const ONBOARD_STEPS = 3;
 const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "size-sm", 5: "size-md" };
 
 const VIEWS = [
@@ -1898,15 +1898,11 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
     const m = {}; (initialBanks || []).forEach((b) => { m[b] = UAE_BANKS.includes(b) ? "AED" : "GBP"; }); return m;
   });
   const banks = Object.keys(bankCurrency);
-  const [savvy, setSavvy] = useState(null);
-  const [tracking, setTracking] = useState(null);
-  const [balanceCheck, setBalanceCheck] = useState(null);
-  const [goals, setGoals] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   const currencyStepOk = currencies.length >= 1 && (!multiCurrency || currencies.length === 2);
   const canContinue = [
-    name.trim().length > 0, currencyStepOk, banks.length > 0, savvy !== null, tracking !== null, balanceCheck !== null, goals.length > 0,
+    name.trim().length > 0, currencyStepOk, banks.length > 0,
   ][step];
 
   const setPrimary = (c) => setCurrencies((prev) => (prev[1] === c ? [c] : (prev[1] ? [c, prev[1]] : [c])));
@@ -1924,7 +1920,6 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
       return changed ? next : prev;
     });
   }, [currencies]);
-  const toggleGoal = (g) => setGoals((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
   const next = async () => {
     if (step === ONBOARD_STEPS - 1) {
       setSubmitting(true);
@@ -2023,59 +2018,6 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                 </div>
               </div>
             ))}
-          </div>
-        )}
-        {step === 3 && (
-          <div className="step">
-            <h1 className="title">How smart are you with your finances?</h1>
-            <div className="segmented">
-              {SAVVY_OPTIONS.map((opt) => (
-                <button key={opt.key} className={"segment " + (savvy === opt.key ? "segment-active" : "")} onClick={() => setSavvy(opt.key)}>
-                  <span>{opt.label}</span>
-                  {savvy === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {step === 4 && (
-          <div className="step">
-            <h1 className="title">Do you currently track your spending?</h1>
-            <div className="segmented">
-              {TRACKING_OPTIONS.map((opt) => (
-                <button key={opt.key} className={"segment " + (tracking === opt.key ? "segment-active" : "")} onClick={() => setTracking(opt.key)}>
-                  <span>{opt.label}</span>
-                  {tracking === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {step === 5 && (
-          <div className="step">
-            <h1 className="title">How often do you check your bank balance?</h1>
-            <div className="segmented">
-              {BALANCE_OPTIONS.map((opt) => (
-                <button key={opt.key} className={"segment " + (balanceCheck === opt.key ? "segment-active" : "")} onClick={() => setBalanceCheck(opt.key)}>
-                  <span>{opt.label}</span>
-                  {balanceCheck === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {step === 6 && (
-          <div className="step">
-            <h1 className="title">What do you want to achieve?</h1>
-            <p className="subtitle">Pick as many as apply.</p>
-            <div className="goal-wrap">
-              {GOALS.map((g) => (
-                <button key={g} className={"chip goal-chip " + (goals.includes(g) ? "chip-selected" : "")} onClick={() => toggleGoal(g)}>
-                  <span>{g}</span>
-                  {goals.includes(g) && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 
@@ -2934,6 +2876,120 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
           <button className="glass-btn ghost" disabled={submitting} onClick={() => setStep(method === "manual" ? "method" : "goal")}>Back</button>
           <button className="glass-btn primary" disabled={submitting} onClick={handleFinish}>
             {submitting ? <span className="btn-spinner" /> : (isEdit ? "Save my plan" : "Finish setup")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- In-app overview setup (post-CWJ) ---------------- */
+
+function SetupIntroScreen({ name, onStart, onSkip }) {
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card size-md" style={{ minHeight: 0 }}>
+        <h1 className="title">Hi {name || "there"}, welcome to {APP_NAME}</h1>
+        <p className="subtitle">Let's take 3 minutes to set up your overview around your financial goals. We'll ask a few quick questions, then help you set your monthly targets.</p>
+        <div className="nav-row" style={{ marginTop: 22 }}>
+          <button className="glass-btn ghost" onClick={onSkip}>I'll fill this in later</button>
+          <button className="glass-btn primary" onClick={onStart}>Let's go</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SETUP_STEPS = 4;
+function SetupQuestionsScreen({ userId, pushToast, onDone, onBack }) {
+  const [step, setStep] = useState(0);
+  const [savvy, setSavvy] = useState(null);
+  const [tracking, setTracking] = useState(null);
+  const [balanceCheck, setBalanceCheck] = useState(null);
+  const [goals, setGoals] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const toggleGoal = (g) => setGoals((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+  const canContinue = [savvy !== null, tracking !== null, balanceCheck !== null, goals.length > 0][step];
+  const next = async () => {
+    if (step === SETUP_STEPS - 1) {
+      setSubmitting(true);
+      try {
+        const { error } = await supabaseClient.from("profiles").upsert({
+          id: userId, savvy, tracking, balance_check: balanceCheck, fin_goals: goals, setup_completed: true,
+        });
+        if (error) throw error;
+      } catch (e) { pushToast("Couldn't save your answers \u2014 " + (e.message || e), "error"); setSubmitting(false); return; }
+      setSubmitting(false);
+      onDone({ savvy, tracking, balanceCheck, goals });
+    } else setStep((s) => s + 1);
+  };
+  return (
+    <div className="page stage-fade">
+      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
+      <div className="glass-card onboard-card">
+        <div className="progress-row">
+          {Array.from({ length: SETUP_STEPS }).map((_, i) => (
+            <span key={i} className={"progress-dot " + (i <= step ? "progress-dot-on" : "")} />
+          ))}
+        </div>
+        {step === 0 && (
+          <div className="step">
+            <h1 className="title">How smart are you with your finances?</h1>
+            <div className="segmented">
+              {SAVVY_OPTIONS.map((opt) => (
+                <button key={opt.key} className={"segment " + (savvy === opt.key ? "segment-active" : "")} onClick={() => setSavvy(opt.key)}>
+                  <span>{opt.label}</span>
+                  {savvy === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 1 && (
+          <div className="step">
+            <h1 className="title">Do you currently track your spending?</h1>
+            <div className="segmented">
+              {TRACKING_OPTIONS.map((opt) => (
+                <button key={opt.key} className={"segment " + (tracking === opt.key ? "segment-active" : "")} onClick={() => setTracking(opt.key)}>
+                  <span>{opt.label}</span>
+                  {tracking === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 2 && (
+          <div className="step">
+            <h1 className="title">How often do you check your bank balance?</h1>
+            <div className="segmented">
+              {BALANCE_OPTIONS.map((opt) => (
+                <button key={opt.key} className={"segment " + (balanceCheck === opt.key ? "segment-active" : "")} onClick={() => setBalanceCheck(opt.key)}>
+                  <span>{opt.label}</span>
+                  {balanceCheck === opt.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 3 && (
+          <div className="step">
+            <h1 className="title">What do you want to achieve?</h1>
+            <p className="subtitle">Pick as many as apply.</p>
+            <div className="goal-wrap">
+              {GOALS.map((g) => (
+                <button key={g} className={"chip goal-chip " + (goals.includes(g) ? "chip-selected" : "")} onClick={() => toggleGoal(g)}>
+                  <span>{g}</span>
+                  {goals.includes(g) && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="nav-row">
+          <button className="glass-btn ghost" disabled={submitting} onClick={() => (step === 0 ? onBack() : setStep((s) => s - 1))}>Back</button>
+          <button className="glass-btn primary" disabled={!canContinue || submitting} onClick={next}>
+            {submitting ? <span className="btn-spinner" /> : step === SETUP_STEPS - 1 ? "Continue to targets" : "Continue"}
           </button>
         </div>
       </div>
@@ -5165,7 +5221,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -5191,6 +5247,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const completedMonths = completedMonthsWithData(viewTransactions || []);
   const inboxTasks = [];
   if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "tag", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
+  if (setupPending) inboxTasks.push({ id: "overview-setup", icon: "target", title: "Set up your overview", desc: "3 minutes: a few questions plus your targets, and we'll shape your dashboard.", action: () => { if (onResumeSetup) onResumeSetup(); } });
   if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "sliders", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
   const reviewBaseline = signupMonth || new Date().toISOString().slice(0, 7);
   if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; if (rm >= reviewBaseline) inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
@@ -5248,7 +5305,7 @@ const THEMES = [
   { key: "dark", label: "Dark", preview: "linear-gradient(135deg, #171C25 55%, #6C8CFF 55%)" },
 ];
 function normalizeTheme(t) { return t === "dark" ? "dark" : "light"; }
-function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
+function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
@@ -5336,6 +5393,12 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
         </div>
         <div className="dash-card settings-section">
           <span className="card-label">Profile</span>
+          {setupPending && (
+            <div className="settings-nudge">
+              <span>Set up your overview — a few questions plus your targets, and we'll shape your dashboard around your goals.</span>
+              <button className="glass-btn primary settings-nudge-btn" onClick={onResumeSetup}>Set up now</button>
+            </div>
+          )}
           {extraPending && (
             <div className="settings-nudge">
               <span>Answer a few extra questions to personalise your experience.</span>
@@ -5717,6 +5780,8 @@ function App() {
   const [bankRows, setBankRows] = useState([]);
   const [overviewSlots, setOverviewSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
   const [homeLayout, setHomeLayout] = useState(DEFAULT_HOME_LAYOUT);
+  const [showSetupBanner, setShowSetupBanner] = useState(false);
+  const [setupResume, setSetupResume] = useState(false);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
   const [allTargets, setAllTargets] = useState({});
   const [targetsEditReq, setTargetsEditReq] = useState(false);
@@ -6045,7 +6110,7 @@ function App() {
           setCustomTransactions(txRows);
           setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-          setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
+          setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false);
           setNavViews(parseNavLayout(profile));
           setBillExcludes(parseBillExcludes(profile));
       setPlan(planFromProfile(profile));
@@ -6177,7 +6242,7 @@ function App() {
       await supabaseClient.from("goals").delete().eq("user_id", userId);
       await supabaseClient.from("statements").delete().eq("user_id", userId);
       await supabaseClient.from("banks").delete().eq("user_id", userId);
-      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null, home_layout: null });
+      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null, home_layout: null, savvy: null, tracking: null, balance_check: null, fin_goals: null, setup_completed: null });
       try {
         const { data: topLevel } = await supabaseClient.storage.from("statements").list(userId);
         const toRemove = [];
@@ -6193,7 +6258,7 @@ function App() {
       } catch (e) {}
       setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setPlan(null);
       setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
-      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false);
+      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false);
       pushToast("Dev account reset \u2014 starting fresh", "success");
       setStage("onboarding");
     } catch (e) {
@@ -6278,7 +6343,7 @@ function App() {
               setCustomTransactions(txRows);
               setStatements(stmtRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-              setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
+              setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false);
               setNavViews(parseNavLayout(profile));
               setBillExcludes(parseBillExcludes(profile));
       setPlan(planFromProfile(profile));
@@ -6328,9 +6393,19 @@ function App() {
   } else if (stage === "openingBalance") {
     content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
-    content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => setStage("targets")} />;
+    content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => setStage("setupIntro")} />;
+  } else if (stage === "setupIntro") {
+    content = <SetupIntroScreen name={name} onStart={() => setStage("setupQuestions")} onSkip={() => {
+      setSignupMonth(new Date().toISOString().slice(0, 7));
+      setShowSetupBanner(true); setShowExtraBanner(true);
+      if (userId) supabaseClient.from("profiles").upsert({ id: userId, setup_completed: false }).then(() => {}, () => {});
+      pushToast("No problem — you can finish this anytime from your Profile in Settings", "info");
+      setRunTour(true); setStage("dashboard");
+    }} />;
+  } else if (stage === "setupQuestions") {
+    content = <SetupQuestionsScreen userId={userId} pushToast={pushToast} onBack={() => setStage(setupResume ? "dashboard" : "setupIntro")} onDone={() => { setShowSetupBanner(false); setStage("targets"); }} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage("breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); setSignupMonth(new Date().toISOString().slice(0, 7)); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); if (!setupResume) setSignupMonth(new Date().toISOString().slice(0, 7)); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setShowExtraBanner(true); if (!setupResume) setRunTour(true); setSetupResume(false); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -6347,6 +6422,8 @@ function App() {
   } else if (stage === "settings") {
     content = (
       <SettingsScreen
+        setupPending={showSetupBanner}
+        onResumeSetup={() => { setSetupResume(true); setStage("setupQuestions"); }}
         extraPending={showExtraBanner}
         onCompleteExtra={() => setStage("extraQuestions")}
         name={name} banks={banks} targets={targets} userId={userId}
@@ -6390,6 +6467,8 @@ function App() {
         overviewSlots={overviewSlots}
         homeLayout={homeLayout}
         onChangeHomeLayout={handleChangeHomeLayout}
+        setupPending={showSetupBanner}
+        onResumeSetup={() => { setSetupResume(true); setStage("setupQuestions"); }}
         onChangeOverviewSlots={handleChangeOverviewSlots}
         navViews={navViews}
         onChangeNavViews={handleChangeNavViews}
