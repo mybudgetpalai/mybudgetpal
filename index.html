@@ -4617,6 +4617,33 @@ function InsightPill({ transactions, targets }) {
   );
 }
 
+function MiniBreakdown({ transactions }) {
+  const k = latestMonthKey(transactions || []);
+  const cats = spendByCategoryForMonth(transactions || [], k);
+  const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((s, e) => s + e[1], 0);
+  if (!total) return (<div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>);
+  const top = entries.slice(0, 4);
+  const otherTotal = entries.slice(4).reduce((s, e) => s + e[1], 0);
+  const seg = top.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
+  if (otherTotal > 0) seg.push({ label: "Other", v: otherTotal, color: "#9aa4b8" });
+  const R = 32, C = 2 * Math.PI * R; let off = 0;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Where it's gone</span>
+      <div className="oh-mb">
+        <svg viewBox="0 0 84 84" width="76" height="76" className="oh-mb-ring">
+          <circle cx="42" cy="42" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="15" />
+          {seg.map((s, i) => { const len = (s.v / total) * C; const el = <circle key={i} cx="42" cy="42" r={R} fill="none" stroke={s.color} strokeWidth="15" strokeDasharray={len + " " + (C - len)} strokeDashoffset={-off} transform="rotate(-90 42 42)" />; off += len; return el; })}
+        </svg>
+        <div className="oh-mb-legend">
+          {seg.map((s, i) => (<div key={i} className="oh-mb-item"><span className="oh-mb-dot" style={{ background: s.color }} /><span className="oh-mb-label">{s.label}</span><span className="oh-mb-pct">{Math.round((s.v / total) * 100)}%</span></div>))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData }) {
   const key = currentMonthKey();
   const txs = transactions || [];
@@ -4647,7 +4674,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   if (!hasData && !runTour) {
     return (
       <div className="oh">
-        <div className="overview-greeting">Hi {name || "there"}, {greetLine}\u2026</div>
+        <div className="overview-greeting">Hi {name || "there"}, {greetLine}{"\u2026"}</div>
         <EmptyState text="Upload a statement to see your overview." />
       </div>
     );
@@ -4655,7 +4682,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
 
   return (
     <div className="oh">
-      <div className="overview-greeting">Hi {name || "there"}, {greetLine}\u2026</div>
+      <div className="overview-greeting">Hi {name || "there"}, {greetLine}{"\u2026"}</div>
 
       {showNeeds && (
         <TourTarget active={runTour && tourStep === 3}>
@@ -4667,14 +4694,14 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
               <div className="oh-need" key={i}>
                 <span className="oh-need-ic" style={{ color: n.color }}><Icon name={n.icon} size={17} /></span>
                 <span className="oh-need-text">{n.text}</span>
-                {n.action && <button className="oh-need-cta" onClick={n.action}>{n.cta} \u203a</button>}
+                {n.action && <button className="oh-need-cta" onClick={n.action}>{n.cta} {"\u203a"}</button>}
               </div>
             ))}
           </div>
         </TourTarget>
       )}
 
-      <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} \u00b7 day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
+      <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} {"\u00b7"} day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
 
       <TourTarget active={runTour && tourStep === 0}>
         <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />
@@ -4683,12 +4710,12 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
 
       <div className="oh-grid">
         <TourTarget active={runTour && tourStep === 1} className="oh-grid-cell">
-          <BreakdownCard transactions={transactions} targets={targets} />
+          <MiniBreakdown transactions={transactions} />
         </TourTarget>
         {income > 0 && (
           <div className="oh-grid-cell">
             <div className="glass-card dash-card">
-              <span className="card-label">In vs out \u00b7 {currentMonthName()}</span>
+              <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
               <div className="oh-io">
                 <div><div className="oh-io-k">In</div><div className="oh-io-v" style={{ color: "var(--pos)" }}>{formatMoney(income)}</div></div>
                 <div><div className="oh-io-k">Out</div><div className="oh-io-v">{formatMoney(out)}</div></div>
@@ -7616,6 +7643,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-track-cap { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; }
   .oh-tour-active { position: relative; z-index: 2; box-shadow: 0 0 0 3px var(--accent-shadow); border-radius: 16px; transition: box-shadow 0.2s; }
   @media (max-width: 640px) { .oh-grid { grid-template-columns: 1fr; } }
+  .oh-mb { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
+  .oh-mb-ring { flex-shrink: 0; }
+  .oh-mb-legend { flex: 1; min-width: 0; }
+  .oh-mb-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 0; color: var(--ink-2); }
+  .oh-mb-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+  .oh-mb-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .oh-mb-pct { color: var(--ink-3); font-weight: 600; }
 </style>
 </body>
 </html>
