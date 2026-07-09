@@ -1004,7 +1004,10 @@ async function aiParseStatementText(text) {
   const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
     body: { action: "parse", text: String(text).slice(0, 150000) },
   });
-  if (error || !data || !Array.isArray(data.transactions)) throw new Error((error && error.message) || (data && data.error) || "AI parsing unavailable");
+  if (error || !data || !Array.isArray(data.transactions)) {
+    const raw = (data && data.error) || (error && error.message) || "";
+    throw new Error(!raw || /non-2xx|Failed to send|fetch|network/i.test(raw) ? "The AI reader couldn't process this statement right now — try again in a minute, or upload a CSV export." : raw);
+  }
   const txs = data.transactions.map((t) => {
     const amount = Number(t.amount) || 0;
     const name = String(t.description || "").trim();
@@ -1047,7 +1050,13 @@ async function parseStatementFile(file) {
   let result;
   if (lower.endsWith(".csv")) result = parseStatementCSV(await file.text());
   else if (lower.endsWith(".pdf")) {
-    const text = await extractPdfText(file);
+    let text;
+    try { text = await extractPdfText(file); }
+    catch (e) {
+      const m = String((e && e.message) || "");
+      if (/password/i.test(m)) throw new Error("This PDF is password-protected — remove the password and try again.");
+      throw new Error("Couldn't read this PDF — it may be damaged or non-standard. Try re-downloading it, or use a CSV export.");
+    }
     if (!text.trim()) throw new Error("This PDF has no readable text (it may be a scanned image) — try a CSV export instead.");
     result = await aiParseStatementText(text);
   } else throw new Error("Only PDF or CSV files are supported.");
@@ -1634,22 +1643,20 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
 
   const handleFile = async (file) => {
     if (!bank) { pushToast("Pick which bank this statement is from first", "error"); return; }
+    const vErr = validateFile(file);
+    if (vErr) { pushToast(vErr, "error"); return; }
     const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".csv") && !lower.endsWith(".pdf")) {
-      pushToast("Only PDF or CSV files are supported.", "error");
-      return;
-    }
     setBusy(lower.endsWith(".pdf") ? "AI is reading your PDF…" : "Reading file…");
     try {
       const { transactions, meta } = await parseStatementFile(file);
-      if (!transactions.length) throw new Error("no rows");
+      if (!transactions.length) throw new Error("No transactions found in that file — check it’s a bank statement with a transaction list.");
       setBusy(false);
       if (meta.opening !== null && meta.closing !== null) {
-        onImport(transactions, bank, meta, file.name);
+        onImport(transactions, bank, meta, file.name, file);
       } else {
         setOpeningInput(meta.opening !== null ? String(meta.opening) : "");
         setClosingInput(meta.closing !== null ? String(meta.closing) : "");
-        setPending({ transactions, meta, fileName: file.name });
+        setPending({ transactions, meta, fileName: file.name, rawFile: file });
       }
     } catch (e) {
       setBusy(false);
@@ -1663,7 +1670,7 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
       meta.opening = openingInput === "" ? null : Number(openingInput);
       meta.closing = closingInput === "" ? null : Number(closingInput);
     }
-    onImport(pending.transactions, bank, meta, pending.fileName);
+    onImport(pending.transactions, bank, meta, pending.fileName, pending.rawFile);
   };
 
   const handleDrop = (e) => {
@@ -2152,12 +2159,13 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
         try {
           const path = userId + "/" + bank + "/" + Date.now() + "_" + f.name;
           await supabaseClient.storage.from("statements").upload(path, f.rawFile);
-        } catch (e) {}
+        } catch (e) { pushToast("Couldn't archive " + f.name + " to storage — continuing anyway", "info"); }
         try {
           const { transactions: parsed, meta } = await parseStatementFile(f.rawFile);
           parsed.forEach((t) => { t.bank = bank; });
           const { kept, skipped } = dedupeTransactions(parsed, allParsed);
           totalSkipped += skipped;
+          if (!parsed.length) pushToast("No transactions found in " + f.name, "error");
           let stmtRow = null;
           try {
             stmtRow = await saveStatementToDb(userId, {
@@ -2173,6 +2181,11 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
           pushToast("Couldn't read " + f.name + " — " + (e.message || "check the format"), "error");
         }
       }
+    }
+    if (!skip && !allParsed.length && totalSkipped === 0) {
+      setSubmitting(false);
+      pushToast("None of the files could be read — nothing was imported. Try different files, or Skip for now.", "error");
+      return;
     }
     devForceUncat(allParsed);
     let saved = allParsed;
@@ -4853,7 +4866,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
           onClose={() => setUploadOpen(false)}
           pushToast={pushToast}
           banks={banks}
-          onImport={(list, bank, meta, fileName) => { onAddTransactions(list, bank, meta, fileName); setUploadOpen(false); }}
+          onImport={(list, bank, meta, fileName, rawFile) => { onAddTransactions(list, bank, meta, fileName, rawFile); setUploadOpen(false); }}
         />
       )}
     </div>
@@ -5567,7 +5580,7 @@ function App() {
     setStage("processing");
   };
 
-  const handleAddTransactions = async (list, bankName, meta, fileName) => {
+  const handleAddTransactions = async (list, bankName, meta, fileName, rawFile) => {
     const base = usingDemo ? [] : customTransactions;
     if (usingDemo) setUsingDemo(false);
     const overrideMap = {};
@@ -5584,6 +5597,12 @@ function App() {
           opening: meta.opening, closing: meta.closing,
         });
       } catch (e) { pushToast("Couldn't record the statement — run the statements SQL setup", "error"); }
+    }
+    if (rawFile && bankName && userId) {
+      try {
+        const path = userId + "/" + bankName + "/" + Date.now() + "_" + (fileName || rawFile.name);
+        await supabaseClient.storage.from("statements").upload(path, rawFile);
+      } catch (e) {}
     }
     let saved = kept;
     if (kept.length) {
