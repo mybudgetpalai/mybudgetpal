@@ -1175,7 +1175,8 @@ function chainIssues(statements) {
         const gapDays = (new Date(cur.periodStart) - new Date(prev.periodEnd)) / 86400000;
         if (gapDays > 3) issues.push({ bank, type: "gap", text: "Possible missing statement between " + prev.periodEnd + " and " + cur.periodStart });
       }
-      if (prev.closing !== null && cur.opening !== null && Math.abs(prev.closing - cur.opening) > 0.01) {
+      const overlaps = prev.periodEnd && cur.periodStart && cur.periodStart <= prev.periodEnd;
+      if (!overlaps && prev.closing !== null && cur.opening !== null && Math.abs(prev.closing - cur.opening) > 0.01) {
         issues.push({ bank, type: "chain", text: "Closing balance (" + formatMoneyNative(prev.closing, FX.bankCurrency[bank] || "GBP") + ") doesn't match next opening (" + formatMoneyNative(cur.opening, FX.bankCurrency[bank] || "GBP") + ")" });
       }
     }
