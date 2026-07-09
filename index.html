@@ -725,16 +725,20 @@ function parseCSVLine(line) {
 const TX_CATEGORIES = ["Groceries", "Dining", "Transport", "Shopping", "Subscriptions", "Bills"];
 const ALL_CATEGORIES = [...TX_CATEGORIES, "Income", "Other", "Uncategorized"];
 const CATEGORY_RULES = {
-  Groceries: ["waitrose", "carrefour", "spinneys", "lulu", "choithram", "union coop", "west zone", "grandiose", "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "grocery", "supermarket", "hypermarket"],
+  Groceries: ["waitrose", "carrefour", "spinneys", "lulu", "choithram", "union coop", "west zone", "grandiose", "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "grocery", "supermarket", "hypermarket", "ocado", "iceland food", "co-op", "coop food", "m&s food", "supermkt"],
   Dining: ["restaurant", "cafe", "caffe", "coffee", "costa", "starbucks", "mcdonald", "kfc", "burger", "pizza", "subway", "deliveroo", "talabat", "zomato", "uber eats", "grill", "bakery", "dunkin", "tim hortons", "nando", "shake shack", "five guys", "wagamama", "pret a manger"],
-  Transport: ["uber", "careem", "bolt ", "taxi", "rta ", "salik", "nol ", "metro", "parking", "petrol", "fuel", "adnoc", "enoc", "eppco", "shell ", "valet"],
+  Transport: ["uber", "careem", "bolt ", "taxi", "rta ", "salik", "nol ", "metro", "parking", "petrol", "fuel", "adnoc", "enoc", "eppco", "shell ", "valet", "tfl", "trainline", "national rail", "oyster", "gwr", "lner", "avanti", "stagecoach", "national express"],
   Shopping: ["amazon", "noon", "namshi", "shein", "zara", "h&m", "ikea", "sharaf dg", "emax", "decathlon", "nike", "adidas", "apple store", "apple.com", "dubai mall", "city centre", "sephora", "primark", "asos"],
   Subscriptions: ["netflix", "spotify", "youtube", "disney", "apple music", "icloud", "prime video", "amazon prime", "openai", "chatgpt", "claude", "anthropic", "adobe", "microsoft 365", "office 365", "playstation", "xbox", "nintendo", "patreon", "dropbox", "canva", "subscription"],
-  Bills: ["dewa", "sewa", "addc", "etisalat", " du ", "virgin mobile", "rent", "insurance", "takaful", "gym", "fitness first", "emicool", "empower", "chiller", "electricity", "internet", "broadband", "school fee", "tuition", "loan", "mortgage", "water bill"],
+  Bills: ["dewa", "sewa", "addc", "etisalat", " du ", "virgin mobile", "rent", "insurance", "takaful", "gym", "fitness first", "emicool", "empower", "chiller", "electricity", "internet", "broadband", "school fee", "tuition", "loan", "mortgage", "water bill", "british gas", "octopus energy", "ovo energy", "edf energy", "e.on", "eon next", "bulb energy", "scottish power", "shell energy", "thames water", "severn trent", "anglian water", "council tax", "tv licence", "tv license", "vodafone", "o2 ", " ee ", "ee limited", "giffgaff", "tesco mobile", "three.co", "hutchison 3g", "sky digital", "virgin media", "bt group", "plusnet", "talktalk"],
 };
 function categorizeByRules(desc, amount) {
   if (amount > 0) return "Income";
   const d = " " + String(desc || "").toLowerCase() + " ";
+  /* Multi-word keywords win first (e.g. "tesco mobile" -> Bills before "tesco" -> Groceries) */
+  for (const cat of TX_CATEGORIES) {
+    if (CATEGORY_RULES[cat].some((k) => k.includes(" ") && k.trim().includes(" ") && d.includes(k))) return cat;
+  }
   for (const cat of TX_CATEGORIES) {
     if (CATEGORY_RULES[cat].some((k) => d.includes(k))) return cat;
   }
@@ -3001,9 +3005,8 @@ function SetupQuestionsScreen({ userId, pushToast, onDone, onBack }) {
     } else setStep((s) => s + 1);
   };
   return (
-    <div className="page stage-fade">
-      <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
-      <div className="glass-card onboard-card">
+    <div className="modal-overlay setup-intro-overlay">
+      <div className="glass-card onboard-card" style={{ maxWidth: 520, minHeight: 0 }}>
         <div className="progress-row">
           {Array.from({ length: SETUP_STEPS }).map((_, i) => (
             <span key={i} className={"progress-dot " + (i <= step ? "progress-dot-on" : "")} />
@@ -4960,7 +4963,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
 
       {editOpen && <EditViewModal layout={layout} onSave={onChangeHomeLayout} onClose={() => setEditOpen(false)} />}
 
-      {showNeeds && (
+      {showNeeds && (!runTour || tourStep >= 3) && (
         <TourTarget active={runTour && tourStep === 3}>
           <div className="oh-needs">
             <div className="oh-needs-head"><span className="card-label" style={{ margin: 0 }}>Needs you</span>{needs.length > 0 && <span className="oh-needs-count">{needs.length} item{needs.length !== 1 ? "s" : ""}</span>}</div>
@@ -4984,7 +4987,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         <InsightPill transactions={transactions} targets={targets} />
       </TourTarget>
 
-      {layout.month.length > 0 && (
+      {layout.month.length > 0 && (!runTour || tourStep >= 1) && (
         <div className="oh-grid">
           {layout.month.map((k, i) => (
             <TourTarget key={k} active={runTour && tourStep === 1 && i === 0} className="oh-grid-cell">
@@ -4994,7 +4997,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         </div>
       )}
 
-      {layout.big.length > 0 && (
+      {layout.big.length > 0 && (!runTour || tourStep >= 2) && (
         <>
           <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
           <TourTarget active={runTour && tourStep === 2}>
@@ -5297,7 +5300,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -5363,6 +5366,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       )}
       {feedbackOpen && <FeedbackModal name={name} pushToast={pushToast} onClose={() => setFeedbackOpen(false)} onSubmitted={() => { setFeedbackDone(true); setFeedbackOpen(false); }} />}
       {setupIntroOpen && <SetupIntroModal name={name} onStart={onSetupStart} onSkip={onSetupSkip} />}
+      {setupQuestionsOpen && <SetupQuestionsScreen {...setupQuestionsProps} />}
       {uploadOpen && (
         <UploadStatementModal
           onClose={() => setUploadOpen(false)}
@@ -5860,6 +5864,7 @@ function App() {
   const [showSetupBanner, setShowSetupBanner] = useState(false);
   const [setupResume, setSetupResume] = useState(false);
   const [setupIntroOpen, setSetupIntroOpen] = useState(false);
+  const [setupQuestionsOpen, setSetupQuestionsOpen] = useState(false);
   const [setupAnswers, setSetupAnswers] = useState(null);
   const [personaKey, setPersonaKey] = useState(null);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
@@ -6338,7 +6343,7 @@ function App() {
       } catch (e) {}
       setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setPlan(null);
       setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
-      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false); setSetupIntroOpen(false); setSetupAnswers(null); setPersonaKey(null);
+      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false); setSetupIntroOpen(false); setSetupQuestionsOpen(false); setSetupAnswers(null); setPersonaKey(null);
       pushToast("Dev account reset \u2014 starting fresh", "success");
       setStage("onboarding");
     } catch (e) {
@@ -6474,8 +6479,6 @@ function App() {
     content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => { setSetupIntroOpen(true); setStage("dashboard"); }} />;
-  } else if (stage === "setupQuestions") {
-    content = <SetupQuestionsScreen userId={userId} pushToast={pushToast} onBack={() => { setStage("dashboard"); if (!setupResume) setSetupIntroOpen(true); }} onDone={(ans) => { setSetupAnswers(ans); setShowSetupBanner(false); setStage("targets"); }} />;
   } else if (stage === "targets") {
     content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => {
       setTargets(t); setPlan(p || null);
@@ -6516,7 +6519,7 @@ function App() {
     content = (
       <SettingsScreen
         setupPending={showSetupBanner}
-        onResumeSetup={() => { setSetupResume(true); setStage("setupQuestions"); }}
+        onResumeSetup={() => { setSetupResume(true); setSetupQuestionsOpen(true); setStage("dashboard"); }}
         extraPending={showExtraBanner}
         onCompleteExtra={() => setStage("extraQuestions")}
         name={name} banks={banks} targets={targets} userId={userId}
@@ -6561,9 +6564,16 @@ function App() {
         homeLayout={homeLayout}
         onChangeHomeLayout={handleChangeHomeLayout}
         setupPending={showSetupBanner}
-        onResumeSetup={() => { setSetupResume(true); setStage("setupQuestions"); }}
+        onResumeSetup={() => { setSetupResume(true); setSetupQuestionsOpen(true); setStage("dashboard"); }}
         setupIntroOpen={setupIntroOpen}
-        onSetupStart={() => { setSetupIntroOpen(false); setStage("setupQuestions"); }}
+        setupQuestionsOpen={setupQuestionsOpen}
+        setupQuestionsProps={{
+          userId: userId,
+          pushToast: pushToast,
+          onBack: () => { setSetupQuestionsOpen(false); if (!setupResume) setSetupIntroOpen(true); },
+          onDone: (ans) => { setSetupAnswers(ans); setShowSetupBanner(false); setSetupQuestionsOpen(false); setStage("targets"); },
+        }}
+        onSetupStart={() => { setSetupIntroOpen(false); setSetupQuestionsOpen(true); }}
         onSetupSkip={() => {
           setSetupIntroOpen(false);
           setSignupMonth(new Date().toISOString().slice(0, 7));
