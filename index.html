@@ -4828,6 +4828,55 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
+function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
+  const [likes, setLikes] = useState("");
+  const [dislikes, setDislikes] = useState("");
+  const [improve, setImprove] = useState("");
+  const [busy, setBusy] = useState(false);
+  const canSend = !!(likes.trim() || dislikes.trim() || improve.trim());
+  const ta = { minHeight: 60, resize: "vertical", width: "100%", boxSizing: "border-box" };
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const usr = (await supabaseClient.auth.getUser()).data.user;
+      const { error } = await supabaseClient.from("feedback").insert({
+        user_id: usr ? usr.id : null, email: usr ? usr.email : null, name: name || null,
+        likes: likes.trim() || null, dislikes: dislikes.trim() || null, improve: improve.trim() || null,
+      });
+      if (error) throw error;
+      if (usr) { try { await supabaseClient.from("profiles").upsert({ id: usr.id, feedback_submitted: true }); } catch (e) {} }
+      pushToast("Thanks \u2014 your feedback's been sent", "success");
+      onSubmitted();
+    } catch (e) { pushToast("Couldn't send feedback: " + (e.message || e), "error"); setBusy(false); }
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="brand-row" style={{ marginBottom: 4, justifyContent: "space-between" }}>
+          <span className="brand-name">Share your feedback</span>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>\u00d7</button>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 14px" }}>A few quick thoughts help shape what comes next \u2014 all optional.</p>
+        <div className="field-group">
+          <label className="field-label">What do you like?</label>
+          <textarea className="glass-input" style={ta} value={likes} onChange={(e) => setLikes(e.target.value)} autoFocus />
+        </div>
+        <div className="field-group">
+          <label className="field-label">What don't you like?</label>
+          <textarea className="glass-input" style={ta} value={dislikes} onChange={(e) => setDislikes(e.target.value)} />
+        </div>
+        <div className="field-group">
+          <label className="field-label">What could we do to make this more useful for you?</label>
+          <textarea className="glass-input" style={ta} value={improve} onChange={(e) => setImprove(e.target.value)} />
+        </div>
+        <div className="nav-row">
+          <button className="glass-btn primary" disabled={!canSend || busy} onClick={submit}>{busy ? <span className="btn-spinner" /> : "Send feedback"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
@@ -4836,6 +4885,9 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const [tourStep, setTourStep] = useState(0);
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [catReviewOpen, setCatReviewOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(true);
+  React.useEffect(() => { let on = true; (async () => { try { const usr = (await supabaseClient.auth.getUser()).data.user; if (!usr) return; const { data } = await supabaseClient.from("profiles").select("feedback_submitted").eq("id", usr.id).maybeSingle(); if (on) setFeedbackDone(!!(data && data.feedback_submitted)); } catch (e) {} })(); return () => { on = false; }; }, []);
   React.useEffect(() => { if (openTargetsEdit && onConsumeTargetsEdit) onConsumeTargetsEdit(); }, []);
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
@@ -4855,6 +4907,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "sliders", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
   const reviewBaseline = signupMonth || new Date().toISOString().slice(0, 7);
   if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; if (rm >= reviewBaseline) inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
+  if (!feedbackDone && !demoActive) inboxTasks.push({ id: "feedback", icon: "edit", title: "Share your feedback", desc: "Tell us what’s working and what could be better.", action: () => setFeedbackOpen(true) });
 
   return (
     <div className="app-shell stage-fade" data-theme={normalizeTheme(theme)}>
@@ -4888,6 +4941,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       {catReviewOpen && (
         <CategoriseReviewModal transactions={viewTransactions} onRecategorize={onRecategorize} onClose={() => setCatReviewOpen(false)} />
       )}
+      {feedbackOpen && <FeedbackModal name={name} pushToast={pushToast} onClose={() => setFeedbackOpen(false)} onSubmitted={() => { setFeedbackDone(true); setFeedbackOpen(false); }} />}
       {uploadOpen && (
         <UploadStatementModal
           onClose={() => setUploadOpen(false)}
@@ -5186,6 +5240,7 @@ function AdminScreen({ onBack, pushToast }) {
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [feedback, setFeedback] = useState([]);
 
   const call = async (action, extra) => {
     const { data, error } = await supabaseClient.functions.invoke("admin", { body: { action, ...(extra || {}) } });
@@ -5198,6 +5253,7 @@ function AdminScreen({ onBack, pushToast }) {
     try {
       const s = await call("stats"); setStats(s.stats);
       const u = await call("list"); setUsers(u.users || []);
+      try { const { data: fb } = await supabaseClient.from("feedback").select("*").order("created_at", { ascending: false }); setFeedback(fb || []); } catch (e) {}
     } catch (e) { pushToast("Admin load failed: " + (e.message || e), "error"); }
     setLoading(false);
   };
@@ -5282,6 +5338,22 @@ function AdminScreen({ onBack, pushToast }) {
               ))}
             </div>
           </div>
+
+          {feedback.length > 0 && (
+            <div style={{ ...tile, marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: "var(--ink)" }}>Feedback ({feedback.length})</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {feedback.map((f) => (
+                  <div key={f.id} style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 6 }}>{(f.name || f.email || "Anonymous") + " · " + fmtDate(f.created_at)}</div>
+                    {f.likes && <div style={{ fontSize: 13, color: "var(--ink)", marginBottom: 4 }}><strong style={{ color: "var(--pos)" }}>Likes:</strong> {" " + f.likes}</div>}
+                    {f.dislikes && <div style={{ fontSize: 13, color: "var(--ink)", marginBottom: 4 }}><strong style={{ color: "var(--neg)" }}>Dislikes:</strong> {" " + f.dislikes}</div>}
+                    {f.improve && <div style={{ fontSize: 13, color: "var(--ink)" }}><strong style={{ color: "var(--accent)" }}>Improve:</strong> {" " + f.improve}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Users ({users.length})</div>
