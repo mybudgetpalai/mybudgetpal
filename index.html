@@ -1398,7 +1398,8 @@ function LpCurrencyDemo() {
 
 /* ---------------- Landing (marketing) ---------------- */
 
-function LandingScreen({ onSignup, onLogin, onSkip }) {
+function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
+  const showTest = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1";
   const revealRef = useRef(null);
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -1422,6 +1423,7 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
         <div className="lp-nav-actions">
           <button className="btn btn-ghost" onClick={onLogin}>Log in</button>
           <button className="btn btn-primary" onClick={onSignup}>Start free trial</button>
+          {showTest && <button className="btn btn-ghost" onClick={onTest} style={{ border: "1px dashed #f59e0b", color: "#b45309", fontWeight: 700 }}>TEST</button>}
         </div>
       </div>
 
@@ -5788,6 +5790,15 @@ function App() {
       resetDevAccount();
     }
   };
+  const handleTest = async () => {
+    try {
+      const { data, error } = await supabaseClient.auth.signInAnonymously();
+      if (error || !data?.user) { pushToast("TEST login failed: " + (error?.message || "no session") + " (enable Anonymous sign-ins in Supabase)", "error"); return; }
+      setUserId(data.user.id);
+      setIsDev(false); setIsAdmin(false); DEV_MODE = false;
+      setStage("onboarding");
+    } catch (e) { pushToast("TEST login error: " + (e?.message || e), "error"); }
+  };
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
     setIsDev(false);
@@ -5814,6 +5825,7 @@ function App() {
       <LandingScreen
         onSignup={() => { setReturnStage("landing"); setStage("signup"); }}
         onLogin={() => { setReturnStage("landing"); setStage("login"); }}
+        onTest={handleTest}
       />
     );
   } else if (stage === "welcome") {
