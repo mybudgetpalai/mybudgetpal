@@ -4585,6 +4585,151 @@ function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks,
   );
 }
 
+const OVERVIEW_TOUR = [
+  { title: "Safe to spend", body: "This is roughly what you can spend each day for the rest of the month and still stay on budget." },
+  { title: "Where it's gone", body: "See what you've spent on so far this month, broken down by category." },
+  { title: "The big picture", body: "Your overall net worth and how you're tracking towards your savings goal." },
+  { title: "Needs you", body: "Anything that needs a quick action \u2014 like transactions to categorise \u2014 shows up here." },
+];
+
+function TourTarget({ active, className, children }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (active && ref.current) {
+      const el = ref.current;
+      const t = setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 120);
+      return () => clearTimeout(t);
+    }
+  }, [active]);
+  return <div ref={ref} className={(className || "") + (active ? " oh-tour-active" : "")}>{children}</div>;
+}
+
+function InsightPill({ transactions, targets }) {
+  const ins = buildInsights(transactions || [], targets || {});
+  if (!ins.length) return null;
+  const top = ins[0];
+  const icon = top.type === "warning" ? "alert" : (top.type === "positive" ? "trending" : "sparkles");
+  return (
+    <div className={"oh-pill oh-pill-" + top.type}>
+      <span className="oh-pill-icon"><Icon name={icon} size={17} /></span>
+      <span className="oh-pill-text">{top.text}</span>
+    </div>
+  );
+}
+
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData }) {
+  const key = currentMonthKey();
+  const txs = transactions || [];
+  const lk = txs.length ? latestMonthKey(txs) : null;
+  const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
+
+  const income = incomeForMonth(txs, key);
+  const out = spendForMonth(txs, key);
+  const kept = income - out;
+  const saveRate = income > 0 ? Math.round((kept / income) * 100) : null;
+
+  const netWorth = totalEstimatedBalance(banks, accountData, txs);
+
+  const goal = goals && goals.length ? goals[0] : null;
+  const goalPct = goal && goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
+  const goalRemain = goal ? Math.max(0, goal.target - goal.saved) : 0;
+  const goalMonths = goal ? monthsUntil(goal.targetDate) : null;
+
+  const needs = [];
+  if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
+  const ex = billExcludes || [];
+  const detected = detectRecurringBills(txs).filter((b) => !ex.includes(b.name));
+  const todayDate = today().getDate();
+  const dueSoonTotal = detected.filter((b) => { const d = parseInt(b.due, 10); return d && d >= todayDate; }).reduce((s, b) => s + b.amount, 0);
+  if (dueSoonTotal > 0) needs.push({ icon: "calendar", color: "var(--ink-2)", text: formatMoney(dueSoonTotal) + " in bills still due this month", cta: null });
+  const showNeeds = runTour || needs.length > 0;
+
+  if (!hasData && !runTour) {
+    return (
+      <div className="oh">
+        <div className="overview-greeting">Hi {name || "there"}, {greetLine}\u2026</div>
+        <EmptyState text="Upload a statement to see your overview." />
+      </div>
+    );
+  }
+
+  return (
+    <div className="oh">
+      <div className="overview-greeting">Hi {name || "there"}, {greetLine}\u2026</div>
+
+      {showNeeds && (
+        <TourTarget active={runTour && tourStep === 3}>
+          <div className="oh-needs">
+            <div className="oh-needs-head"><span className="card-label" style={{ margin: 0 }}>Needs you</span>{needs.length > 0 && <span className="oh-needs-count">{needs.length} item{needs.length !== 1 ? "s" : ""}</span>}</div>
+            {needs.length === 0 ? (
+              <div className="oh-need"><span className="oh-need-ic" style={{ color: "var(--pos)" }}><Icon name="checkcircle" size={17} /></span><span className="oh-need-text">You're all caught up.</span></div>
+            ) : needs.map((n, i) => (
+              <div className="oh-need" key={i}>
+                <span className="oh-need-ic" style={{ color: n.color }}><Icon name={n.icon} size={17} /></span>
+                <span className="oh-need-text">{n.text}</span>
+                {n.action && <button className="oh-need-cta" onClick={n.action}>{n.cta} \u203a</button>}
+              </div>
+            ))}
+          </div>
+        </TourTarget>
+      )}
+
+      <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} \u00b7 day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
+
+      <TourTarget active={runTour && tourStep === 0}>
+        <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />
+        <InsightPill transactions={transactions} targets={targets} />
+      </TourTarget>
+
+      <div className="oh-grid">
+        <TourTarget active={runTour && tourStep === 1} className="oh-grid-cell">
+          <BreakdownCard transactions={transactions} targets={targets} />
+        </TourTarget>
+        {income > 0 && (
+          <div className="oh-grid-cell">
+            <div className="glass-card dash-card">
+              <span className="card-label">In vs out \u00b7 {currentMonthName()}</span>
+              <div className="oh-io">
+                <div><div className="oh-io-k">In</div><div className="oh-io-v" style={{ color: "var(--pos)" }}>{formatMoney(income)}</div></div>
+                <div><div className="oh-io-k">Out</div><div className="oh-io-v">{formatMoney(out)}</div></div>
+                <div><div className="oh-io-k">Kept</div><div className="oh-io-v">{formatMoney(kept)}</div></div>
+              </div>
+              {saveRate !== null && kept >= 0 && <><div className="oh-track"><div className="oh-track-fill" style={{ width: Math.min(100, saveRate) + "%", background: "var(--pos)" }} /></div><div className="oh-track-cap">saving {saveRate}% of income so far</div></>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
+
+      <TourTarget active={runTour && tourStep === 2}>
+        <div className="oh-grid">
+          {netWorth !== null && (
+            <div className="oh-grid-cell"><div className="glass-card dash-card">
+              <span className="card-label">Net worth</span>
+              <div className="oh-big">{formatMoney(netWorth)}</div>
+              <div className="oh-sub">across your linked accounts</div>
+            </div></div>
+          )}
+          {goal ? (
+            <div className="oh-grid-cell"><div className="glass-card dash-card">
+              <span className="card-label">{goal.name || "Savings goal"}</span>
+              <div className="oh-big">{formatMoney(goal.saved)} <span className="oh-big-sub">of {formatMoney(goal.target)}</span></div>
+              <div className="oh-track"><div className="oh-track-fill" style={{ width: goalPct + "%" }} /></div>
+              <div className="oh-track-cap">{formatMoney(goalRemain)} to go{goalMonths !== null ? " \u00b7 " + goalMonths + " month" + (goalMonths !== 1 ? "s" : "") + " left" : ""}</div>
+            </div></div>
+          ) : (
+            <div className="oh-grid-cell"><div className="glass-card dash-card">
+              <span className="card-label">Savings goal</span>
+              <div className="oh-sub" style={{ marginTop: 8 }}>Set a savings goal to track your big-picture progress here.</div>
+            </div></div>
+          )}
+        </div>
+      </TourTarget>
+    </div>
+  );
+}
+
 function UncatBanner({ count, onSort, label }) {
   const [hidden, setHidden] = useState(false);
   if (!count || hidden) return null;
@@ -4739,12 +4884,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
 
 function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
   if (view === "overview") return (
-    <>
-      <div className="overview-greeting">Hi {name || "there"}, {(() => { const lk = transactions && transactions.length ? latestMonthKey(transactions) : null; return lk && lk !== currentMonthKey() ? "here's how " + monthLabelFromKey(lk) + " went…" : "here's how " + currentMonthName() + " is looking…"; })()}</div>
-      {!runTour && <UncatBanner count={uncatCount} onSort={onOpenCatReview} />}
-      {!runTour && hasData && <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />}
-      <OverviewGrid slots={overviewSlots} onChangeSlots={onChangeOverviewSlots} runTour={runTour} tourStep={tourStep} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} rollovers={rollovers} />
-    </>
+    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -4893,9 +5033,8 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
   const effectiveView = runTour ? "overview" : (navKeys.includes(view) ? view : "overview");
-  const stepKey = overviewSlots[tourStep] || "empty";
-  const copy = TOUR_COPY[stepKey] || { title: "", body: "" };
-  const advanceTour = () => { if (tourStep >= overviewSlots.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
+  const copy = OVERVIEW_TOUR[tourStep] || { title: "", body: "" };
+  const advanceTour = () => { if (tourStep >= OVERVIEW_TOUR.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
   const demoActive = runTour && !hasData;
   const viewTransactions = demoActive ? DEMO_TRANSACTIONS : transactions;
   const viewTargets = demoActive ? DEMO_TARGETS : targets;
@@ -4926,13 +5065,13 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       </div>
       {runTour && (
         <div className="tour-card">
-          <div className="tour-step-count">Step {tourStep + 1} of {overviewSlots.length}</div>
+          <div className="tour-step-count">Step {tourStep + 1} of {OVERVIEW_TOUR.length}</div>
           <h3 className="tour-title">{copy.title}</h3>
           <p className="tour-body">{copy.body}</p>
           <div className="tour-dots">
-            {overviewSlots.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
+            {OVERVIEW_TOUR.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
           </div>
-          <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= overviewSlots.length - 1 ? "Finish" : "Next"}</button>
+          <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= OVERVIEW_TOUR.length - 1 ? "Finish" : "Next"}</button>
         </div>
       )}
       {customiseOpen && (
@@ -7444,6 +7583,39 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lpd-ask-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 7px 7px 16px; color: var(--ink-3); font-size: 13px; margin-top: auto; opacity: 0; }
   .in-view .lpd-ask-bar { animation: lpdShow 0.5s ease 1.5s forwards; }
   .lpd-ask-send { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; flex-shrink: 0; }
+
+  .oh-sec { display: flex; align-items: center; gap: 12px; margin: 22px 2px 14px; }
+  .oh-sec > span:first-child { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); white-space: nowrap; }
+  .oh-sec-ctx { font-size: 11.5px; font-weight: 500; color: var(--ink-3); opacity: 0.85; }
+  .oh-rule { flex: 1; height: 1px; background: var(--line); }
+  .oh-pill { display: flex; align-items: center; gap: 12px; background: var(--accent-soft); border-radius: 99px; padding: 11px 18px; margin-top: 14px; }
+  .oh-pill-icon { color: var(--accent); display: flex; flex-shrink: 0; }
+  .oh-pill-warning .oh-pill-icon { color: var(--warn); }
+  .oh-pill-positive .oh-pill-icon { color: var(--pos); }
+  .oh-pill-text { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+  .oh-needs { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-card); }
+  .oh-needs-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+  .oh-needs-count { font-size: 11.5px; color: var(--ink-3); }
+  .oh-need { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .oh-need:first-of-type { border-top: none; }
+  .oh-need-ic { display: flex; flex-shrink: 0; width: 20px; justify-content: center; }
+  .oh-need-text { flex: 1; font-size: 13.5px; color: var(--ink); }
+  .oh-need-cta { font-size: 12.5px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; padding: 0; }
+  .oh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .oh-grid-cell { min-width: 0; }
+  .oh-grid .glass-card { padding: 18px 20px; min-height: 0; }
+  .oh-io { display: flex; gap: 14px; margin-top: 6px; }
+  .oh-io > div { flex: 1; }
+  .oh-io-k { font-size: 11.5px; color: var(--ink-3); }
+  .oh-io-v { font-size: 17px; font-weight: 600; margin-top: 2px; color: var(--ink); }
+  .oh-big { font-size: 25px; font-weight: 600; color: var(--ink); line-height: 1.1; margin-top: 6px; }
+  .oh-big-sub { font-size: 13px; color: var(--ink-3); font-weight: 500; }
+  .oh-sub { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; }
+  .oh-track { height: 9px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-top: 12px; }
+  .oh-track-fill { height: 100%; background: var(--accent); border-radius: 99px; }
+  .oh-track-cap { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; }
+  .oh-tour-active { position: relative; z-index: 2; box-shadow: 0 0 0 3px var(--accent-shadow); border-radius: 16px; transition: box-shadow 0.2s; }
+  @media (max-width: 640px) { .oh-grid { grid-template-columns: 1fr; } }
 </style>
 </body>
 </html>
