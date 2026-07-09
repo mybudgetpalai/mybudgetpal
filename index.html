@@ -357,8 +357,8 @@ function parseHomeLayout(profile) {
   return { month, big };
 }
 const HOME_WIDGET_KEYS = {
-  month: ["breakdown_mini", "in_out", "category_status", "pace_gauge", "bills_upcoming", "transactions_mini", "merchants", "bills", "trend"],
-  big: ["net_worth", "goal", "accounts", "since_last_month"],
+  month: ["breakdown_mini", "in_out", "category_status", "pace_gauge", "bills_upcoming", "money_flow", "savings_rate", "transactions_mini", "merchants", "bills", "trend"],
+  big: ["net_worth", "goal", "goal_ring", "accounts", "since_last_month", "contribution_bars"],
 };
 function parseNavLayout(profile) {
   const valid = VIEWS.map((v) => v.key);
@@ -2929,13 +2929,13 @@ function scorePersona({ savvy, tracking, balanceCheck, goals }) {
 const PERSONA_TEMPLATES = {
   fresh_start: {
     name: "Fresh Start",
-    blurb: "A simple, clear view \u2014 what you can spend, where it's going, and one thing to act on.",
-    layout: { month: ["breakdown_mini", "in_out"], big: ["goal"] },
+    blurb: "A clear, visual view \u2014 what you can spend, how each budget is doing, and what's coming up.",
+    layout: { month: ["category_status", "pace_gauge", "bills_upcoming"], big: ["goal_ring", "net_worth", "since_last_month"] },
   },
   goal_getter: {
     name: "Goal Getter",
-    blurb: "Your goal front and centre, with the month's money-in vs money-out feeding it.",
-    layout: { month: ["in_out", "breakdown_mini"], big: ["goal", "net_worth"] },
+    blurb: "Everything points at your goal \u2014 what this month adds, your pace, and the projected finish date.",
+    layout: { month: ["money_flow", "savings_rate", "category_status"], big: ["goal_ring", "contribution_bars", "net_worth"] },
   },
   budget_hawk: {
     name: "Budget Hawk",
@@ -5039,6 +5039,217 @@ function SinceLastMonthCard({ transactions }) {
   );
 }
 
+function goalProjection(goal, transactions) {
+  if (!goal || goal.target <= 0) return null;
+  const remaining = Math.max(0, goal.target - goal.saved);
+  const keys = lastNMonthKeys(currentMonthKey(), 4).slice(0, 3);
+  const paces = keys.map((k) => incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)).filter((v) => v > 0);
+  const pace = paces.length ? paces.reduce((a, b) => a + b, 0) / paces.length : 0;
+  if (pace <= 0) return { remaining, pace: 0, projected: null };
+  const monthsNeeded = remaining / pace;
+  const proj = new Date(today());
+  proj.setDate(proj.getDate() + Math.round(monthsNeeded * 30.44));
+  return { remaining, pace, projected: proj };
+}
+function shortDate(d) { return d ? d.getDate() + " " + MONTHS_LABEL[d.getMonth()] : null; }
+
+function GoalRingCard({ goals, transactions }) {
+  const goal = goals && goals.length ? goals[0] : null;
+  if (!goal) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Savings goal</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>Set a savings goal to see your progress ring here.</div>
+    </div>
+  );
+  const pct = goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
+  const proj = goalProjection(goal, transactions);
+  const targetD = goal.targetDate ? new Date(goal.targetDate + "T00:00:00") : null;
+  let etaChip = null;
+  if (proj && proj.projected && targetD && !isNaN(targetD)) {
+    const wks = Math.round((targetD - proj.projected) / (7 * 864e5));
+    etaChip = wks >= 0
+      ? { cls: "cst-ok", text: (wks === 0 ? "Right on schedule" : wks + " week" + (wks !== 1 ? "s" : "") + " early") }
+      : { cls: "cst-warn", text: Math.abs(wks) + " week" + (Math.abs(wks) !== 1 ? "s" : "") + " behind" };
+  }
+  const R = 52, C = 2 * Math.PI * R;
+  const milestones = [0.25, 0.5, 0.75].map((f) => {
+    const a = -Math.PI / 2 + f * 2 * Math.PI;
+    return { x: 65 + R * Math.cos(a), y: 65 + R * Math.sin(a), passed: pct / 100 >= f };
+  });
+  const nextM = [0.25, 0.5, 0.75, 1].find((f) => pct / 100 < f);
+  const nextAmt = nextM ? Math.round(goal.target * nextM) : null;
+  const nextWks = nextM && proj && proj.pace > 0 ? Math.max(1, Math.round(((goal.target * nextM - goal.saved) / proj.pace) * 4.33)) : null;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">{goal.name || "Savings goal"}</span>
+      <div className="grc-row">
+        <svg viewBox="0 0 130 130" width="118" height="118" className="grc-ring">
+          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="12" />
+          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="12" strokeLinecap="round" strokeDasharray={(pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
+          {milestones.map((m, i) => <circle key={i} cx={m.x} cy={m.y} r="4" fill={m.passed ? "var(--accent)" : "var(--line-strong)"} />)}
+          <circle cx="65" cy={65 - R} r="5" fill="var(--pos)" />
+          <text x="65" y="61" textAnchor="middle" fontSize="22" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{pct}%</text>
+          <text x="65" y="80" textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="inherit">saved</text>
+        </svg>
+        <div className="grc-side">
+          <div className="grc-amt">{formatMoney(goal.saved)} <span>of {formatMoney(goal.target)}</span></div>
+          {targetD && !isNaN(targetD) && <div className="grc-line"><span>Target date</span><strong>{shortDate(targetD)}</strong></div>}
+          {proj && proj.projected && <div className="grc-line"><span>On current pace</span><strong className={etaChip && etaChip.cls === "cst-warn" ? "grc-late" : "grc-early"}>{shortDate(proj.projected)}</strong></div>}
+          {etaChip && <span className={"cst-chip " + etaChip.cls} style={{ marginTop: 7 }}>{etaChip.text}</span>}
+          {nextAmt && <div className="oh-sub" style={{ marginTop: 8 }}>Grey dots are 25 / 50 / 75% milestones {"\u00b7"} next at {formatMoney(nextAmt)}{nextWks ? ", ~" + nextWks + " week" + (nextWks !== 1 ? "s" : "") + " away" : ""}.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoneyFlowCard({ transactions }) {
+  const key = currentMonthKey();
+  const income = incomeForMonth(transactions || [], key);
+  const out = spendForMonth(transactions || [], key);
+  const kept = income - out;
+  if (income <= 0) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Money flow</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>No income recorded yet this month.</div>
+    </div>
+  );
+  const pence = Math.max(0, Math.round((kept / income) * 100));
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Money flow {"\u2014"} what feeds the goal</span>
+      <div className="mf-row">
+        <div className="mf-box"><div className="mf-v">{formatMoney(income)}</div><div className="mf-k">In</div></div>
+        <span className="mf-arr"><Icon name="trending" size={15} /></span>
+        <div className="mf-box"><div className="mf-v">{formatMoney(out)}</div><div className="mf-k">Out</div></div>
+        <span className="mf-arr"><Icon name="trending" size={15} /></span>
+        <div className="mf-box mf-goal"><div className="mf-v">{formatMoney(Math.max(0, kept))}</div><div className="mf-k">To goal</div></div>
+      </div>
+      <div className="oh-sub" style={{ marginTop: 9 }}>You're keeping <strong>{pence}p of every {"\u00a3"}1</strong> right now.</div>
+    </div>
+  );
+}
+
+function SavingsRateCard({ transactions }) {
+  const keys = lastNMonthKeys(currentMonthKey(), 6);
+  const pts = keys.map((k) => {
+    const i = incomeForMonth(transactions || [], k);
+    const s = spendForMonth(transactions || [], k);
+    return i > 0 ? Math.max(0, Math.round(((i - s) / i) * 100)) : null;
+  });
+  const valid = pts.filter((v) => v !== null);
+  if (valid.length < 2) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Savings rate</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>Upload a couple of months of statements to see your trend.</div>
+    </div>
+  );
+  const cur = pts[pts.length - 1];
+  const isBest = cur !== null && cur >= Math.max(...valid);
+  const W = 200, H = 44;
+  const step = W / Math.max(pts.length - 1, 1);
+  const line = pts.map((v, i) => v === null ? null : (i * step) + "," + (H - 4 - (v / 100) * (H - 10))).filter(Boolean).join(" ");
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Savings rate {"\u2014"} last 6 months</span>
+      <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
+        <polyline points={line} fill="none" stroke="var(--pos)" strokeWidth="2.5" />
+      </svg>
+      <div className="sr-foot">
+        <span className="sr-num">{cur !== null ? cur + "%" : "\u2014"}</span>
+        {isBest && <span className="cst-chip cst-ok">best month yet</span>}
+      </div>
+    </div>
+  );
+}
+
+function ContributionBarsCard({ transactions }) {
+  const keys = lastNMonthKeys(currentMonthKey(), 6);
+  const vals = keys.map((k) => Math.max(0, incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)));
+  const max = Math.max(...vals, 1);
+  const any = vals.some((v) => v > 0);
+  if (!any) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Added each month</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>Contributions appear once a month ends with money kept.</div>
+    </div>
+  );
+  const curIsMax = vals[vals.length - 1] >= max;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Added each month</span>
+      <div className="cb-bars">
+        {vals.map((v, i) => <div key={i} className={i === vals.length - 1 ? "cb-hot" : ""} style={{ height: Math.max(4, (v / max) * 100) + "%" }} />)}
+      </div>
+      <div className="cb-x">{keys.map((k) => <span key={k}>{monthLabelFromKey(k).slice(0, 3)}</span>)}</div>
+      {curIsMax && <div className="oh-sub" style={{ marginTop: 7 }}>{monthLabelFromKey(keys[keys.length - 1])}'s your biggest contribution yet.</div>}
+    </div>
+  );
+}
+
+function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const income = incomeForMonth(transactions || [], s.key);
+  const kept = income - s.spent;
+  const projKept = income > 0 ? Math.max(kept, income - Math.min(s.pot, s.spent + s.reserved + s.perDay * s.daysLeft)) : null;
+  return (
+    <div className="safe-hero gg-hero">
+      <div className="gg-col">
+        <span className="safe-hero-label">Safe to spend</span>
+        <span className={"gg-num" + (s.over ? " safe-hero-over" : "")}><CountUp value={s.perDay} format={formatMoney} /><em>/day</em></span>
+        <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")} style={{ marginTop: 7 }}>{s.over ? "Over budget" : "On track"}</span>
+      </div>
+      <div className="gg-vr" />
+      <div className="gg-col">
+        <span className="safe-hero-label">Added to your goal this month</span>
+        <span className="gg-num gg-pos">{kept >= 0 ? "+" : "\u2212"}<CountUp value={Math.abs(kept)} format={formatMoney} /></span>
+        {projKept !== null && projKept > kept && !s.over && (
+          <span className="oh-sub" style={{ marginTop: 6 }}>Stay under {formatMoney(s.perDay)}/day and this becomes <strong>{"\u2248"} {formatMoney(Math.round(projKept))}</strong> by month end.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const pct = Math.min(100, Math.max(0, ((s.pot - Math.max(0, s.free)) / Math.max(s.pot, 1)) * 100));
+  const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(s.pot, 1)) * 100));
+  const R = 52, C = 2 * Math.PI * R;
+  return (
+    <div className="safe-hero fs-hero">
+      <svg viewBox="0 0 130 130" width="112" height="112" className="fs-dial">
+        <circle cx="65" cy="65" r={R} fill="none" stroke="var(--card)" strokeWidth="13" />
+        <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="13" strokeLinecap="round" strokeDasharray={Math.max(0.04, 1 - pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
+        <text x="65" y="60" textAnchor="middle" fontSize="24" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{formatMoney(s.perDay)}</text>
+        <text x="65" y="80" textAnchor="middle" fontSize="11.5" fill="var(--ink-3)" fontFamily="inherit">a day</text>
+      </svg>
+      <div className="fs-side">
+        <div className="fs-head">
+          <span className="safe-hero-label">Safe to spend</span>
+          <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
+        </div>
+        <div className="oh-sub" style={{ marginTop: 4 }}>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget {"\u2014"} upcoming bills are already accounted for.</div>
+        {!s.over && (
+          <>
+            <div className="safe-hero-track safe-hero-seg" style={{ marginTop: 10 }}>
+              <div className="seg-spent" style={{ width: pw(s.spent) + "%" }} />
+              <div className="seg-reserved" style={{ width: pw(s.reserved) + "%" }} />
+            </div>
+            <div className="safe-hero-legend">
+              <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
+              {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
+              <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} free</span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const HOME_WIDGETS = {
   breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => <MiniBreakdown transactions={p.transactions} /> },
   in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
@@ -5051,6 +5262,10 @@ const HOME_WIDGETS = {
   bills_upcoming: { label: "Bills coming up", section: "month", render: (p) => <BillsUpcomingCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
   net_worth: { label: "Net worth", section: "big", render: (p) => <NetWorthCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
   since_last_month: { label: "Since last month", section: "big", render: (p) => <SinceLastMonthCard transactions={p.transactions} /> },
+  goal_ring: { label: "Goal ring & forecast", section: "big", render: (p) => <GoalRingCard goals={p.goals} transactions={p.transactions} /> },
+  money_flow: { label: "Money flow", section: "month", render: (p) => <MoneyFlowCard transactions={p.transactions} /> },
+  savings_rate: { label: "Savings rate", section: "month", render: (p) => <SavingsRateCard transactions={p.transactions} /> },
+  contribution_bars: { label: "Added each month", section: "big", render: (p) => <ContributionBarsCard transactions={p.transactions} /> },
   goal: { label: "Savings goal", section: "big", render: (p) => <GoalCard goals={p.goals} /> },
   accounts: { label: "Bank accounts", section: "big", render: (p) => <BankAccountsCard banks={p.banks} transactions={p.transactions} accountData={p.accountData} /> },
 };
@@ -5112,7 +5327,7 @@ function EditViewModal({ layout, onSave, onClose }) {
   );
 }
 
-function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup }) {
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
@@ -5179,7 +5394,11 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
           </>
         ) : (
           <>
-            <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
+            {persona === "fresh_start"
+              ? <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
+              : persona === "goal_getter"
+              ? <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} />
+              : <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />}
             <InsightPill transactions={transactions} targets={targets} />
           </>
         )}
@@ -5225,12 +5444,11 @@ function UncatBanner({ count, onSort, label }) {
   );
 }
 
-function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
+function computeSafeToSpend(targets, transactions, rollovers, billExcludes) {
   const key = currentMonthKey();
   const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
-  if (budget <= 0) return null;
   const roll = rolloverForMonth(rollovers, key);
-  const spent = spendForMonth(transactions, key);
+  const spent = spendForMonth(transactions || [], key);
   const reserved = remainingBillsThisMonth(transactions, billExcludes).filter((b) => b.upcoming).reduce((s, b) => s + b.amount, 0);
   const pot = budget + roll;
   const free = pot - spent - reserved;
@@ -5239,6 +5457,13 @@ function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
   const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
   const over = free < 0;
   const perDay = over ? 0 : Math.floor(free / daysLeft);
+  return { key, budget, roll, spent, reserved, pot, free, daysLeft, daysInMonth, over, perDay };
+}
+
+function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const { spent, reserved, pot, free, daysLeft, over, perDay, roll } = s;
   const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(pot, 1)) * 100));
   const spentPct = pw(spent), resPct = pw(reserved);
   return (
@@ -5379,9 +5604,9 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
   );
 }
 
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
+function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
   if (view === "overview") return (
-    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} />
+    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -5514,7 +5739,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -5559,7 +5784,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -6409,7 +6634,7 @@ function App() {
           setCustomTransactions(txRows);
           setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-          setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false);
+          setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false); setPersonaKey((profile && profile.persona) || null);
           setNavViews(parseNavLayout(profile));
           setBillExcludes(parseBillExcludes(profile));
       setPlan(planFromProfile(profile));
@@ -6642,7 +6867,7 @@ function App() {
               setCustomTransactions(txRows);
               setStatements(stmtRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-              setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false);
+              setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false); setPersonaKey((profile && profile.persona) || null);
               setNavViews(parseNavLayout(profile));
               setBillExcludes(parseBillExcludes(profile));
       setPlan(planFromProfile(profile));
@@ -6779,6 +7004,7 @@ function App() {
         onChangeHomeLayout={handleChangeHomeLayout}
         setupPending={showSetupBanner}
         onResumeSetup={() => { setSetupResume(true); setSetupQuestionsOpen(true); setStage("dashboard"); }}
+        persona={personaKey}
         setupIntroOpen={setupIntroOpen}
         setupQuestionsOpen={setupQuestionsOpen}
         setupQuestionsProps={{
@@ -8248,6 +8474,45 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .slm-good { color: var(--pos); }
   .slm-bad { color: var(--neg); }
   .slm-k { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; margin-top: 3px; }
+
+  .grc-row { display: flex; align-items: center; gap: 18px; margin-top: 8px; flex-wrap: wrap; }
+  .grc-ring { flex-shrink: 0; }
+  .grc-side { flex: 1; min-width: 180px; }
+  .grc-amt { font-size: 19px; font-weight: 600; color: var(--ink); }
+  .grc-amt span { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+  .grc-line { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--ink-3); margin-top: 6px; max-width: 230px; }
+  .grc-line strong { color: var(--ink); font-weight: 600; }
+  .grc-early { color: var(--pos) !important; }
+  .grc-late { color: var(--warn) !important; }
+  .mf-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .mf-box { flex: 1; background: var(--surface-2); border-radius: 10px; padding: 10px 8px; text-align: center; min-width: 0; }
+  .mf-goal { background: rgba(18,161,80,0.08); box-shadow: inset 0 0 0 1px rgba(18,161,80,0.25); }
+  .mf-goal .mf-v { color: var(--pos); }
+  .mf-v { font-size: 15.5px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mf-k { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-top: 3px; }
+  .mf-arr { color: var(--ink-3); display: flex; flex-shrink: 0; }
+  .sr-foot { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+  .sr-num { font-size: 19px; font-weight: 600; color: var(--ink); }
+  .cb-bars { display: flex; align-items: flex-end; gap: 6px; height: 58px; margin-top: 10px; }
+  .cb-bars > div { flex: 1; background: color-mix(in srgb, var(--accent-solid) 35%, transparent); border-radius: 4px 4px 0 0; }
+  .cb-bars > div.cb-hot { background: var(--accent-solid); }
+  .cb-x { display: flex; gap: 6px; font-size: 9.5px; color: var(--ink-3); font-weight: 600; margin-top: 5px; }
+  .cb-x span { flex: 1; text-align: center; }
+  .gg-hero { display: grid; grid-template-columns: 1fr 1px 1.25fr; gap: 20px; align-items: center; }
+  .gg-col { display: flex; flex-direction: column; align-items: flex-start; }
+  .gg-vr { width: 1px; align-self: stretch; background: var(--accent); opacity: 0.3; }
+  .gg-num { font-size: 30px; font-weight: 700; color: var(--ink); margin-top: 4px; line-height: 1; }
+  .gg-num em { font-style: normal; font-size: 13px; color: var(--ink-3); font-weight: 500; }
+  .gg-pos { color: var(--pos); }
+  .fs-hero { display: flex; align-items: center; gap: 20px; }
+  .fs-dial { flex-shrink: 0; }
+  .fs-side { flex: 1; min-width: 0; }
+  .fs-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  @media (max-width: 640px) {
+    .gg-hero { grid-template-columns: 1fr; }
+    .gg-vr { display: none; }
+    .fs-hero { flex-direction: column; align-items: flex-start; }
+  }
 </style>
 </body>
 </html>
