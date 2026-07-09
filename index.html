@@ -345,6 +345,20 @@ function parseOverviewLayout(profile) {
   if (!Array.isArray(arr) || arr.length !== 4 || !arr.every((k) => valid.includes(k))) return DEFAULT_OVERVIEW_SLOTS;
   return arr;
 }
+const DEFAULT_HOME_LAYOUT = { month: ["breakdown_mini", "in_out"], big: ["net_worth", "goal"] };
+function parseHomeLayout(profile) {
+  const raw = profile?.home_layout;
+  let obj = (raw && typeof raw === "object" && !Array.isArray(raw)) ? raw : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : null);
+  if (!obj) return DEFAULT_HOME_LAYOUT;
+  const clean = (arr, sec) => Array.isArray(arr) ? arr.filter((k, i) => typeof k === "string" && HOME_WIDGET_KEYS[sec].includes(k) && arr.indexOf(k) === i) : [];
+  const month = clean(obj.month, "month"), big = clean(obj.big, "big");
+  if (!month.length && !big.length) return DEFAULT_HOME_LAYOUT;
+  return { month, big };
+}
+const HOME_WIDGET_KEYS = {
+  month: ["breakdown_mini", "in_out", "transactions_mini", "merchants", "bills", "trend"],
+  big: ["net_worth", "goal", "accounts"],
+};
 function parseNavLayout(profile) {
   const valid = VIEWS.map((v) => v.key);
   const raw = profile?.nav_layout;
@@ -4644,23 +4658,148 @@ function MiniBreakdown({ transactions }) {
   );
 }
 
-function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData }) {
+function InOutCard({ transactions }) {
+  const key = currentMonthKey();
+  const txs = transactions || [];
+  const income = incomeForMonth(txs, key);
+  const out = spendForMonth(txs, key);
+  const kept = income - out;
+  const saveRate = income > 0 ? Math.round((kept / income) * 100) : null;
+  if (income <= 0) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>No income recorded yet this month.</div>
+    </div>
+  );
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
+      <div className="oh-io">
+        <div><div className="oh-io-k">In</div><div className="oh-io-v" style={{ color: "var(--pos)" }}>{formatMoney(income)}</div></div>
+        <div><div className="oh-io-k">Out</div><div className="oh-io-v">{formatMoney(out)}</div></div>
+        <div><div className="oh-io-k">Kept</div><div className="oh-io-v">{formatMoney(kept)}</div></div>
+      </div>
+      {saveRate !== null && kept >= 0 && <><div className="oh-track"><div className="oh-track-fill" style={{ width: Math.min(100, saveRate) + "%", background: "var(--pos)" }} /></div><div className="oh-track-cap">saving {saveRate}% of income so far</div></>}
+    </div>
+  );
+}
+
+function NetWorthCard({ banks, accountData, transactions }) {
+  const netWorth = totalEstimatedBalance(banks, accountData, transactions || []);
+  if (netWorth === null) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Net worth</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>Add opening balances to your statements to see an estimate.</div>
+    </div>
+  );
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Net worth</span>
+      <div className="oh-big">{formatMoney(netWorth)}</div>
+      <div className="oh-sub">across your linked accounts</div>
+    </div>
+  );
+}
+
+function GoalCard({ goals }) {
+  const goal = goals && goals.length ? goals[0] : null;
+  if (!goal) return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Savings goal</span>
+      <div className="oh-sub" style={{ marginTop: 8 }}>Set a savings goal to track your big-picture progress here.</div>
+    </div>
+  );
+  const pct = goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
+  const remain = Math.max(0, goal.target - goal.saved);
+  const months = monthsUntil(goal.targetDate);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">{goal.name || "Savings goal"}</span>
+      <div className="oh-big">{formatMoney(goal.saved)} <span className="oh-big-sub">of {formatMoney(goal.target)}</span></div>
+      <div className="oh-track"><div className="oh-track-fill" style={{ width: pct + "%" }} /></div>
+      <div className="oh-track-cap">{formatMoney(remain)} to go{months !== null ? " \u00b7 " + months + " month" + (months !== 1 ? "s" : "") + " left" : ""}</div>
+    </div>
+  );
+}
+
+const HOME_WIDGETS = {
+  breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => <MiniBreakdown transactions={p.transactions} /> },
+  in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
+  transactions_mini: { label: "Recent transactions", section: "month", render: (p) => <TransactionFeed limit={5} transactions={p.transactions} /> },
+  merchants: { label: "Top merchants", section: "month", render: (p) => <MerchantsCard transactions={p.transactions} /> },
+  bills: { label: "Bills & subscriptions", section: "month", render: (p) => <BillsCard transactions={p.transactions} excludes={p.billExcludes} /> },
+  trend: { label: "Spending trend", section: "month", render: (p) => <TrendsCard transactions={p.transactions} compact /> },
+  net_worth: { label: "Net worth", section: "big", render: (p) => <NetWorthCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
+  goal: { label: "Savings goal", section: "big", render: (p) => <GoalCard goals={p.goals} /> },
+  accounts: { label: "Bank accounts", section: "big", render: (p) => <BankAccountsCard banks={p.banks} transactions={p.transactions} accountData={p.accountData} /> },
+};
+
+function EditViewModal({ layout, onSave, onClose }) {
+  const [draft, setDraft] = useState({ month: [...(layout.month || [])], big: [...(layout.big || [])] });
+  const move = (sec, i, dir) => setDraft((d) => {
+    const arr = [...d[sec]]; const j = i + dir;
+    if (j < 0 || j >= arr.length) return d;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    return { ...d, [sec]: arr };
+  });
+  const remove = (sec, i) => setDraft((d) => ({ ...d, [sec]: d[sec].filter((_, idx) => idx !== i) }));
+  const add = (sec, k) => setDraft((d) => (d[sec].includes(k) ? d : { ...d, [sec]: [...d[sec], k] }));
+  const reset = () => setDraft({ month: [...DEFAULT_HOME_LAYOUT.month], big: [...DEFAULT_HOME_LAYOUT.big] });
+  const sections = [{ key: "month", title: "This month" }, { key: "big", title: "The big picture" }];
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="glass-card modal-card ev-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="brand-row" style={{ marginBottom: 4, justifyContent: "space-between" }}>
+          <span className="brand-name">Edit your overview</span>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"\u00d7"}</button>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 12px" }}>Choose what shows in each section. Reorder or remove anything {"\u2014"} you can always reset.</p>
+        {sections.map((s) => {
+          const available = HOME_WIDGET_KEYS[s.key].filter((k) => !draft[s.key].includes(k));
+          return (
+            <div className="ev-section" key={s.key}>
+              <span className="card-label">{s.title}</span>
+              <div className="ev-list">
+                {draft[s.key].length === 0 && <div className="ev-empty">Nothing here yet {"\u2014"} add a widget below.</div>}
+                {draft[s.key].map((k, i) => (
+                  <div className="ev-row" key={k}>
+                    <span className="ev-row-name">{HOME_WIDGETS[k].label}</span>
+                    <div className="ev-row-actions">
+                      <button className="ev-ctl" disabled={i === 0} onClick={() => move(s.key, i, -1)} aria-label="Move up">{"\u2191"}</button>
+                      <button className="ev-ctl" disabled={i === draft[s.key].length - 1} onClick={() => move(s.key, i, 1)} aria-label="Move down">{"\u2193"}</button>
+                      <button className="ev-ctl ev-remove" onClick={() => remove(s.key, i)} aria-label="Remove">{"\u00d7"}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {available.length > 0 && (
+                <div className="ev-add-row">
+                  {available.map((k) => (
+                    <button className="ev-add-chip" key={k} onClick={() => add(s.key, k)}>+ {HOME_WIDGETS[k].label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className="nav-row">
+          <button className="glass-btn ghost" onClick={reset}>Reset to default</button>
+          <button className="glass-btn primary" onClick={() => { onSave(draft); onClose(); }}>Save view</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
   const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
-  const income = incomeForMonth(txs, key);
-  const out = spendForMonth(txs, key);
-  const kept = income - out;
-  const saveRate = income > 0 ? Math.round((kept / income) * 100) : null;
-
-  const netWorth = totalEstimatedBalance(banks, accountData, txs);
-
-  const goal = goals && goals.length ? goals[0] : null;
-  const goalPct = goal && goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
-  const goalRemain = goal ? Math.max(0, goal.target - goal.saved) : 0;
-  const goalMonths = goal ? monthsUntil(goal.targetDate) : null;
+  const layout = homeLayout || DEFAULT_HOME_LAYOUT;
+  const widgetProps = { transactions, banks, accountData, goals, billExcludes };
+  const [editOpen, setEditOpen] = useState(false);
 
   const needs = [];
   if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
@@ -4682,7 +4821,12 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
 
   return (
     <div className="oh">
-      <div className="overview-greeting">Hi {name || "there"}, {greetLine}{"\u2026"}</div>
+      <div className="oh-greet-row">
+        <div className="overview-greeting" style={{ margin: 0 }}>Hi {name || "there"}, {greetLine}{"\u2026"}</div>
+        {!runTour && <button className="ev-open-btn" onClick={() => setEditOpen(true)}><Icon name="sliders" size={13} /> Edit view</button>}
+      </div>
+
+      {editOpen && <EditViewModal layout={layout} onSave={onChangeHomeLayout} onClose={() => setEditOpen(false)} />}
 
       {showNeeds && (
         <TourTarget active={runTour && tourStep === 3}>
@@ -4708,51 +4852,28 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         <InsightPill transactions={transactions} targets={targets} />
       </TourTarget>
 
-      <div className="oh-grid">
-        <TourTarget active={runTour && tourStep === 1} className="oh-grid-cell">
-          <MiniBreakdown transactions={transactions} />
-        </TourTarget>
-        {income > 0 && (
-          <div className="oh-grid-cell">
-            <div className="glass-card dash-card">
-              <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
-              <div className="oh-io">
-                <div><div className="oh-io-k">In</div><div className="oh-io-v" style={{ color: "var(--pos)" }}>{formatMoney(income)}</div></div>
-                <div><div className="oh-io-k">Out</div><div className="oh-io-v">{formatMoney(out)}</div></div>
-                <div><div className="oh-io-k">Kept</div><div className="oh-io-v">{formatMoney(kept)}</div></div>
-              </div>
-              {saveRate !== null && kept >= 0 && <><div className="oh-track"><div className="oh-track-fill" style={{ width: Math.min(100, saveRate) + "%", background: "var(--pos)" }} /></div><div className="oh-track-cap">saving {saveRate}% of income so far</div></>}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
-
-      <TourTarget active={runTour && tourStep === 2}>
+      {layout.month.length > 0 && (
         <div className="oh-grid">
-          {netWorth !== null && (
-            <div className="oh-grid-cell"><div className="glass-card dash-card">
-              <span className="card-label">Net worth</span>
-              <div className="oh-big">{formatMoney(netWorth)}</div>
-              <div className="oh-sub">across your linked accounts</div>
-            </div></div>
-          )}
-          {goal ? (
-            <div className="oh-grid-cell"><div className="glass-card dash-card">
-              <span className="card-label">{goal.name || "Savings goal"}</span>
-              <div className="oh-big">{formatMoney(goal.saved)} <span className="oh-big-sub">of {formatMoney(goal.target)}</span></div>
-              <div className="oh-track"><div className="oh-track-fill" style={{ width: goalPct + "%" }} /></div>
-              <div className="oh-track-cap">{formatMoney(goalRemain)} to go{goalMonths !== null ? " \u00b7 " + goalMonths + " month" + (goalMonths !== 1 ? "s" : "") + " left" : ""}</div>
-            </div></div>
-          ) : (
-            <div className="oh-grid-cell"><div className="glass-card dash-card">
-              <span className="card-label">Savings goal</span>
-              <div className="oh-sub" style={{ marginTop: 8 }}>Set a savings goal to track your big-picture progress here.</div>
-            </div></div>
-          )}
+          {layout.month.map((k, i) => (
+            <TourTarget key={k} active={runTour && tourStep === 1 && i === 0} className="oh-grid-cell">
+              {HOME_WIDGETS[k].render(widgetProps)}
+            </TourTarget>
+          ))}
         </div>
-      </TourTarget>
+      )}
+
+      {layout.big.length > 0 && (
+        <>
+          <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
+          <TourTarget active={runTour && tourStep === 2}>
+            <div className="oh-grid">
+              {layout.big.map((k) => (
+                <div className="oh-grid-cell" key={k}>{HOME_WIDGETS[k].render(widgetProps)}</div>
+              ))}
+            </div>
+          </TourTarget>
+        </>
+      )}
     </div>
   );
 }
@@ -4909,9 +5030,9 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
   );
 }
 
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
+function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
   if (view === "overview") return (
-    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} />
+    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -5044,7 +5165,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -5088,7 +5209,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -5595,6 +5716,7 @@ function App() {
   const [statements, setStatements] = useState([]);
   const [bankRows, setBankRows] = useState([]);
   const [overviewSlots, setOverviewSlots] = useState(DEFAULT_OVERVIEW_SLOTS);
+  const [homeLayout, setHomeLayout] = useState(DEFAULT_HOME_LAYOUT);
   const [navViews, setNavViews] = useState(VIEWS.map((v) => v.key));
   const [allTargets, setAllTargets] = useState({});
   const [targetsEditReq, setTargetsEditReq] = useState(false);
@@ -5923,7 +6045,7 @@ function App() {
           setCustomTransactions(txRows);
           setStatements(stmtRows);
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-          setOverviewSlots(parseOverviewLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
+          setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
           setNavViews(parseNavLayout(profile));
           setBillExcludes(parseBillExcludes(profile));
       setPlan(planFromProfile(profile));
@@ -5982,6 +6104,12 @@ function App() {
     setOverviewSlots(newSlots);
     if (userId) {
       supabaseClient.from("profiles").upsert({ id: userId, overview_layout: newSlots }).then(() => {});
+    }
+  };
+  const handleChangeHomeLayout = (newLayout) => {
+    setHomeLayout(newLayout);
+    if (userId) {
+      supabaseClient.from("profiles").upsert({ id: userId, home_layout: newLayout }).then(() => {}, () => {});
     }
   };
   const handleChangeTheme = (t) => {
@@ -6049,7 +6177,7 @@ function App() {
       await supabaseClient.from("goals").delete().eq("user_id", userId);
       await supabaseClient.from("statements").delete().eq("user_id", userId);
       await supabaseClient.from("banks").delete().eq("user_id", userId);
-      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null });
+      await supabaseClient.from("profiles").upsert({ id: userId, name: null, occupation: null, salary_range: null, employment_type: null, overview_layout: null, home_layout: null });
       try {
         const { data: topLevel } = await supabaseClient.storage.from("statements").list(userId);
         const toRemove = [];
@@ -6065,7 +6193,7 @@ function App() {
       } catch (e) {}
       setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setPlan(null);
       setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
-      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setExtraProfile(null); setShowExtraBanner(false);
+      setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false);
       pushToast("Dev account reset \u2014 starting fresh", "success");
       setStage("onboarding");
     } catch (e) {
@@ -6150,7 +6278,7 @@ function App() {
               setCustomTransactions(txRows);
               setStatements(stmtRows);
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-              setOverviewSlots(parseOverviewLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
+              setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
               setNavViews(parseNavLayout(profile));
               setBillExcludes(parseBillExcludes(profile));
       setPlan(planFromProfile(profile));
@@ -6260,6 +6388,8 @@ function App() {
         usingDemo={usingDemo}
         pushToast={pushToast}
         overviewSlots={overviewSlots}
+        homeLayout={homeLayout}
+        onChangeHomeLayout={handleChangeHomeLayout}
         onChangeOverviewSlots={handleChangeOverviewSlots}
         navViews={navViews}
         onChangeNavViews={handleChangeNavViews}
@@ -7650,6 +7780,22 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-mb-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
   .oh-mb-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .oh-mb-pct { color: var(--ink-3); font-weight: 600; }
+
+  .oh-greet-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .ev-open-btn { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; cursor: pointer; transition: background 0.15s; }
+  .ev-open-btn:hover { background: var(--surface-2); }
+  .ev-modal { max-width: 520px; max-height: 86vh; overflow-y: auto; }
+  .ev-section { margin-top: 14px; }
+  .ev-list { margin-top: 8px; }
+  .ev-empty { font-size: 13px; color: var(--ink-3); padding: 8px 0; }
+  .ev-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 10px; margin-bottom: 6px; }
+  .ev-row-name { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+  .ev-row-actions { display: flex; gap: 4px; }
+  .ev-ctl { font-family: inherit; font-size: 14px; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .ev-ctl:disabled { opacity: 0.3; cursor: default; }
+  .ev-remove { color: var(--neg); }
+  .ev-add-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ev-add-chip { font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border: none; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
 </style>
 </body>
 </html>
