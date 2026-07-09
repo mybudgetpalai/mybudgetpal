@@ -4689,7 +4689,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
                     <span className="tx-name"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
                     <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " \u2014 over target" : ""}</span>
                   </div>
-                  <span className="tx-amount" style={v > 0 && spent > v ? { color: "#ff8b8b" } : null}>{formatMoney(v)}</span>
+                  <span className="tx-amount" style={v > 0 && spent > v ? { color: "var(--neg)" } : null}>{formatMoney(v)}</span>
                 </div>
               );
             })}
@@ -7256,6 +7256,37 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .beta-callout { display: flex; align-items: center; gap: 10px; background: #FFE44D; color: #3a2d00; border: 1.5px solid #E0B400; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; font-weight: 600; line-height: 1.4; margin: 4px 0 16px; box-shadow: 0 2px 10px rgba(224,180,0,0.25); }
   .beta-callout-tag { background: #3a2d00; color: #FFE44D; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; }
   .beta-callout strong { font-weight: 800; }
+
+  /* ===== Unified table skin: Targets / Long-Term Plan / Monthly Review ===== */
+  .budget-table-wrap, .ltp-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .budget-table th, .budget-table td, .ltp-table th, .ltp-table td { padding: 8px 12px !important; font-size: 13px; }
+  .budget-table thead th, .ltp-table thead th { background: var(--surface-2) !important; color: var(--ink-3) !important; font-size: 11px !important; font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line); }
+  .bt-corner, .bt-month-head { font-size: 11px !important; font-weight: 600 !important; color: var(--ink-3) !important; text-transform: uppercase; letter-spacing: 0.05em; }
+  .bt-month-current, .ltp-plan-head { color: var(--accent) !important; }
+  .bt-cat, .ltp-table .ltp-sticky { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .ltp-table .ltp-sticky { background: var(--card); }
+  .ltp-table thead th.ltp-sticky { background: var(--surface-2) !important; }
+  .budget-table tbody tr td, .ltp-table tbody tr td { border-bottom: 1px solid var(--line); }
+
+  .bt-total-row td, .ltp-bal-row td, .ltp-net-row td { background: var(--surface-3) !important; font-weight: 700 !important; }
+  .bt-total-row .bt-total-num { font-weight: 700; }
+  .ltp-bal-row .ltp-sticky, .ltp-net-row .ltp-sticky { background: var(--surface-3) !important; color: var(--ink) !important; font-weight: 700 !important; }
+  .bt-total-row td { border-top: 2px solid var(--line-strong) !important; }
+  .ltp-bal-row.ltp-close-row td { border-top: 2px solid var(--line-strong) !important; }
+  .ltp-net-row td { border-top: none !important; }
+
+  .review-table { border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; margin-top: 16px; }
+  .review-head { background: var(--surface-2); color: var(--ink-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 9px 12px; }
+  .review-row { padding: 8px 12px; font-size: 13px; gap: 12px; }
+  .review-cat { gap: 8px; font-weight: 500; }
+  .review-cat .cat-dot { width: 9px; height: 9px; }
+  .review-total { background: var(--surface-3); border-top: 2px solid var(--line-strong); margin-top: 0; padding: 10px 12px; font-weight: 700; }
+
+  .rv-over { color: var(--neg) !important; }
+  .rv-under { color: var(--pos) !important; }
+  .ltp-goal-cell { background: rgba(18,161,80,0.12) !important; color: var(--pos) !important; font-weight: 800; }
+  .rt-good .rt-verdict { color: var(--pos) !important; }
+  .rt-bad .rt-verdict { color: var(--neg) !important; }
 </style>
 </body>
 </html>
