@@ -4,7 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="MyBudgetPal — upload your bank statements, track spending by category, and hit your savings goals." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='1' stop-color='%23b56bff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='16' fill='url(%23g)'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MyBudgetPal" />
+<meta property="og:title" content="MyBudgetPal" />
+<meta property="og:description" content="Upload your bank statements, track spending by category, and hit your savings goals." />
+<meta property="og:url" content="https://mybudgetpal-rouge.vercel.app/" />
+<meta property="og:image" content="https://mybudgetpal-rouge.vercel.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="MyBudgetPal" />
+<meta name="twitter:description" content="Upload your bank statements, track spending by category, and hit your savings goals." />
+<meta name="twitter:image" content="https://mybudgetpal-rouge.vercel.app/og-image.png" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27g%27%20x1%3D%270%27%20y1%3D%270%27%20x2%3D%271%27%20y2%3D%271%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%234f8cff%27/%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%23b56bff%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27url%28%23g%29%27/%3E%3Crect%20x%3D%278%27%20y%3D%2718%27%20width%3D%274%27%20height%3D%276%27%20rx%3D%272%27%20fill%3D%27%23fff%27/%3E%3Crect%20x%3D%2714%27%20y%3D%2714%27%20width%3D%274%27%20height%3D%2710%27%20rx%3D%272%27%20fill%3D%27%23fff%27/%3E%3Crect%20x%3D%2720%27%20y%3D%2710%27%20width%3D%274%27%20height%3D%2714%27%20rx%3D%272%27%20fill%3D%27%23fff%27/%3E%3C/svg%3E" />
+<link rel="icon" type="image/png" href="/icon-192.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#2E5BFF" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1497,13 +1510,13 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
       <div className="lp-section lp-wrap">
         <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
         <div className="features">
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="income" size={17} /></div><h3>Multi-currency</h3><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="chart" size={17} /></div><h3>Spending breakdown</h3><p>See exactly what you spend by category, every month.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="target" size={17} /></div><h3>Monthly targets</h3><p>Set a budget per category and track how you're pacing.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h3>Savings goals</h3><p>Plan toward a goal and see your progress over time.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="bills" size={17} /></div><h3>Bills & subscriptions</h3><p>Keep track of recurring payments and due dates in one place.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="linechart" size={17} /></div><h3>Trends over time</h3><p>See how your spending and income shift month to month.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="sliders" size={17} /></div><h3>Customizable views</h3><p>Switch between different dashboard views to see the data your way.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="income" size={17} /></div><h4>Multi-currency</h4><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="chart" size={17} /></div><h4>Spending breakdown</h4><p>See exactly what you spend by category, every month.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="target" size={17} /></div><h4>Monthly targets</h4><p>Set a budget per category and track how you're pacing.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h4>Savings goals</h4><p>Plan toward a goal and see your progress over time.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="bills" size={17} /></div><h4>Bills & subscriptions</h4><p>Keep track of recurring payments and due dates in one place.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="linechart" size={17} /></div><h4>Trends over time</h4><p>See how your spending and income shift month to month.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="sliders" size={17} /></div><h4>Customizable views</h4><p>Switch between different dashboard views to see the data your way.</p></div>
         </div>
       </div>
 
@@ -1569,11 +1582,11 @@ function WelcomeScreen({ onChoose, onSkip, onOpenLegal }) {
 
 /* ---------------- Legal (privacy / terms) ---------------- */
 
-function LegalScreen({ initialTab, onBack }) {
+function LegalScreen({ initialTab, onBack, theme }) {
   const [tab, setTab] = useState(initialTab || "privacy");
   const sections = tab === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;
   return (
-    <div className="page stage-fade">
+    <div className="page stage-fade app-shell" data-theme={normalizeTheme(theme)}>
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card legal-card">
         <div className="brand-row">
@@ -4948,8 +4961,8 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
             <label className="field-label">Email</label>
             <input className="glass-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <button className="link-btn inline" style={{ marginTop: 4 }}>Change password</button>
-          <button className="glass-btn primary" style={{ marginTop: 14, flex: "none" }} disabled={!profileDirty || savingProfile} onClick={saveProfile}>
+          <button className="link-btn inline" style={{ marginTop: 4, padding: "10px 2px", display: "inline-block" }}>Change password</button>
+          <button className="glass-btn primary" style={{ marginTop: 14, marginLeft: 14, flex: "none" }} disabled={!profileDirty || savingProfile} onClick={saveProfile}>
             {savingProfile ? <span className="btn-spinner" /> : "Save"}
           </button>
         </div>
@@ -4960,7 +4973,7 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
             {(banks && banks.length > 0 ? banks : ["No banks linked yet"]).map((b) => (
               <div className="settings-bank-row" key={b}>
                 <span>{b}</span>
-                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => onRemoveBank(b)}>Remove</button>}
+                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => onRemoveBank(b)} style={{ padding: "10px 8px", display: "inline-block" }}>Remove</button>}
               </div>
             ))}
           </div>
@@ -5049,13 +5062,13 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
           <span className="card-label">Notifications</span>
           <div className="toggle-row">
             <span>Budget overspend alerts</span>
-            <button className={"switch " + (notifBudget ? "switch-on" : "")} onClick={() => setNotifBudget((v) => !v)}>
+            <button className={"switch " + (notifBudget ? "switch-on" : "")} onClick={() => setNotifBudget((v) => !v)} aria-label="Budget overspend alerts" role="switch" aria-checked={notifBudget}>
               <span className="switch-knob" />
             </button>
           </div>
           <div className="toggle-row">
             <span>Weekly spending summary</span>
-            <button className={"switch " + (notifWeekly ? "switch-on" : "")} onClick={() => setNotifWeekly((v) => !v)}>
+            <button className={"switch " + (notifWeekly ? "switch-on" : "")} onClick={() => setNotifWeekly((v) => !v)} aria-label="Weekly spending summary" role="switch" aria-checked={notifWeekly}>
               <span className="switch-knob" />
             </button>
           </div>
@@ -5642,7 +5655,7 @@ function App() {
       />
     );
   } else if (stage === "legal") {
-    content = <LegalScreen initialTab={legalTab} onBack={() => setStage(returnStage)} />;
+    content = <LegalScreen initialTab={legalTab} onBack={() => setStage(returnStage)} theme={theme} />;
   } else if (stage === "login" || stage === "signup") {
     content = (
       <AuthScreen
@@ -5914,7 +5927,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catrev-banner-btn { background: var(--accent); color: var(--on-accent); border: none; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
   .catrev-banner-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
   .catrev-banner-later { background: none; border: none; color: var(--ink-3); font-size: 12.5px; font-family: inherit; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
-  .settings-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(143,180,255,0.1); border: 1px solid rgba(143,180,255,0.3); color: #cfe0ff; font-size: 13px; }
+  .settings-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(143,180,255,0.1); border: 1px solid rgba(143,180,255,0.3); color: #1d4ed8; font-size: 13px; }
   .settings-nudge-btn { flex: none; padding: 8px 16px; font-size: 13px; border-radius: 999px; }
   .rollover-note { margin-top: 6px; }
   .rollover-note.rn-up { color: #4fe0c0; }
@@ -6574,7 +6587,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .feature-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 18px; padding: 20px; }
   .feature-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); font-size: 16px; margin-bottom: 10px; }
-  .feature-card h3 { font-size: 14px; margin: 0 0 5px; color: var(--ink); }
+  .feature-card h4 { font-size: 14px; margin: 0 0 5px; color: var(--ink); }
   .feature-card p { font-size: 12px; color: var(--ink-3); margin: 0; line-height: 1.5; }
 
   .pricing { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 620px; margin: 0 auto; }
@@ -6644,7 +6657,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* ---- long-term plan grid ---- */
   .ltp-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); }
-  .ltp-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  .ltp-table { border-collapse: collapse; width: 100%; font-size: 13px; }
   .ltp-table th, .ltp-table td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .ltp-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
   .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--ink); min-width: 140px; z-index: 1; }
@@ -7042,6 +7055,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
   /* ============= end mobile usability fixes ============= */
 
+
+  /* --- audit fixes: contrast, touch targets, close-btn hit-area --- */
+  .app-shell[data-theme="dark"] .settings-nudge { color: #cfe0ff; }
+  .icon-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .side-close-btn { min-width: 44px; min-height: 44px; padding: 0; }
 </style>
 </body>
 </html>
