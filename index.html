@@ -357,8 +357,8 @@ function parseHomeLayout(profile) {
   return { month, big };
 }
 const HOME_WIDGET_KEYS = {
-  month: ["breakdown_mini", "in_out", "transactions_mini", "merchants", "bills", "trend"],
-  big: ["net_worth", "goal", "accounts"],
+  month: ["breakdown_mini", "in_out", "category_status", "pace_gauge", "bills_upcoming", "transactions_mini", "merchants", "bills", "trend"],
+  big: ["net_worth", "goal", "accounts", "since_last_month"],
 };
 function parseNavLayout(profile) {
   const valid = VIEWS.map((v) => v.key);
@@ -892,6 +892,22 @@ function topMerchantsFor(txs, k, n) {
   return Object.entries(o).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount).slice(0, n);
 }
 function ordinalDay(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function remainingBillsThisMonth(txs, excludes) {
+  const ex = excludes || [];
+  const key = currentMonthKey();
+  const todayDay = today().getDate();
+  const norm = (n) => String(n || "").toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim();
+  const paidThisMonth = new Set(
+    (txs || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key).map((t) => norm(t.name))
+  );
+  return detectRecurringBills(txs || [])
+    .filter((b) => !ex.includes(b.name))
+    .map((b) => {
+      const dueDay = parseInt(b.due, 10) || 0;
+      const paid = paidThisMonth.has(norm(b.name));
+      return { ...b, dueDay, paid, upcoming: !paid && dueDay >= todayDay };
+    });
+}
 function detectRecurringBills(txs) {
   const groups = {};
   txs.filter((t) => t.amount < 0 && t.date).forEach((t) => {
@@ -4892,6 +4908,137 @@ function GoalCard({ goals }) {
   );
 }
 
+const CAT_ICON = { Groceries: "groceries", Dining: "dining", Transport: "transport", Shopping: "shopping", Subscriptions: "subscriptions", Bills: "bills" };
+
+function CategoryStatusCard({ transactions, targets }) {
+  const key = currentMonthKey();
+  const cats = spendByCategoryForMonth(transactions || [], key);
+  const day = today().getDate(), dim = daysInCurrentMonth();
+  const rows = TX_CATEGORIES.map((c) => {
+    const spent = cats[c] || 0;
+    const target = Number((targets || {})[c]) || 0;
+    return { c, spent, target };
+  }).filter((r) => r.spent > 0 || r.target > 0);
+  if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
+  const maxRef = Math.max(...rows.map((r) => r.target || r.spent), 1);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Where it's gone</span>
+      <div className="cst-list">
+        {rows.map((r) => {
+          const over = r.target > 0 && r.spent > r.target;
+          const left = r.target > 0 ? r.target - r.spent : null;
+          const width = Math.min(100, (r.spent / (r.target || maxRef)) * 100);
+          return (
+            <div className="cst-row" key={r.c}>
+              <span className="cst-ic"><Icon name={CAT_ICON[r.c] || "tag"} size={15} /></span>
+              <span className="cst-nm">{displayCat(r.c)}</span>
+              <div className="cst-bar"><div style={{ width: width + "%", background: over ? "var(--neg)" : "var(--accent)" }} /></div>
+              {r.target > 0
+                ? <span className={"cst-chip " + (over ? "cst-warn" : "cst-ok")}>{over ? formatMoney(r.spent - r.target) + " over" : formatMoney(left) + " left"}</span>
+                : <span className="cst-chip cst-mut">{formatMoney(r.spent)}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PaceGaugeCard({ transactions, targets }) {
+  const key = currentMonthKey();
+  const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
+  const spent = spendForMonth(transactions || [], key);
+  const day = today().getDate(), dim = daysInCurrentMonth();
+  const expected = budget > 0 ? budget * (day / dim) : null;
+  if (expected === null) return <div className="glass-card dash-card"><span className="card-label">Your pace</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to see your spending pace.</div></div>;
+  const ratio = Math.min(2, spent / Math.max(expected, 1));
+  const under = spent <= expected;
+  const angle = -90 + Math.min(180, ratio * 90);
+  const rad = (angle * Math.PI) / 180;
+  const nx = 45 + 26 * Math.sin(rad), ny = 47 - 26 * Math.cos(rad);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Your pace</span>
+      <div className="pace-row">
+        <svg viewBox="0 0 90 52" width="84" height="49">
+          <path d="M9 47 A36 36 0 0 1 81 47" fill="none" stroke="var(--surface-2)" strokeWidth="10" strokeLinecap="round" />
+          <path d="M9 47 A36 36 0 0 1 45 11" fill="none" stroke={under ? "var(--pos)" : "var(--neg)"} strokeWidth="10" strokeLinecap="round" strokeDasharray={Math.min(1, ratio / 2) * 113 + " 113"} />
+          <line x1="45" y1="47" x2={nx} y2={ny} stroke="var(--ink)" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="45" cy="47" r="4" fill="var(--ink)" />
+        </svg>
+        <div>
+          <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace" : "Over pace"}</span>
+          <div className="oh-sub" style={{ marginTop: 6 }}>{formatMoney(spent)} spent {"\u00b7"} expected by day {day}: {formatMoney(Math.round(expected))}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillsUpcomingCard({ transactions, billExcludes }) {
+  const bills = remainingBillsThisMonth(transactions, billExcludes);
+  const upcoming = bills.filter((b) => b.upcoming).slice(0, 5);
+  const paid = bills.filter((b) => b.paid).length;
+  if (!bills.length) return <div className="glass-card dash-card"><span className="card-label">Bills coming up</span><div className="oh-sub" style={{ marginTop: 8 }}>No recurring bills detected yet {"\u2014"} they appear after 2+ months of statements.</div></div>;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Bills coming up</span>
+      {upcoming.length === 0
+        ? <div className="oh-sub" style={{ marginTop: 8 }}>All done {"\u2014"} {paid} bill{paid !== 1 ? "s" : ""} paid this month.</div>
+        : (
+          <>
+            <div className="bup-list">
+              {upcoming.map((b, i) => (
+                <div className="bup-row" key={i}>
+                  <span className="bup-nm">{b.name} {"\u00b7"} {b.due}</span>
+                  <span className="bup-amt">{formatMoney(b.amount)}</span>
+                  <span className="bup-tick"><Icon name="checkcircle" size={15} /></span>
+                </div>
+              ))}
+            </div>
+            <div className="oh-sub" style={{ marginTop: 8 }}><Icon name="checkcircle" size={11} /> means it's already set aside in your safe-to-spend.</div>
+          </>
+        )}
+    </div>
+  );
+}
+
+function SinceLastMonthCard({ transactions }) {
+  const cur = currentMonthKey();
+  const prev = lastNMonthKeys(cur, 2)[0];
+  const sCur = spendForMonth(transactions || [], cur), sPrev = spendForMonth(transactions || [], prev);
+  const iCur = incomeForMonth(transactions || [], cur);
+  const kept = iCur > 0 ? Math.round(((iCur - sCur) / iCur) * 100) : null;
+  const cCur = spendByCategoryForMonth(transactions || [], cur), cPrev = spendByCategoryForMonth(transactions || [], prev);
+  let drop = null, rise = null;
+  Object.keys({ ...cCur, ...cPrev }).forEach((c) => {
+    const d = (cCur[c] || 0) - (cPrev[c] || 0);
+    if (d < 0 && (!drop || d < drop.d)) drop = { c, d };
+    if (d > 0 && (!rise || d > rise.d)) rise = { c, d };
+  });
+  const spendD = sCur - sPrev;
+  const chips = [];
+  if (sPrev > 0) chips.push({ v: (spendD <= 0 ? "\u2193 " : "\u2191 ") + formatMoney(Math.abs(spendD)), k: "Spending", good: spendD <= 0 });
+  if (kept !== null) chips.push({ v: kept + "%", k: "Kept", good: kept >= 50 });
+  if (drop) chips.push({ v: "\u2193 " + formatMoney(Math.abs(drop.d)), k: displayCat(drop.c), good: true });
+  if (rise) chips.push({ v: "\u2191 " + formatMoney(rise.d), k: displayCat(rise.c), good: false });
+  if (!chips.length) return <div className="glass-card dash-card"><span className="card-label">Since last month</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload another month of statements to compare.</div></div>;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Since last month</span>
+      <div className="slm-grid">
+        {chips.slice(0, 4).map((c, i) => (
+          <div className="slm-chip" key={i}>
+            <div className={"slm-v " + (c.good ? "slm-good" : "slm-bad")}>{c.v}</div>
+            <div className="slm-k">{c.k}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const HOME_WIDGETS = {
   breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => <MiniBreakdown transactions={p.transactions} /> },
   in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
@@ -4899,7 +5046,11 @@ const HOME_WIDGETS = {
   merchants: { label: "Top merchants", section: "month", render: (p) => <MerchantsCard transactions={p.transactions} /> },
   bills: { label: "Bills & subscriptions", section: "month", render: (p) => <BillsCard transactions={p.transactions} excludes={p.billExcludes} /> },
   trend: { label: "Spending trend", section: "month", render: (p) => <TrendsCard transactions={p.transactions} compact /> },
+  category_status: { label: "Where it's gone (bars)", section: "month", render: (p) => <CategoryStatusCard transactions={p.transactions} targets={p.targets} /> },
+  pace_gauge: { label: "Your pace", section: "month", render: (p) => <PaceGaugeCard transactions={p.transactions} targets={p.targets} /> },
+  bills_upcoming: { label: "Bills coming up", section: "month", render: (p) => <BillsUpcomingCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
   net_worth: { label: "Net worth", section: "big", render: (p) => <NetWorthCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
+  since_last_month: { label: "Since last month", section: "big", render: (p) => <SinceLastMonthCard transactions={p.transactions} /> },
   goal: { label: "Savings goal", section: "big", render: (p) => <GoalCard goals={p.goals} /> },
   accounts: { label: "Bank accounts", section: "big", render: (p) => <BankAccountsCard banks={p.banks} transactions={p.transactions} accountData={p.accountData} /> },
 };
@@ -4968,7 +5119,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
-  const widgetProps = { transactions, banks, accountData, goals, billExcludes };
+  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets };
   const [editOpen, setEditOpen] = useState(false);
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0;
@@ -5028,7 +5179,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
           </>
         ) : (
           <>
-            <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} />
+            <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
             <InsightPill transactions={transactions} targets={targets} />
           </>
         )}
@@ -5074,19 +5225,22 @@ function UncatBanner({ count, onSort, label }) {
   );
 }
 
-function SafeToSpendHero({ targets, transactions, rollovers }) {
+function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
   const key = currentMonthKey();
   const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   if (budget <= 0) return null;
   const roll = rolloverForMonth(rollovers, key);
   const spent = spendForMonth(transactions, key);
-  const remaining = budget + roll - spent;
+  const reserved = remainingBillsThisMonth(transactions, billExcludes).filter((b) => b.upcoming).reduce((s, b) => s + b.amount, 0);
+  const pot = budget + roll;
+  const free = pot - spent - reserved;
   const now = today();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
-  const over = remaining < 0;
-  const perDay = over ? 0 : Math.floor(remaining / daysLeft);
-  const pctOfDay = budget > 0 ? Math.min(100, Math.max(0, (Math.max(0, remaining) / budget) * 100)) : 0;
+  const over = free < 0;
+  const perDay = over ? 0 : Math.floor(free / daysLeft);
+  const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(pot, 1)) * 100));
+  const spentPct = pw(spent), resPct = pw(reserved);
   return (
     <div className="safe-hero">
       <div className="safe-hero-row">
@@ -5096,12 +5250,25 @@ function SafeToSpendHero({ targets, transactions, rollovers }) {
         </div>
         <div className="safe-hero-side">
           {over
-            ? <span className="safe-hero-overtext">{formatMoney(Math.abs(remaining))} over budget this month</span>
-            : <span>{formatMoney(remaining)} left {"\u00b7"} {daysLeft} day{daysLeft !== 1 ? "s" : ""} to go</span>}
+            ? <span className="safe-hero-overtext">{formatMoney(Math.abs(free))} over budget this month{reserved > 0 ? " (incl. bills to come)" : ""}</span>
+            : <span>{formatMoney(free)} free {"\u00b7"} {daysLeft} day{daysLeft !== 1 ? "s" : ""} to go</span>}
+          {reserved > 0 && <span className="safe-hero-roll">{formatMoney(reserved)} bills set aside</span>}
           {roll !== 0 && <span className="safe-hero-roll">{roll < 0 ? "after " + formatMoney(Math.abs(roll)) + " rollover" : "incl. " + formatMoney(roll) + " rollover"}</span>}
         </div>
       </div>
-      {!over && <div className="safe-hero-track"><div className="safe-hero-fill" style={{ width: pctOfDay + "%" }} /></div>}
+      {!over && (
+        <>
+          <div className="safe-hero-track safe-hero-seg">
+            <div className="seg-spent" style={{ width: spentPct + "%" }} />
+            <div className="seg-reserved" style={{ width: resPct + "%" }} />
+          </div>
+          <div className="safe-hero-legend">
+            <span><span className="seg-dot seg-dot-spent" /> {formatMoney(spent)} spent</span>
+            {reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(reserved)} bills set aside</span>}
+            <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, free))} free</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -8049,6 +8216,38 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-setup-ic { color: var(--accent); display: flex; flex-shrink: 0; }
   .oh-setup-text { flex: 1; font-size: 13px; color: var(--ink); line-height: 1.5; }
   .oh-setup-cta { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--on-accent); background: var(--accent-solid); border: none; border-radius: 12px; padding: 9px 16px; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 14px var(--accent-shadow); }
+
+  .safe-hero-seg { display: flex; overflow: hidden; }
+  .safe-hero-seg .seg-spent { background: var(--accent-solid); height: 100%; border-radius: 99px 0 0 99px; }
+  .safe-hero-seg .seg-reserved { background: color-mix(in srgb, var(--accent-solid) 40%, transparent); height: 100%; }
+  .safe-hero-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2); margin-top: 7px; }
+  .seg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .seg-dot-spent { background: var(--accent-solid); }
+  .seg-dot-res { background: color-mix(in srgb, var(--accent-solid) 40%, transparent); }
+  .seg-dot-free { background: var(--line-strong); }
+  .cst-list { margin-top: 6px; }
+  .cst-row { display: grid; grid-template-columns: 20px 82px 1fr auto; align-items: center; gap: 9px; padding: 7px 0; font-size: 12.5px; }
+  .cst-ic { color: var(--ink-3); display: flex; }
+  .cst-nm { color: var(--ink-2); font-weight: 500; }
+  .cst-bar { height: 11px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+  .cst-bar > div { height: 100%; border-radius: 99px; }
+  .cst-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+  .cst-ok { background: rgba(18,161,80,0.12); color: var(--pos); }
+  .cst-warn { background: rgba(217,45,32,0.10); color: var(--neg); }
+  .cst-mut { background: var(--surface-2); color: var(--ink-3); }
+  .pace-row { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+  .bup-list { margin-top: 4px; }
+  .bup-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 12.5px; border-top: 1px solid var(--line); }
+  .bup-row:first-child { border-top: none; }
+  .bup-nm { color: var(--ink-2); }
+  .bup-amt { margin-left: auto; font-weight: 600; color: var(--ink); }
+  .bup-tick { color: var(--pos); display: flex; }
+  .slm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin-top: 8px; }
+  .slm-chip { background: var(--surface-2); border-radius: 10px; padding: 9px 8px; text-align: center; }
+  .slm-v { font-size: 14.5px; font-weight: 700; }
+  .slm-good { color: var(--pos); }
+  .slm-bad { color: var(--neg); }
+  .slm-k { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; margin-top: 3px; }
 </style>
 </body>
 </html>
