@@ -4802,7 +4802,7 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -4827,7 +4827,8 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const inboxTasks = [];
   if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "tag", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
   if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "sliders", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
-  if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
+  const reviewBaseline = signupMonth || new Date().toISOString().slice(0, 7);
+  if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; if (rm >= reviewBaseline) inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
 
   return (
     <div className="app-shell stage-fade" data-theme={normalizeTheme(theme)}>
@@ -5977,6 +5978,7 @@ function App() {
     content = (
       <DashboardScreen
         name={name}
+        signupMonth={signupMonth}
         targets={targets}
         banks={banks}
         hasData={hasData}
