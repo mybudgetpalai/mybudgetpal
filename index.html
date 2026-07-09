@@ -5351,6 +5351,7 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [rollovers, setRollovers] = useState([]);
   const [reviewMonth, setReviewMonth] = useState(null);
+  const [signupMonth, setSignupMonth] = useState(null);
   const [devNow, setDevNow] = useState(null);
   const setDevDate = (val) => { DEV_NOW = val || null; setDevNow(val || null); };
   const [reviewManual, setReviewManual] = useState(false);
@@ -5386,6 +5387,10 @@ function App() {
     // Real month-end: only review the month that has JUST completed (previous month
     // relative to today), never retrospectively surface older months.
     const prev = addMonths(currentMonthKey(), -1);
+    // Never review months that closed before the customer signed up — the first
+    // review a Cx should ever see is the signup month, once a new month opens.
+    const baseline = signupMonth || new Date().toISOString().slice(0, 7);
+    if (prev < baseline) return;
     const done = completedMonthsWithData(customTransactions);
     if (!done.includes(prev)) return;
     const reviewed = new Set(monthReviews.map((r) => r.month));
@@ -5393,7 +5398,7 @@ function App() {
     const b = (allTargets && allTargets[prev]) || {};
     const hasBudget = TX_CATEGORIES.some((c) => Number(b[c]) > 0) || !!plan;
     if (hasBudget) { setReviewManual(false); setReviewMonth(prev); }
-  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev, runTour, showExtraBanner, hasData, plan, devNow]);
+  }, [stage, customTransactions, allTargets, monthReviews, reviewMonth, sessionDismissed, isDev, runTour, showExtraBanner, hasData, plan, devNow, signupMonth]);
 
   const reviewBudgets = (() => {
     if (!reviewMonth) return {};
@@ -5646,6 +5651,7 @@ function App() {
           const stmtRows = await fetchStatements(uid);
           setGoals(goalRows);
           setName(profile.name);
+          setSignupMonth((profile.created_at || "").slice(0, 7) || null);
           setBanks(bankRows.map((b) => b.bank_name));
           setBankRows(bankRows);
           setTargets(targetObj); fetchAllTargets(uid).then(setAllTargets).catch(() => {});
@@ -5872,6 +5878,7 @@ function App() {
               const stmtRows = await fetchStatements(uid);
               setGoals(goalRows);
               setName(profile.name);
+              setSignupMonth((profile.created_at || "").slice(0, 7) || null);
               setBanks(bankRows.map((b) => b.bank_name));
               setBankRows(bankRows);
               setTargets(targetObj); fetchAllTargets(uid).then(setAllTargets).catch(() => {});
@@ -5930,7 +5937,7 @@ function App() {
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => setStage("targets")} />;
   } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage("breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
+    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage("breakdown")} onDone={(t, p) => { setTargets(t); setPlan(p || null); setSignupMonth(new Date().toISOString().slice(0, 7)); if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {}); setOverviewSlots(TOUR_DEFAULT_SLOTS); if (userId) supabaseClient.from("profiles").upsert({ id: userId, overview_layout: TOUR_DEFAULT_SLOTS }).then(() => {}); setShowExtraBanner(true); setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
