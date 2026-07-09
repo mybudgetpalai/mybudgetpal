@@ -1547,7 +1547,7 @@ function LandingScreen({ onSignup, onLogin, onSkip }) {
       </div>
 
       <footer className="lp-footer">
-        {APP_NAME} · <button className="link-btn inline" onClick={onSkip}>Skip to homepage (dev)</button>
+        {APP_NAME}
       </footer>
     </div>
   );
@@ -1574,7 +1574,6 @@ function WelcomeScreen({ onChoose, onSkip, onOpenLegal }) {
           <button className="link-btn inline" onClick={() => onOpenLegal("terms")}>Terms</button> and{" "}
           <button className="link-btn inline" onClick={() => onOpenLegal("privacy")}>Privacy Policy</button>
         </p>
-        <button className="skip-btn" onClick={onSkip}>Skip to homepage →</button>
       </div>
     </div>
   );
@@ -2967,7 +2966,7 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks, isAdmin, onOpenAdmin }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const taskList = tasks || [];
@@ -3004,6 +3003,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
           <div className="avatar-menu">
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>Settings</button>
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenMapping(); }}>Mapping</button>
+            {isAdmin && <button className="menu-item menu-item-admin" onClick={() => { setMenuOpen(false); onOpenAdmin(); }}>Admin tools</button>}
             <button className="menu-item" onClick={onLogout}>Log out</button>
           </div>
         )}
@@ -4781,7 +4781,7 @@ const DEMO_TRANSACTIONS = (() => {
 })();
 const DEMO_TARGETS = { Groceries: 450, Dining: 200, Transport: 120, Shopping: 400, Subscriptions: 80, Bills: 450 };
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -4817,7 +4817,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenSetting
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
@@ -5086,6 +5086,194 @@ function SettingsScreen({ name, banks, targets, userId, onBack, onOpenLegal, pus
   );
 }
 
+/* ---------------- Admin ---------------- */
+
+function AdminBar({ onOpen }) {
+  return (
+    <div className="admin-bar">
+      <span className="admin-bar-dot" />
+      <span className="admin-bar-label">Admin account</span>
+      <span className="admin-bar-sub">Logged in as master</span>
+      <button className="admin-bar-btn" onClick={onOpen}>Admin tools</button>
+    </div>
+  );
+}
+
+function NotificationBanner({ notes, onDismiss }) {
+  if (!notes || !notes.length) return null;
+  const n = notes[0];
+  return (
+    <div className="notif-banner">
+      <span className="notif-banner-text">{n.body}</span>
+      <button className="notif-banner-x" onClick={() => onDismiss(n.id)} aria-label="Dismiss">\u00d7</button>
+    </div>
+  );
+}
+
+function AdminScreen({ onBack, pushToast }) {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [composer, setComposer] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(null);
+
+  const call = async (action, extra) => {
+    const { data, error } = await supabaseClient.functions.invoke("admin", { body: { action, ...(extra || {}) } });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  };
+  const load = async () => {
+    setLoading(true);
+    try {
+      const s = await call("stats"); setStats(s.stats);
+      const u = await call("list"); setUsers(u.users || []);
+    } catch (e) { pushToast("Admin load failed: " + (e.message || e), "error"); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const fmtDate = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "\u2014";
+  const doReset = async (u) => {
+    if (!window.confirm("Reset " + u.email + "?\n\nThis deletes all their data and sends them back through onboarding.")) return;
+    setBusy(u.id);
+    try { await call("reset", { userId: u.id }); pushToast("Account reset", "success"); await load(); }
+    catch (e) { pushToast("Reset failed: " + (e.message || e), "error"); }
+    setBusy(null);
+  };
+  const doDelete = async (u) => {
+    if (!window.confirm("Permanently delete " + u.email + "?\n\nThis removes their account and all data and cannot be undone.")) return;
+    setBusy(u.id);
+    try { await call("delete", { userId: u.id }); pushToast("Account deleted", "success"); await load(); }
+    catch (e) { pushToast("Delete failed: " + (e.message || e), "error"); }
+    setBusy(null);
+  };
+  const openMsg = (u) => { setComposer({ userId: u.id, to: "To: " + u.email }); setMsg(""); };
+  const openBroadcast = () => { setComposer({ userId: null, to: "To: all " + (stats ? stats.total : 0) + " users" }); setMsg(""); };
+  const send = async () => {
+    const body = msg.trim(); if (!body) return;
+    setSending(true);
+    try {
+      if (composer.userId) await call("notify", { userId: composer.userId, body });
+      else await call("notifyAll", { body });
+      pushToast("Message sent", "success"); setComposer(null); setMsg("");
+    } catch (e) { pushToast("Send failed: " + (e.message || e), "error"); }
+    setSending(false);
+  };
+
+  const weekly = (stats && stats.weekly) || [];
+  const maxWk = weekly.length ? Math.max(1, ...weekly.map((w) => w.count)) : 1;
+  const badgeFor = (u) => u.statements > 0 ? { t: "uploaded", bg: "rgba(18,161,80,0.12)", c: "var(--pos)" }
+    : u.onboarded ? { t: "onboarded", bg: "var(--accent-soft)", c: "var(--accent)" }
+    : { t: "signed up", bg: "rgba(181,71,8,0.12)", c: "var(--warn)" };
+  const tile = { background: "var(--card)", border: "1px solid var(--line)", borderRadius: 14, padding: 14, boxShadow: "var(--shadow-card)" };
+  const th = { padding: "11px 12px", fontWeight: 600, color: "var(--ink-2)" };
+
+  return (
+    <div className="admin-page">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", fontWeight: 700 }}>{APP_NAME}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--ink)" }}>Admin tools</div>
+        </div>
+        <button className="btn" onClick={onBack}>\u2190 Back to app</button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", color: "var(--ink-3)", padding: 60 }}>Loading\u2026</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
+            <div style={{ ...tile, flex: 1, minWidth: 220, display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div>
+                <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1, color: "var(--ink)" }}>{stats ? stats.total : 0}</div>
+                <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 4 }}>Total sign-ups</div>
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 260, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={tile}><div style={{ fontSize: 12, color: "var(--ink-3)" }}>Onboarded</div><div style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{stats ? stats.onboarded : 0}</div></div>
+              <div style={tile}><div style={{ fontSize: 12, color: "var(--ink-3)" }}>Uploaded a statement</div><div style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{stats ? stats.uploaded : 0}</div></div>
+              <div style={tile}><div style={{ fontSize: 12, color: "var(--ink-3)" }}>Statements uploaded</div><div style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{stats ? stats.statements_total : 0}</div></div>
+              <div style={tile}><div style={{ fontSize: 12, color: "var(--ink-3)" }}>Active last 7 days</div><div style={{ fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{stats ? stats.active7d : 0}</div></div>
+            </div>
+          </div>
+
+          <div style={{ ...tile, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "var(--ink)" }}>Sign-ups over time</div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 110 }}>
+              {weekly.map((w, i) => (
+                <div key={i} style={{ flex: 1, textAlign: "center" }}>
+                  <div style={{ background: i === weekly.length - 1 ? "var(--accent)" : "var(--accent-soft)", borderRadius: "5px 5px 0 0", height: Math.max(4, Math.round((w.count / maxWk) * 90)) }} />
+                  <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 6 }}>{w.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Users ({users.length})</div>
+            <button className="btn" onClick={openBroadcast}>Message all users</button>
+          </div>
+
+          {composer && (
+            <div style={{ background: "var(--accent-soft)", border: "1px solid var(--accent)", borderRadius: 14, padding: 14, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 8, fontWeight: 600 }}>{composer.to}</div>
+              <textarea className="tx-input" style={{ width: "100%", minHeight: 64, boxSizing: "border-box", resize: "vertical" }} placeholder="Write an in-app message they'll see next time they log in" value={msg} onChange={(e) => setMsg(e.target.value)} />
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button className="btn btn-primary" disabled={sending || !msg.trim()} onClick={send}>{sending ? "Sending\u2026" : "Send"}</button>
+                <button className="btn" onClick={() => setComposer(null)}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ ...tile, padding: 0, overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "var(--surface-2)", textAlign: "left" }}>
+                    <th style={th}>Email</th>
+                    <th style={th}>Joined</th>
+                    <th style={th}>Progress</th>
+                    <th style={th}>Statements</th>
+                    <th style={th}>Active</th>
+                    <th style={{ ...th, textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.length === 0 ? (
+                    <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "var(--ink-3)" }}>No customers yet.</td></tr>
+                  ) : users.map((u) => {
+                    const b = badgeFor(u);
+                    return (
+                      <tr key={u.id} style={{ borderTop: "1px solid var(--line)", opacity: busy === u.id ? 0.5 : 1 }}>
+                        <td style={{ padding: "11px 12px", color: "var(--ink)" }}>{u.email}</td>
+                        <td style={{ padding: "11px 12px", color: "var(--ink-3)" }}>{fmtDate(u.created_at)}</td>
+                        <td style={{ padding: "11px 12px" }}><span style={{ background: b.bg, color: b.c, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>{b.t}</span></td>
+                        <td style={{ padding: "11px 12px", color: "var(--ink-2)" }}>{u.statements}</td>
+                        <td style={{ padding: "11px 12px", color: "var(--ink-3)" }}>{fmtDate(u.last_sign_in_at)}</td>
+                        <td style={{ padding: "11px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button className="admin-act" onClick={() => openMsg(u)}>Message</button>
+                          <button className="admin-act" onClick={() => doReset(u)}>Reset</button>
+                          <button className="admin-act admin-act-danger" onClick={() => doDelete(u)}>Delete</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- App shell / router ---------------- */
 
 function App() {
@@ -5112,6 +5300,8 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [goals, setGoals] = useState([]);
   const [isDev, setIsDev] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const [theme, setTheme] = useState("light");
   const [runTour, setRunTour] = useState(false);
   const [usingDemo, setUsingDemo] = useState(false);
@@ -5132,11 +5322,15 @@ function App() {
   const hasData = customTransactions.length > 0;
 
   React.useEffect(() => {
-    if (!userId) { setMonthReviews([]); setRollovers([]); return; }
+    if (!userId) { setMonthReviews([]); setRollovers([]); setNotifications([]); return; }
     (async () => {
       try {
         const [mr, ro] = await Promise.all([fetchMonthReviews(userId), fetchRollovers(userId)]);
         setMonthReviews(mr); setRollovers(ro);
+      } catch (e) {}
+      try {
+        const { data: notes } = await supabaseClient.from("notifications").select("*").eq("user_id", userId).eq("read", false).order("created_at", { ascending: false });
+        setNotifications(notes || []);
       } catch (e) {}
     })();
   }, [userId]);
@@ -5392,6 +5586,7 @@ function App() {
         const uid = session.user.id;
         setUserId(uid);
         setIsDev(session.user.email === DEV_EMAIL);
+        setIsAdmin(session.user.email === ADMIN_EMAIL);
         DEV_MODE = session.user.email === DEV_EMAIL;
         const profile = await fetchProfile(uid);
         if (profile?.name) {
@@ -5427,71 +5622,9 @@ function App() {
 
   const openLegal = (tab, from) => { setLegalTab(tab); setReturnStage(from); setStage("legal"); };
 
-  const DEV_EMAIL = "dev@mybudgetpal.test";
-  const DEV_PASSWORD = "DevAccount123!";
+  const DEV_EMAIL = "testing@mybudgetpal.com";
+  const ADMIN_EMAIL = "admin@mybudgetpal.com";
 
-  const skipToHomepage = async () => {
-    setCheckingSession(true);
-    try {
-      let signIn = await supabaseClient.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
-      if (signIn.error) {
-        const msg = signIn.error.message || "";
-        if (msg.toLowerCase().includes("confirm")) {
-          pushToast("Dev account needs email confirmation disabled in Supabase settings", "error");
-          setCheckingSession(false);
-          return;
-        }
-        const signUp = await supabaseClient.auth.signUp({ email: DEV_EMAIL, password: DEV_PASSWORD });
-        if (signUp.error) { pushToast("Dev login failed: " + signUp.error.message, "error"); setCheckingSession(false); return; }
-        signIn = await supabaseClient.auth.signInWithPassword({ email: DEV_EMAIL, password: DEV_PASSWORD });
-        if (signIn.error) {
-          pushToast("Dev account created but needs email confirmation disabled in Supabase settings", "error");
-          setCheckingSession(false);
-          return;
-        }
-      }
-      const uid = signIn.data.user.id;
-      setUserId(uid);
-      setIsDev(true);
-      DEV_MODE = true;
-
-      let profile = await fetchProfile(uid);
-      if (!profile?.name) {
-        await supabaseClient.from("profiles").upsert({ id: uid, name: "Shezaad" });
-        await supabaseClient.from("banks").insert([
-          { user_id: uid, bank_name: "HSBC", currency: "GBP" },
-          { user_id: uid, bank_name: "Emirates NBD", currency: "AED" },
-        ]);
-        const rows = Object.keys(CATEGORY_MONTHLY).map((c) => ({
-          user_id: uid, category: c, monthly_target: CATEGORY_MONTHLY[c][CATEGORY_MONTHLY[c].length - 1],
-        }));
-        await supabaseClient.from("targets").insert(rows);
-      }
-
-      const bankRows = await fetchBanks(uid);
-      const targetObj = await fetchTargets(uid);
-      const txRows = await fetchTransactions(uid);
-      const goalRows = await fetchGoals(uid);
-      const stmtRows = await fetchStatements(uid);
-      setGoals(goalRows);
-      profile = await fetchProfile(uid);
-      setName(profile?.name || "Shezaad");
-      setBanks(bankRows.map((b) => b.bank_name));
-      setBankRows(bankRows);
-      setTargets(targetObj); fetchAllTargets(uid).then(setAllTargets).catch(() => {});
-      setCustomTransactions(txRows);
-      setStatements(stmtRows);
-      setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
-      setOverviewSlots(parseOverviewLayout(profile)); setTheme(normalizeTheme(profile && profile.theme));
-      setNavViews(parseNavLayout(profile));
-      setBillExcludes(parseBillExcludes(profile));
-      setPlan(planFromProfile(profile));
-      setStage("dashboard");
-    } catch (e) {
-      pushToast("Dev login failed — check connection", "error");
-    }
-    setCheckingSession(false);
-  };
   const reloadFxData = async () => {
     if (!userId) return;
     FX.ready = false;
@@ -5628,11 +5761,17 @@ function App() {
   const handleLogout = async () => {
     await supabaseClient.auth.signOut();
     setIsDev(false);
+    setIsAdmin(false);
     DEV_MODE = false;
     setUserId(null); setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setStatements([]); setPlan(null);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
     setStage("landing");
+  };
+
+  const dismissNote = async (id) => {
+    setNotifications((p) => p.filter((n) => n.id !== id));
+    try { await supabaseClient.from("notifications").update({ read: true }).eq("id", id); } catch (e) {}
   };
 
   if (checkingSession) return null;
@@ -5643,14 +5782,12 @@ function App() {
       <LandingScreen
         onSignup={() => { setReturnStage("landing"); setStage("signup"); }}
         onLogin={() => { setReturnStage("landing"); setStage("login"); }}
-        onSkip={skipToHomepage}
       />
     );
   } else if (stage === "welcome") {
     content = (
       <WelcomeScreen
         onChoose={(mode) => { setReturnStage("welcome"); setStage(mode === "signup" ? "signup" : "login"); }}
-        onSkip={skipToHomepage}
         onOpenLegal={(tab) => openLegal(tab, "welcome")}
       />
     );
@@ -5664,6 +5801,7 @@ function App() {
         onError={(msg, type) => pushToast(msg, type || "error")}
         onDone={async (mode, uid, profile) => {
           setUserId(uid);
+          try { const em = (await supabaseClient.auth.getUser()).data?.user?.email || ""; setIsDev(em === DEV_EMAIL); setIsAdmin(em === ADMIN_EMAIL); DEV_MODE = em === DEV_EMAIL; } catch (e) {}
           if (mode === "login") {
             if (profile?.name) {
               const bankRows = await fetchBanks(uid);
@@ -5765,6 +5903,8 @@ function App() {
         onEditTargetsPage={() => { setTargetsEditReq(true); setStage("dashboard"); }}
       />
     );
+  } else if (stage === "admin") {
+    content = <AdminScreen onBack={() => setStage("dashboard")} pushToast={pushToast} />;
   } else {
     content = (
       <DashboardScreen
@@ -5796,6 +5936,8 @@ function App() {
         goalsApi={goalsApi}
         accountData={{ statements, bankRows }}
         isDev={isDev}
+        isAdmin={isAdmin}
+        onOpenAdmin={() => setStage("admin")}
         onResetDev={handleResetDev}
         runTour={runTour}
         onFinishTour={() => setRunTour(false)}
@@ -5811,6 +5953,8 @@ function App() {
 
   return (
     <>
+      {isAdmin && stage !== "landing" && stage !== "welcome" && stage !== "login" && stage !== "signup" && <AdminBar onOpen={() => setStage("admin")} />}
+      {stage === "dashboard" && <NotificationBanner notes={notifications} onDismiss={dismissNote} />}
       {content}
       {reviewMonth && (
         <MonthEndReviewModal
@@ -7060,6 +7204,22 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .app-shell[data-theme="dark"] .settings-nudge { color: #cfe0ff; }
   .icon-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   .side-close-btn { min-width: 44px; min-height: 44px; padding: 0; }
+
+  .admin-bar { display: flex; align-items: center; gap: 12px; background: var(--accent); color: var(--on-accent); padding: 10px 18px; font-size: 13px; }
+  .admin-bar-dot { width: 9px; height: 9px; border-radius: 50%; background: #BFF3D6; box-shadow: 0 0 0 3px rgba(255,255,255,0.27); flex-shrink: 0; }
+  .admin-bar-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; }
+  .admin-bar-sub { opacity: 0.92; }
+  .admin-bar-btn { margin-left: auto; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--on-accent); background: rgba(255,255,255,0.16); border: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .admin-bar-btn:hover { background: rgba(255,255,255,0.28); }
+  .notif-banner { display: flex; align-items: center; gap: 10px; background: var(--accent-soft); color: var(--ink); border-bottom: 1px solid var(--line); padding: 10px 18px; font-size: 13.5px; }
+  .notif-banner-text { flex: 1; }
+  .notif-banner-x { background: none; border: none; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; font-family: inherit; }
+  .menu-item-admin { color: var(--accent); font-weight: 600; }
+  .admin-page { max-width: 1000px; margin: 0 auto; padding: 24px 20px 60px; min-height: 100vh; }
+  .admin-act { font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; margin-left: 6px; }
+  .admin-act:hover { background: var(--surface-2); }
+  .admin-act-danger { color: var(--neg); border-color: rgba(217,45,32,0.35); }
+  .admin-act-danger:hover { background: rgba(217,45,32,0.08); }
 </style>
 </body>
 </html>
