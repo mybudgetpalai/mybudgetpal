@@ -3273,6 +3273,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
         </div>
         <div className="avatar-wrap">
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
+        {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
         {menuOpen && (
           <div className="avatar-menu">
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>Settings</button>
@@ -6315,7 +6316,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
         </div>
         <div className="catman-add">
           <input className="catman-input" value={newName} placeholder="Add a category (e.g. Holidays, Kids)" onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustom(); }} />
-          <button className="glass-btn" onClick={addCustom}>Add</button>
+          <button className="glass-btn primary" onClick={addCustom}>Add</button>
         </div>
       </div>
 
@@ -9645,6 +9646,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catman-add { display: flex; gap: 8px; margin-top: 12px; }
   .catman-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .catman-actions .glass-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .menu-backdrop { position: fixed; inset: 0; z-index: 90; }
+  .avatar-menu { z-index: 100; }
+  @media (max-width: 640px) {
+    .bd-header { flex-direction: column; align-items: stretch; }
+    .bd-hero-right { justify-content: flex-start; margin-top: 8px; }
+  }
 </style>
 </body>
 </html>
