@@ -8714,10 +8714,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* ---- long-term plan grid ---- */
   .ltp-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); }
-  .ltp-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .ltp-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
   .ltp-table th, .ltp-table td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .ltp-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
-  .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--ink); min-width: 140px; z-index: 1; }
+  .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--ink); min-width: 140px; z-index: 3; }
   .ltp-table .ltp-sticky .cat-dot { margin-right: 7px; }
   .ltp-actual-head { color: var(--ink-2) !important; }
   .ltp-plan-head { color: var(--accent-solid) !important; }
