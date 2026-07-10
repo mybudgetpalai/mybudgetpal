@@ -357,8 +357,8 @@ function parseHomeLayout(profile) {
   return { month, big };
 }
 const HOME_WIDGET_KEYS = {
-  month: ["breakdown_mini", "in_out", "category_status", "pace_gauge", "bills_upcoming", "money_flow", "savings_rate", "transactions_mini", "merchants", "bills", "trend"],
-  big: ["net_worth", "goal", "goal_ring", "accounts", "since_last_month", "contribution_bars"],
+  month: ["breakdown_mini", "in_out", "category_status", "category_vs_target", "pace_gauge", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "trend"],
+  big: ["net_worth", "net_worth_pro", "goal", "goal_ring", "accounts", "since_last_month", "contribution_bars", "month_end_projection", "money_score"],
 };
 function parseNavLayout(profile) {
   const valid = VIEWS.map((v) => v.key);
@@ -2939,13 +2939,13 @@ const PERSONA_TEMPLATES = {
   },
   budget_hawk: {
     name: "Budget Hawk",
-    blurb: "Built around pacing \u2014 where the money's going and what's left, category by category.",
-    layout: { month: ["breakdown_mini", "bills", "in_out"], big: ["net_worth", "goal"] },
+    blurb: "Full control \u2014 the worked maths behind every number, pacing deltas, and what's about to leave your account.",
+    layout: { month: ["category_vs_target", "spend_by_week", "next_7_days"], big: ["month_end_projection", "net_worth", "goal"] },
   },
   power_view: {
     name: "Power View",
-    blurb: "The dense view \u2014 merchants, trends, bills and balances, all on one screen.",
-    layout: { month: ["breakdown_mini", "in_out", "merchants", "trend"], big: ["net_worth", "accounts", "goal"] },
+    blurb: "Maximum signal \u2014 deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
+    layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score", "goal_ring"] },
   },
 };
 
@@ -5250,6 +5250,383 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
   );
 }
 
+/* ---------------- Budget Hawk components ---------------- */
+
+function BudgetHawkHero({ targets, transactions, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const day = today().getDate();
+  const expected = s.budget * (day / s.daysInMonth);
+  const delta = s.spent - expected;
+  const under = delta <= 0;
+  return (
+    <div className="safe-hero bh-hero">
+      <div className="bh-left">
+        <span className="safe-hero-label">Safe to spend</span>
+        <span className={"gg-num" + (s.over ? " safe-hero-over" : "")}><CountUp value={s.perDay} format={formatMoney} /><em>/day</em></span>
+        <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")} style={{ marginTop: 8 }}>
+          {under ? "Under pace" : "Over pace"} {"\u00b7"} {under ? "\u2212" : "+"}{formatMoney(Math.round(Math.abs(delta)))}
+        </span>
+      </div>
+      <div className="bh-math">
+        <span className="card-label" style={{ display: "block", marginBottom: 4 }}>How we get this</span>
+        <div className="bh-ln"><span>Monthly budget{s.roll !== 0 ? " + rollover" : ""}</span><strong>{formatMoney(s.pot)}</strong></div>
+        <div className="bh-ln"><span>Spent so far</span><strong>{"\u2212"}{formatMoney(s.spent)}</strong></div>
+        {s.reserved > 0 && <div className="bh-ln"><span>Bills still to come (reserved)</span><strong>{"\u2212"}{formatMoney(s.reserved)}</strong></div>}
+        <div className="bh-ln"><span>Free to spend {"\u00f7"} {s.daysLeft} days left</span><strong>{formatMoney(Math.max(0, s.free))} {"\u00f7"} {s.daysLeft}</strong></div>
+        <div className="bh-ln bh-total"><span>Safe to spend</span><strong>{s.over ? formatMoney(0) : "\u2248 " + formatMoney(s.perDay) + "/day"}</strong></div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
+  const key = currentMonthKey();
+  const cats = spendByCategoryForMonth(transactions || [], key);
+  const day = today().getDate(), dim = daysInCurrentMonth();
+  const elapsed = day / dim;
+  const rows = TX_CATEGORIES.map((c) => ({ c, spent: cats[c] || 0, target: Number((targets || {})[c]) || 0 }))
+    .filter((r) => r.spent > 0 || r.target > 0);
+  if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Category vs target</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to compare against.</div></div>;
+  const upcomingBills = remainingBillsThisMonth(transactions, billExcludes).filter((b) => b.upcoming);
+  const earliestDue = upcomingBills.length ? Math.min(...upcomingBills.map((b) => b.dueDay || 31)) : null;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Category vs target</span>
+      <div className="cvt-row cvt-hd"><span>Category</span><span></span><span>Spent / Target</span><span>{"\u0394"} vs pace</span></div>
+      {rows.map((r) => {
+        const over = r.target > 0 && r.spent > r.target;
+        const width = r.target > 0 ? Math.min(100, (r.spent / r.target) * 100) : 0;
+        const isBillsPending = r.c === "Bills" && r.spent === 0 && earliestDue !== null;
+        const d = r.spent - r.target * elapsed;
+        return (
+          <div className="cvt-row" key={r.c}>
+            <span className="cvt-nm">{displayCat(r.c)}</span>
+            <div className="cvt-bar"><div style={{ width: width + "%", background: over ? "var(--neg)" : "var(--accent)" }} /></div>
+            <span className="cvt-num">{Math.round(r.spent)} / {Math.round(r.target)}</span>
+            {isBillsPending
+              ? <span className="cvt-d cvt-mut">due {ordinalDay(earliestDue)}</span>
+              : r.target > 0
+              ? <span className={"cvt-d " + (d > 0 ? "cvt-bad" : "cvt-ok")}>{d > 0 ? "+" : "\u2212"}{formatMoney(Math.round(Math.abs(d)))}</span>
+              : <span className="cvt-d cvt-mut">{"\u2014"}</span>}
+          </div>
+        );
+      })}
+      <div className="oh-sub" style={{ marginTop: 8 }}>{"\u0394"} = versus where you'd be on day {day} (target {"\u00d7"} {Math.round(elapsed * 100)}%).</div>
+    </div>
+  );
+}
+
+function SpendByWeekCard({ transactions }) {
+  const key = currentMonthKey();
+  const txs = (transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key);
+  if (!txs.length) return <div className="glass-card dash-card"><span className="card-label">Spend by week</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
+  const dim = daysInCurrentMonth();
+  const nWeeks = Math.ceil(dim / 7);
+  const weeks = Array.from({ length: nWeeks }, () => 0);
+  txs.forEach((t) => { const d = parseInt(t.date.slice(8, 10), 10) || 1; weeks[Math.min(nWeeks - 1, Math.floor((d - 1) / 7))] += Math.abs(t.amount); });
+  const curW = Math.min(nWeeks - 1, Math.floor((today().getDate() - 1) / 7));
+  const max = Math.max(...weeks, 1);
+  const hotIdx = weeks.indexOf(Math.max(...weeks));
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Spend by week</span>
+      <div className="cb-bars" style={{ height: 50 }}>
+        {weeks.map((v, i) => (
+          <div key={i}
+            className={i === curW ? "cb-hot" : ""}
+            style={{ height: Math.max(4, (v / max) * 100) + "%", background: i === hotIdx && hotIdx !== curW && v > 0 ? "var(--neg)" : undefined, opacity: i > curW ? 0.35 : 1 }} />
+        ))}
+      </div>
+      <div className="cb-x">{weeks.map((_, i) => <span key={i}>W{i + 1}{i === curW ? " \u00b7 now" : ""}</span>)}</div>
+      {weeks[hotIdx] > 0 && <div className="oh-sub" style={{ marginTop: 7 }}>W{hotIdx + 1} is your heaviest so far: <strong>{formatMoney(Math.round(weeks[hotIdx]))}</strong>.</div>}
+    </div>
+  );
+}
+
+function Next7DaysCard({ transactions, billExcludes }) {
+  const todayDay = today().getDate();
+  const upcoming = remainingBillsThisMonth(transactions, billExcludes)
+    .filter((b) => b.upcoming && b.dueDay <= todayDay + 7)
+    .sort((a, b) => a.dueDay - b.dueDay);
+  const total = upcoming.reduce((s, b) => s + b.amount, 0);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Next 7 days</span>
+      {upcoming.length === 0
+        ? <div className="oh-sub" style={{ marginTop: 8 }}>Nothing due in the next week.</div>
+        : (
+          <>
+            {upcoming.slice(0, 4).map((b, i) => (
+              <div className="n7-row" key={i}><span className="n7-dt">{ordinalDay(b.dueDay)}</span><span className="n7-nm">{b.name}</span><span className="n7-amt">{formatMoney(b.amount)}</span></div>
+            ))}
+            <div className="n7-row n7-total"><span className="n7-dt" /><span className="n7-nm">Total leaving</span><span className="n7-amt">{formatMoney(total)}</span></div>
+          </>
+        )}
+    </div>
+  );
+}
+
+function MonthEndProjectionCard({ transactions, targets }) {
+  const key = currentMonthKey();
+  const spent = spendForMonth(transactions || [], key);
+  const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
+  const day = today().getDate();
+  const proj = Math.round(projectMonthEnd(spent));
+  const rate = day > 0 ? spent / day : 0;
+  const diff = budget - proj;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Month-end projection</span>
+      <div className="oh-big">{formatMoney(proj)} <span className="oh-big-sub">projected spend</span></div>
+      {budget > 0 && (
+        <span className={"cst-chip " + (diff >= 0 ? "cst-ok" : "cst-warn")} style={{ marginTop: 7 }}>
+          {formatMoney(Math.abs(Math.round(diff)))} {diff >= 0 ? "under" : "over"} budget
+        </span>
+      )}
+      <div className="oh-sub" style={{ marginTop: 8 }}>Based on your current daily rate of {formatMoney(Math.round(rate))}.</div>
+    </div>
+  );
+}
+
+/* ---------------- Power View components ---------------- */
+
+function avg3moSpendByCategory(transactions) {
+  const keys = lastNMonthKeys(currentMonthKey(), 4).slice(0, 3);
+  const acc = {};
+  keys.forEach((k) => {
+    const c = spendByCategoryForMonth(transactions || [], k);
+    Object.keys(c).forEach((cat) => { acc[cat] = (acc[cat] || 0) + c[cat]; });
+  });
+  const out = {};
+  Object.keys(acc).forEach((cat) => { out[cat] = acc[cat] / keys.length; });
+  return out;
+}
+
+function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, accountData, goals }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  const key = currentMonthKey();
+  const income = incomeForMonth(transactions || [], key);
+  const kept = income > 0 ? Math.round(((income - s.spent) / income) * 100) : null;
+  const avg = avg3moSpendByCategory(transactions);
+  const avgTotal = Object.keys(avg).reduce((t, c) => t + avg[c], 0);
+  const elapsed = today().getDate() / s.daysInMonth;
+  const spentVsAvg = avgTotal > 0 ? Math.round(((s.spent - avgTotal * elapsed) / Math.max(avgTotal * elapsed, 1)) * 100) : null;
+  const nw = totalEstimatedBalance(banks, accountData, transactions || []);
+  const goal = goals && goals.length ? goals[0] : null;
+  const proj = goal ? goalProjection(goal, transactions) : null;
+  const day = today().getDate();
+  const expected = s.budget * (day / s.daysInMonth);
+  const paceD = Math.round(s.spent - expected);
+  const stats = [];
+  if (s.budget > 0) stats.push({ k: "Safe/day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "\u2212" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
+  stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "\u2193" : "\u2191") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
+  if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: null, good: kept >= 50 });
+  if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: null, good: true });
+  if (proj && proj.projected) stats.push({ k: "Goal ETA", v: shortDate(proj.projected), s: null, good: true });
+  if (!stats.length) return null;
+  return (
+    <div className="pv-band">
+      {stats.slice(0, 5).map((st, i) => (
+        <div className="pv-stat" key={i}>
+          <div className="pv-k">{st.k}</div>
+          <div className="pv-v">{st.v}</div>
+          {st.s && <div className={"pv-s " + (st.good ? "pv-good" : "pv-bad")}>{st.s}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CategoryDeltaCard({ transactions }) {
+  const key = currentMonthKey();
+  const cur = spendByCategoryForMonth(transactions || [], key);
+  const avg = avg3moSpendByCategory(transactions);
+  const elapsed = today().getDate() / daysInCurrentMonth();
+  const rows = TX_CATEGORIES.map((c) => {
+    const s = cur[c] || 0;
+    const a = (avg[c] || 0) * elapsed;
+    if (s === 0 && a === 0) return null;
+    const pct = a > 0 ? Math.round(((s - a) / a) * 100) : null;
+    return { c, s, pct };
+  }).filter(Boolean).sort((x, y) => y.s - x.s);
+  if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">{"\u0394"} vs 3-mo avg</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs a few months of statements.</div></div>;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Category {"\u0394"} vs 3-mo avg</span>
+      {rows.slice(0, 5).map((r) => (
+        <div className="pvr" key={r.c}>
+          <span className="pvr-n">{displayCat(r.c)}</span>
+          <span className="pvr-v">{formatMoney(Math.round(r.s))}{r.pct !== null && <em className={r.pct > 0 ? "cvt-bad" : "cvt-ok"}> {r.pct > 0 ? "+" : "\u2212"}{Math.abs(r.pct)}%</em>}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MerchantsProCard({ transactions }) {
+  const key = currentMonthKey();
+  const txs = (transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key);
+  const by = {};
+  txs.forEach((t) => { const n = t.name || "Unknown"; by[n] = (by[n] || 0) + Math.abs(t.amount); });
+  const rows = Object.entries(by).sort((a, b) => b[1] - a[1]);
+  const total = rows.reduce((s, [, v]) => s + v, 0);
+  if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Top merchants</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
+  const conc = Math.round((rows.slice(0, 3).reduce((s, [, v]) => s + v, 0) / Math.max(total, 1)) * 100);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Top merchants <span className="pv-mut">{"\u00b7"} top 3 = {conc}%</span></span>
+      {rows.slice(0, 5).map(([n, v], i) => (
+        <div className="pvr" key={i}>
+          <span className="pvr-n">{n}</span>
+          <span className="pvr-v">{formatMoney(Math.round(v))} <em className="pv-mut">{Math.round((v / total) * 100)}%</em></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BiggestMoversCard({ transactions }) {
+  const cur = currentMonthKey();
+  const prev = lastNMonthKeys(cur, 2)[0];
+  const cCur = spendByCategoryForMonth(transactions || [], cur);
+  const cPrev = spendByCategoryForMonth(transactions || [], prev);
+  const elapsed = today().getDate() / daysInCurrentMonth();
+  const movers = Object.keys({ ...cCur, ...cPrev }).map((c) => {
+    const a = cCur[c] || 0, b = (cPrev[c] || 0) * elapsed;
+    const d = a - b;
+    const pct = b > 0 ? Math.round((d / b) * 100) : null;
+    return { c, d, pct };
+  }).filter((m) => Math.abs(m.d) >= 1).sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
+  if (!movers.length) return <div className="glass-card dash-card"><span className="card-label">Biggest movers MoM</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs last month's statements to compare.</div></div>;
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Biggest movers MoM <span className="pv-mut">{"\u00b7"} pace-adjusted</span></span>
+      {movers.slice(0, 5).map((m) => (
+        <div className="pvr" key={m.c}>
+          <span className="pvr-n">{displayCat(m.c)}</span>
+          <span className={"pvr-v " + (m.d > 0 ? "cvt-bad" : "cvt-ok")}>{m.d > 0 ? "+" : "\u2212"}{formatMoney(Math.round(Math.abs(m.d)))}{m.pct !== null ? " " + (m.d > 0 ? "\u2191" : "\u2193") + Math.abs(m.pct) + "%" : ""}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Trend12Card({ transactions }) {
+  const keys = lastNMonthKeys(currentMonthKey(), 12);
+  const vals = keys.map((k) => spendForMonth(transactions || [], k));
+  const withData = vals.filter((v) => v > 0);
+  if (withData.length < 3) return <div className="glass-card dash-card"><span className="card-label">Spend {"\u2014"} trailing 12 months</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload more history to unlock the long trend.</div></div>;
+  const avg = withData.reduce((a, b) => a + b, 0) / withData.length;
+  const max = Math.max(...vals, avg, 1);
+  const W = 560, H = 60;
+  const step = W / Math.max(vals.length - 1, 1);
+  const pts = vals.map((v, i) => (i * step) + "," + (H - 6 - (v / max) * (H - 14))).join(" ");
+  const avgY = H - 6 - (avg / max) * (H - 14);
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Spend {"\u2014"} trailing 12 months <span className="pv-mut">{"\u00b7"} dashed = avg {formatMoney(Math.round(avg))}</span></span>
+      <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
+        <line x1="0" y1={avgY} x2={W} y2={avgY} stroke="var(--line-strong)" strokeWidth="1.5" strokeDasharray="5 5" />
+        <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2.5" />
+      </svg>
+      <div className="tr12-x"><span>{monthLabelFromKey(keys[0]).slice(0, 3)}</span><span>{monthLabelFromKey(keys[Math.floor(keys.length / 2)]).slice(0, 3)}</span><span>{monthLabelFromKey(keys[keys.length - 1]).slice(0, 3)}</span></div>
+    </div>
+  );
+}
+
+function NetWorthProCard({ banks, accountData, transactions }) {
+  const nw = totalEstimatedBalance(banks, accountData, transactions || []);
+  if (nw === null) return <NetWorthCard banks={banks} accountData={accountData} transactions={transactions} />;
+  const { statements = [], bankRows = [] } = accountData || {};
+  const names = new Set(banks || []);
+  (transactions || []).forEach((t) => { if (t.bank) names.add(t.bank); });
+  const byCur = {};
+  names.forEach((b) => {
+    const row = bankRows.find((r) => r.bank_name === b);
+    const bal = computeBankBalance(b, statements, transactions, row);
+    if (bal !== null) { const cur = FX.bankCurrency[b] || "GBP"; byCur[cur] = (byCur[cur] || 0) + bal; }
+  });
+  const curs = Object.keys(byCur);
+  const homeTotals = curs.map((c) => ({ c, native: byCur[c], home: c === FX.home ? byCur[c] : fxConvert(byCur[c], c, nowMonth()) }));
+  const totalHome = homeTotals.reduce((s, x) => s + x.home, 0);
+  const palette = ["var(--accent-solid)", "#1D9E75", "#B54708", "#7A5AF8"];
+  return (
+    <div className="glass-card dash-card">
+      <span className="card-label">Net worth {"\u00b7"} currency split</span>
+      <div className="oh-big">{formatMoney(Math.round(nw))}</div>
+      {curs.length > 1 && (
+        <>
+          <div className="nwp-bar">
+            {homeTotals.map((x, i) => <div key={x.c} style={{ width: Math.max(2, (x.home / Math.max(totalHome, 1)) * 100) + "%", background: palette[i % palette.length] }} />)}
+          </div>
+          <div className="nwp-legend">
+            {homeTotals.map((x, i) => (
+              <span key={x.c}><span className="seg-dot" style={{ background: palette[i % palette.length] }} /> {x.c} {(CURRENCY_SYMBOLS[x.c] || "")}{Math.round(x.native).toLocaleString()}{x.c !== FX.home ? " \u2248 " + formatMoney(Math.round(x.home)) : ""} {"\u00b7"} {Math.round((x.home / Math.max(totalHome, 1)) * 100)}%</span>
+            ))}
+          </div>
+        </>
+      )}
+      {curs.length <= 1 && <div className="oh-sub" style={{ marginTop: 6 }}>across your linked accounts</div>}
+    </div>
+  );
+}
+
+function MoneyScoreCard({ transactions, targets, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, null, billExcludes);
+  const key = currentMonthKey();
+  const spent = spendForMonth(transactions || [], key);
+  const income = incomeForMonth(transactions || [], key);
+  const day = today().getDate(), dim = daysInCurrentMonth();
+  const budget = TX_CATEGORIES.reduce((t, c) => t + (Number((targets || {})[c]) || 0), 0);
+  const parts = [];
+  let score = 50;
+  if (budget > 0) {
+    const under = spent <= budget * (day / dim);
+    score += under ? 15 : -10;
+    parts.push({ t: "pace", ok: under });
+  }
+  if (income > 0) {
+    const rate = (income - spent) / income;
+    const ok = rate >= 0.2;
+    score += ok ? 15 : -5;
+    parts.push({ t: "savings", ok });
+  }
+  const bills = remainingBillsThisMonth(transactions, billExcludes);
+  if (bills.length) {
+    const covered = budget <= 0 || s.free >= 0;
+    score += covered ? 10 : -10;
+    parts.push({ t: "bills", ok: covered });
+  }
+  let drag = null;
+  if (budget > 0) {
+    const cats = spendByCategoryForMonth(transactions || [], key);
+    const overs = TX_CATEGORIES.filter((c) => { const t = Number((targets || {})[c]) || 0; return t > 0 && (cats[c] || 0) > t; });
+    if (overs.length) { score -= 4 * Math.min(3, overs.length); drag = displayCat(overs[0]); }
+  }
+  score = Math.max(5, Math.min(98, Math.round(score)));
+  const col = score >= 70 ? "var(--pos)" : score >= 45 ? "var(--warn)" : "var(--neg)";
+  const R = 31, C = 2 * Math.PI * R;
+  return (
+    <div className="glass-card dash-card">
+      <div className="ms-row">
+        <svg viewBox="0 0 80 80" width="62" height="62">
+          <circle cx="40" cy="40" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="9" />
+          <circle cx="40" cy="40" r={R} fill="none" stroke={col} strokeWidth="9" strokeLinecap="round" strokeDasharray={(score / 100) * C + " " + C} transform="rotate(-90 40 40)" />
+          <text x="40" y="46" textAnchor="middle" fontSize="17" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{score}</text>
+        </svg>
+        <div>
+          <span className="card-label" style={{ marginBottom: 3, display: "block" }}>Money score</span>
+          <div className="oh-sub" style={{ marginTop: 0 }}>
+            {parts.map((pt, i) => <span key={i}>{pt.t} {pt.ok ? "\u2713" : "\u2717"}{i < parts.length - 1 ? " \u00b7 " : ""}</span>)}
+            {drag && <span> {"\u00b7"} <strong>{drag} drag</strong></span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const HOME_WIDGETS = {
   breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => <MiniBreakdown transactions={p.transactions} /> },
   in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
@@ -5266,6 +5643,16 @@ const HOME_WIDGETS = {
   money_flow: { label: "Money flow", section: "month", render: (p) => <MoneyFlowCard transactions={p.transactions} /> },
   savings_rate: { label: "Savings rate", section: "month", render: (p) => <SavingsRateCard transactions={p.transactions} /> },
   contribution_bars: { label: "Added each month", section: "big", render: (p) => <ContributionBarsCard transactions={p.transactions} /> },
+  category_vs_target: { label: "Category vs target (table)", section: "month", render: (p) => <CategoryVsTargetCard transactions={p.transactions} targets={p.targets} billExcludes={p.billExcludes} /> },
+  spend_by_week: { label: "Spend by week", section: "month", render: (p) => <SpendByWeekCard transactions={p.transactions} /> },
+  next_7_days: { label: "Next 7 days", section: "month", render: (p) => <Next7DaysCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
+  category_delta: { label: "\u0394 vs 3-mo average", section: "month", render: (p) => <CategoryDeltaCard transactions={p.transactions} /> },
+  merchants_pro: { label: "Top merchants (share)", section: "month", render: (p) => <MerchantsProCard transactions={p.transactions} /> },
+  biggest_movers: { label: "Biggest movers", section: "month", render: (p) => <BiggestMoversCard transactions={p.transactions} /> },
+  trend_12: { label: "12-month trend", section: "month", render: (p) => <Trend12Card transactions={p.transactions} /> },
+  month_end_projection: { label: "Month-end projection", section: "big", render: (p) => <MonthEndProjectionCard transactions={p.transactions} targets={p.targets} /> },
+  net_worth_pro: { label: "Net worth + currency split", section: "big", render: (p) => <NetWorthProCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
+  money_score: { label: "Money score", section: "big", render: (p) => <MoneyScoreCard transactions={p.transactions} targets={p.targets} billExcludes={p.billExcludes} /> },
   goal: { label: "Savings goal", section: "big", render: (p) => <GoalCard goals={p.goals} /> },
   accounts: { label: "Bank accounts", section: "big", render: (p) => <BankAccountsCard banks={p.banks} transactions={p.transactions} accountData={p.accountData} /> },
 };
@@ -5398,6 +5785,10 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
               ? <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
               : persona === "goal_getter"
               ? <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} />
+              : persona === "budget_hawk"
+              ? <BudgetHawkHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
+              : persona === "power_view"
+              ? <PowerViewHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} banks={banks} accountData={accountData} goals={goals} />
               : <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />}
             <InsightPill transactions={transactions} targets={targets} />
           </>
@@ -8512,6 +8903,51 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .gg-hero { grid-template-columns: 1fr; }
     .gg-vr { display: none; }
     .fs-hero { flex-direction: column; align-items: flex-start; }
+  }
+
+  .bh-hero { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
+  .bh-left { display: flex; flex-direction: column; align-items: flex-start; }
+  .bh-math { background: color-mix(in srgb, var(--card) 78%, transparent); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; }
+  .bh-ln { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; color: var(--ink-2); padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .bh-ln strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bh-ln.bh-total { border-bottom: none; border-top: 1.5px solid var(--line-strong); margin-top: 2px; padding-top: 6px; }
+  .bh-ln.bh-total span, .bh-ln.bh-total strong { color: var(--ink); font-weight: 600; }
+  .cvt-row { display: grid; grid-template-columns: 86px 1fr 82px 70px; gap: 9px; align-items: center; padding: 6px 0; font-size: 12px; }
+  .cvt-hd { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+  .cvt-hd span:nth-child(3), .cvt-hd span:nth-child(4) { text-align: right; }
+  .cvt-nm { color: var(--ink-2); font-weight: 500; }
+  .cvt-bar { height: 9px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+  .cvt-bar > div { height: 100%; border-radius: 99px; }
+  .cvt-num { text-align: right; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .cvt-d { text-align: right; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cvt-ok { color: var(--pos); }
+  .cvt-bad { color: var(--neg); }
+  .cvt-mut { color: var(--ink-3); font-weight: 500; }
+  .n7-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 12.5px; border-top: 1px solid var(--line); }
+  .n7-row:first-of-type { border-top: none; }
+  .n7-dt { width: 36px; color: var(--ink-3); font-weight: 600; font-size: 10.5px; }
+  .n7-nm { color: var(--ink-2); }
+  .n7-amt { margin-left: auto; font-weight: 600; color: var(--ink); }
+  .n7-total .n7-nm, .n7-total .n7-amt { font-weight: 700; color: var(--ink); }
+  .pv-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 0 4px; }
+  .pv-stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-card); padding: 10px 13px; }
+  .pv-k { font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+  .pv-v { font-size: 16.5px; font-weight: 600; color: var(--ink); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .pv-s { font-size: 10px; font-weight: 600; margin-top: 2px; }
+  .pv-good { color: var(--pos); }
+  .pv-bad { color: var(--neg); }
+  .pv-mut { color: var(--ink-3); font-size: 10px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+  .pvr { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; font-size: 12px; }
+  .pvr-n { color: var(--ink-2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pvr-v { font-weight: 600; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pvr-v em { font-style: normal; font-weight: 700; font-size: 11px; }
+  .tr12-x { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
+  .nwp-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; margin-top: 10px; }
+  .nwp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11px; color: var(--ink-2); margin-top: 6px; }
+  .ms-row { display: flex; align-items: center; gap: 13px; }
+  @media (max-width: 640px) {
+    .bh-hero { grid-template-columns: 1fr; }
+    .cvt-row { grid-template-columns: 74px 1fr 74px 60px; }
   }
 </style>
 </body>
