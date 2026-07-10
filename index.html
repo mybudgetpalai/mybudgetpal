@@ -4949,14 +4949,14 @@ function MiniBreakdown({ transactions }) {
   const otherTotal = entries.slice(4).reduce((s, e) => s + e[1], 0);
   const seg = top.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
   if (otherTotal > 0) seg.push({ label: "Other", v: otherTotal, color: "#9aa4b8" });
-  const R = 32, C = 2 * Math.PI * R; let off = 0;
+  const R = 44, C = 2 * Math.PI * R; let off = 0;
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Where it's gone</span>
       <div className="oh-mb">
-        <svg viewBox="0 0 84 84" width="76" height="76" className="oh-mb-ring">
-          <circle cx="42" cy="42" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="15" />
-          {seg.map((s, i) => { const len = (s.v / total) * C; const el = <circle key={i} cx="42" cy="42" r={R} fill="none" stroke={s.color} strokeWidth="15" strokeDasharray={len + " " + (C - len)} strokeDashoffset={-off} transform="rotate(-90 42 42)" />; off += len; return el; })}
+        <svg viewBox="0 0 108 108" width="104" height="104" className="oh-mb-ring">
+          <circle cx="54" cy="54" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="18" />
+          {seg.map((s, i) => { const len = (s.v / total) * C; const el = <circle key={i} cx="54" cy="54" r={R} fill="none" stroke={s.color} strokeWidth="18" strokeDasharray={len + " " + (C - len)} strokeDashoffset={-off} transform="rotate(-90 54 54)" />; off += len; return el; })}
         </svg>
         <div className="oh-mb-legend">
           {seg.map((s, i) => (<div key={i} className="oh-mb-item"><span className="oh-mb-dot" style={{ background: s.color }} /><span className="oh-mb-label">{s.label}</span><span className="oh-mb-amt">{formatMoney(s.v)}</span><span className="oh-mb-pct">{Math.round((s.v / total) * 100)}%</span></div>))}
@@ -5102,28 +5102,24 @@ function PaceFullCard({ transactions, targets, rollovers, billExcludes }) {
   const projEnd = Math.round(projectMonthEnd(s.spent));
   const pctSpent = Math.min(100, (s.spent / Math.max(s.budget, 1)) * 100);
   const pctExpected = Math.min(100, (expected / Math.max(s.budget, 1)) * 100);
+  const pctOf = (v) => Math.min(100, Math.max(0, (v / Math.max(s.budget, 1)) * 100));
+  const spentPct = pctOf(s.spent), resPct = pctOf(s.reserved), expPct = pctOf(expected);
   return (
     <div className="glass-card dash-card pf-card">
       <div className="pace-head-row"><span className="card-label" style={{ margin: 0 }}>Your pace</span><span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace" : "Over pace"}</span></div>
-      <div className="pf-grid">
-        <div className="pf-left">
-          <div className="fs-budget-row"><span className="safe-hero-label" style={{ fontSize: 11 }}>This month's spend budget</span><span className="fs-budget-val">{formatMoney(s.spent)} <span className="fs-budget-of">of {formatMoney(s.budget)}</span></span></div>
-          <div className="pace-track" style={{ marginTop: 12 }}>
-            <div className="pace-fill2" style={{ width: pctSpent + "%", background: under ? "var(--pos)" : "var(--neg)" }} />
-            <div className="pace-mark" style={{ left: pctExpected + "%" }} />
-            <div className="pace-mark-lb" style={{ left: pctExpected + "%" }}>expected by today</div>
-          </div>
-          <div className="safe-hero-legend" style={{ marginTop: 28 }}>
-            <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
-            {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
-            <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} {s.over ? "over" : "free"}</span>
-          </div>
+      <div className="fs-budget-row" style={{ marginTop: 16 }}><span className="safe-hero-label" style={{ fontSize: 11 }}>This month's spend budget</span><span className="fs-budget-val" style={{ fontSize: 16 }}>{formatMoney(s.spent)} <span className="fs-budget-of">of {formatMoney(s.budget)}</span></span></div>
+      <div className="pf-bar-wrap">
+        <div className="pf-bar">
+          <div className="pf-bar-seg pf-seg-spent" style={{ width: spentPct + "%" }} />
+          {s.reserved > 0 && <div className="pf-bar-seg pf-seg-res" style={{ width: resPct + "%" }} />}
         </div>
-        <div className="pf-right">
-          <div className="oh-sub">You've spent <strong>{formatMoney(s.spent)}</strong> so far. By day {day} you'd typically be around <strong>{formatMoney(Math.round(expected))}</strong> — that's <strong>{formatMoney(Math.abs(diff))} {under ? "under" : "over"}</strong> your usual pace for a {formatMoney(Math.round(s.budget))} monthly budget.</div>
-          <div className="oh-sub" style={{ marginTop: 12 }}>Keep this up and you're on track to finish {currentMonthName()} around <strong>{formatMoney(projEnd)}</strong>{projEnd < s.budget ? ", comfortably inside budget" : ""}.</div>
-          {s.reserved > 0 && <div className="oh-sub" style={{ marginTop: 12 }}>{formatMoney(s.reserved)} of upcoming bills is already set aside, so your <strong>{formatMoney(s.perDay)}/day</strong> safe-to-spend stays honest.</div>}
-        </div>
+        <div className="pf-bar-mark" style={{ left: expPct + "%" }} />
+        <div className="pf-bar-lb" style={{ left: expPct + "%" }}>expected by today</div>
+      </div>
+      <div className="safe-hero-legend pf-legend">
+        <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
+        {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
+        <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} {s.over ? "over" : "free"}</span>
       </div>
     </div>
   );
@@ -5372,23 +5368,38 @@ function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals 
 function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
   const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
   if (s.budget <= 0) return null;
-  const pct = Math.min(100, Math.max(0, ((s.pot - Math.max(0, s.free)) / Math.max(s.pot, 1)) * 100));
-  const fsDay = today().getDate();
-  const fsPace = s.spent - s.budget * (fsDay / s.daysInMonth);
-  const fsPaceLine = s.over ? "You are spending a little faster than planned — easing off now keeps you on budget." : (fsPace <= 0 ? "You are pacing nicely — a touch under where you would expect by day " + fsDay + "." : "Slightly ahead of pace, but still within budget — nothing to worry about yet.");
-  const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(s.pot, 1)) * 100));
-  const bpw = (v) => Math.min(100, Math.max(0, (v / Math.max(s.budget, 1)) * 100));
-  const R = 52, C = 2 * Math.PI * R;
+  const day = today().getDate();
+  const expected = s.budget * (day / s.daysInMonth);
+  const projEnd = Math.round(projectMonthEnd(s.spent));
+  const ratio = expected > 0 ? s.spent / expected : 1;
+  const paceWord = s.over ? "ahead of budget" : ratio >= 0.9 ? "right on pace" : ratio >= 0.7 ? "a little under pace" : ratio >= 0.4 ? "well under pace" : "far below your usual pace";
+  const budgetPct = s.budget > 0 ? Math.min(100, Math.round((s.spent / s.budget) * 100)) : 0;
+  const R = 46, C = 2 * Math.PI * R;
   return (
-    <div className="safe-hero fs-hero">
-      <div className="fs-side">
+    <div className="safe-hero fs-hero2">
+      <div className="fs2-left">
+        <span className="safe-hero-label">Spent this month</span>
+        <div className="fs2-spent">{formatMoney(s.spent)} <span>of {formatMoney(s.budget)}</span></div>
+        <div className="fs2-ring">
+          <svg viewBox="0 0 120 120" width="128" height="128">
+            <circle cx="60" cy="60" r={R} fill="none" stroke="var(--surface-3)" strokeWidth="12" />
+            <circle cx="60" cy="60" r={R} fill="none" stroke="var(--accent)" strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C - C * (budgetPct / 100)} transform="rotate(-90 60 60)" />
+          </svg>
+          <div className="fs2-ring-c"><span className="fs2-ring-pct">{budgetPct}%</span><span className="fs2-ring-sub">of budget</span></div>
+        </div>
+      </div>
+      <div className="fs2-right">
         <div className="fs-head">
           <span className="safe-hero-label">Safe to spend</span>
           <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
         </div>
         <div className="fs-bignum">{formatMoney(s.perDay)} <em>a day</em></div>
-        <div className="oh-sub" style={{ marginTop: 4 }}>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget {"\u2014"} upcoming bills are already accounted for.</div>
-        <div className="oh-sub" style={{ marginTop: 6 }}>{fsPaceLine}</div>
+        <ul className="fs2-bullets">
+          <li>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget.</li>
+          <li>You've spent <strong>{formatMoney(s.spent)}</strong> so far {DASH} <strong>{paceWord}</strong> for day {day} (usually {APPROX}{formatMoney(Math.round(expected))}).</li>
+          <li>On track to finish around <strong>{formatMoney(projEnd)}</strong>, {projEnd < s.budget ? "well inside" : "close to"} your {formatMoney(Math.round(s.budget))} budget.</li>
+          {s.reserved > 0 && <li><strong>{formatMoney(s.reserved)}</strong> of upcoming bills is already set aside.</li>}
+        </ul>
       </div>
     </div>
   );
@@ -9295,6 +9306,33 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pace-fill2 { height: 100%; border-radius: 99px; transition: width .4s ease; }
   .pace-mark { position: absolute; top: -4px; width: 2px; height: 20px; background: var(--ink); border-radius: 2px; }
   .pace-mark-lb { position: absolute; top: 22px; font-size: 10px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .fs-hero2 { display: grid; grid-template-columns: 240px 1fr; gap: 32px; align-items: center; }
+  @media (max-width: 760px) { .fs-hero2 { grid-template-columns: 1fr; gap: 20px; } }
+  .fs2-left { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+  .fs2-left .safe-hero-label { align-self: flex-start; }
+  .fs2-spent { font-size: 19px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin: 4px 0 6px; align-self: flex-start; }
+  .fs2-spent span { font-size: 13px; font-weight: 500; color: var(--ink-3); }
+  .fs2-ring { position: relative; width: 128px; height: 128px; }
+  .fs2-ring-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .fs2-ring-pct { font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; line-height: 1; }
+  .fs2-ring-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+  .fs2-right { min-width: 0; }
+  .fs2-bullets { list-style: none; margin: 12px 0 0; padding: 0; }
+  .fs2-bullets li { position: relative; padding-left: 18px; margin-bottom: 8px; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+  .fs2-bullets li:last-child { margin-bottom: 0; }
+  .fs2-bullets li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .fs2-bullets strong { color: var(--ink); font-weight: 700; }
+  .pf-bar-wrap { position: relative; margin: 16px 0 30px; }
+  .pf-bar { position: relative; display: flex; height: 34px; background: var(--surface-2); border: 1.5px solid var(--line-strong); border-radius: 11px; overflow: hidden; }
+  .pf-bar-seg { height: 100%; }
+  .pf-seg-spent { background: var(--accent-solid); }
+  .pf-seg-res { background: color-mix(in srgb, var(--accent-solid) 42%, transparent); }
+  .pf-bar-mark { position: absolute; top: -5px; width: 2.5px; height: 44px; background: var(--ink); border-radius: 2px; z-index: 2; }
+  .pf-bar-lb { position: absolute; top: 42px; font-size: 10.5px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .pf-legend { margin-top: 12px; font-size: 13px; }
+  .oh-mb-item { font-size: 14.5px; padding: 5px 0; }
+  .oh-mb-amt { font-size: 14.5px; }
+  .oh-mb-pct { font-size: 14px; min-width: 44px; }
   .pv-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 0 4px; }
   .pv-stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-card); padding: 10px 13px; }
   .pv-k { font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
