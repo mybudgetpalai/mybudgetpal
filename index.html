@@ -5396,7 +5396,7 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
         <div className="fs-bignum">{formatMoney(s.perDay)} <em>a day</em></div>
         <ul className="fs2-bullets">
           <li>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget.</li>
-          <li>You've spent <strong>{formatMoney(s.spent)}</strong> so far {DASH} <strong>{paceWord}</strong> for day {day} (usually {APPROX}{formatMoney(Math.round(expected))}).</li>
+          <li>You've spent <strong>{formatMoney(s.spent)}</strong> so far — <strong>{paceWord}</strong> for day {day} (usually ≈{formatMoney(Math.round(expected))}).</li>
           <li>On track to finish around <strong>{formatMoney(projEnd)}</strong>, {projEnd < s.budget ? "well inside" : "close to"} your {formatMoney(Math.round(s.budget))} budget.</li>
           {s.reserved > 0 && <li><strong>{formatMoney(s.reserved)}</strong> of upcoming bills is already set aside.</li>}
         </ul>
