@@ -5411,7 +5411,7 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
         <div className="fsr-num">{formatMoney(s.perDay)} <em>a day</em></div>
         <div className="fsr-say">Spend up to this each day and you'll still finish {currentMonthName()} on budget. You've spent just <strong>{formatMoney(s.spent)}</strong> so far — {paceWord} your usual <strong>{formatMoney(Math.round(expected))}</strong> by now.</div>
       </div>
-      {!s.over && underBy > 0 && <div className="fsr-goal"><Icon name="checkcircle" size={14} /> On track to finish around <strong>{formatMoney(projEnd)}</strong> — about <strong>{formatMoney(underBy)}</strong> under budget</div>}
+      {!s.over && underBy > 0 && <div className="fsr-goal"><Icon name="checkcircle" size={14} /> On track to finish around <br className="fsr-goal-brk" /><strong>{formatMoney(projEnd)}</strong> — about <strong>{formatMoney(underBy)}</strong> under budget</div>}
       <div className="fsr-pace-head">
         <span className="fsr-label">Your pace this month</span>
         <span className="fsr-pace-of"><strong>{formatMoney(s.spent)}</strong> of {formatMoney(s.budget)} budget</span>
@@ -5490,7 +5490,7 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
           const isBillsPending = r.c === "Bills" && r.spent === 0 && r.target > 0 && earliestDue !== null;
           const d = r.spent - r.target * elapsed;
           return (
-            <React.Fragment key={r.c}>
+            <div className="cvt2-row" key={r.c}>
               <span className="cvt2-nm">{displayCat(r.c)}</span>
               <div className="cvt2-track"><div className="cvt2-fill" style={{ width: fill + "%", background: over ? "var(--neg)" : "var(--accent-solid)" }} /><div className="cvt2-tick" style={{ left: tickPct + "%" }} /></div>
               <span className="cvt2-num">{formatMoney(Math.round(r.spent))} <span className="cvt2-tgt">/ {Math.round(r.target)}</span></span>
@@ -5499,7 +5499,7 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
                 : r.target > 0
                 ? <span className={"cvt2-d " + (over ? "cvt2-bad" : "cvt2-ok")}>{over ? "+" : "−"}{formatMoney(Math.round(Math.abs(d)))}</span>
                 : <span className="cvt2-d cvt2-mut">—</span>}
-            </React.Fragment>
+            </div>
           );
         })}
       </div>
@@ -9467,6 +9467,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fsr-say strong { color: var(--ink); font-weight: 700; }
   .fsr-goal { display: inline-flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); border-radius: 10px; padding: 9px 13px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
   .fsr-goal strong { font-weight: 800; }
+  .fsr-goal-brk { display: none; }
   .fsr-pace-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
   .fsr-pace-of { font-size: 12.5px; color: var(--ink-3); }
   .fsr-pace-of strong { color: var(--ink); font-weight: 700; }
@@ -9500,6 +9501,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cvt2-cap { font-size: 11px; color: var(--ink-3); font-weight: 500; }
   .cvt2-cap-tick { border-left: 2px solid var(--ink); padding-left: 5px; }
   .cvt2-grid { display: grid; grid-template-columns: 96px 1fr 96px 66px; row-gap: 15px; column-gap: 16px; align-items: center; }
+  .cvt2-row { display: contents; }
   .cvt2-h { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .cvt2-r { text-align: right; }
   .cvt2-nm { font-size: 13px; color: var(--ink); }
@@ -9521,6 +9523,25 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .sbw2-x > span { flex: 1; text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-2); }
   .sbw2-xnow { color: var(--accent-solid); }
   .sbw2-xfut { color: var(--ink-3); font-weight: 500; }
+  @media (max-width: 560px) {
+    /* 1 · Safe-to-spend hero */
+    .fsr-say { min-width: 0; }
+    .fsr-num em { letter-spacing: normal; white-space: nowrap; margin-left: 6px; }
+    .fsr-goal { display: block; line-height: 1.6; padding: 11px 14px; margin-bottom: 18px; }
+    .fsr-goal .ic { vertical-align: -2px; margin-right: 5px; }
+    .fsr-goal-brk { display: block; }
+    /* 2 · Category vs target — stacked rows */
+    .cvt2-grid { display: block; }
+    .cvt2-grid > span { display: none; }
+    .cvt2-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; row-gap: 8px; padding: 13px 0; border-top: 1px solid var(--line); }
+    .cvt2-row:first-of-type { border-top: none; padding-top: 2px; }
+    .cvt2-nm { grid-column: 1; grid-row: 1; font-size: 15px; }
+    .cvt2-d { grid-column: 2; grid-row: 1; font-size: 15px; }
+    .cvt2-track { grid-column: 1 / -1; grid-row: 2; height: 10px; }
+    .cvt2-num { grid-column: 1 / -1; grid-row: 3; text-align: left; font-size: 13px; }
+    /* 3 · Spend by week — headroom for value labels */
+    .sbw2-plot { height: 128px; padding-top: 24px; }
+  }
   .pace2-card { display: flex; flex-direction: column; }
   .pace2-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
   .pace2-barwrap { position: relative; margin-bottom: 22px; }
