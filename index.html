@@ -362,7 +362,7 @@ function parseHomeLayout(profile) {
   return { month, big };
 }
 const HOME_WIDGET_KEYS = {
-  month: ["breakdown_mini", "in_out", "category_status", "category_vs_target", "pace_gauge", "pace_full", "pace_outlook", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "bills_checklist", "trend"],
+  month: ["breakdown_mini", "breakdown_wide", "in_out", "category_status", "category_vs_target", "pace_gauge", "pace_full", "pace_outlook", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "bills_checklist", "trend"],
   big: ["net_worth", "net_worth_pro", "goal", "goal_ring", "accounts", "since_last_month", "contribution_bars", "month_end_projection", "money_score"],
 };
 function parseNavLayout(profile) {
@@ -2995,7 +2995,7 @@ const PERSONA_TEMPLATES = {
   goal_getter: {
     name: "Goal Getter",
     blurb: "Everything points at your goal — what this month adds, your pace, and the projected finish date.",
-    layout: { month: ["in_out", "savings_rate", "breakdown_mini", "pace_gauge"], big: ["goal_ring", "contribution_bars"] },
+    layout: { month: ["money_flow", "savings_rate", "breakdown_wide"], big: ["goal_ring", "contribution_bars", "net_worth"] },
   },
   budget_hawk: {
     name: "Budget Hawk",
@@ -3005,7 +3005,7 @@ const PERSONA_TEMPLATES = {
   power_view: {
     name: "Power View",
     blurb: "Maximum signal — deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
-    layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score"] },
+    layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score", "goal_ring"] },
   },
 };
 
@@ -5262,25 +5262,23 @@ function MoneyFlowCard({ transactions }) {
   const key = currentMonthKey();
   const income = incomeForMonth(transactions || [], key);
   const out = spendForMonth(transactions || [], key);
-  const kept = income - out;
+  const kept = Math.max(0, income - out);
   if (income <= 0) return (
     <div className="glass-card dash-card">
-      <span className="card-label">Money flow</span>
+      <span className="card-label">Money flow {"·"} {currentMonthName()}</span>
       <div className="oh-sub" style={{ marginTop: 8 }}>No income recorded yet this month.</div>
     </div>
   );
-  const pence = Math.max(0, Math.round((kept / income) * 100));
+  const outPct = Math.min(100, Math.max(1.5, (out / income) * 100));
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Money flow {"—"} what feeds the goal</span>
-      <div className="mf-row">
-        <div className="mf-box"><div className="mf-v">{formatMoney(income)}</div><div className="mf-k">In</div></div>
-        <span className="mf-arr"><Icon name="trending" size={15} /></span>
-        <div className="mf-box"><div className="mf-v">{formatMoney(out)}</div><div className="mf-k">Out</div></div>
-        <span className="mf-arr"><Icon name="trending" size={15} /></span>
-        <div className="mf-box mf-goal"><div className="mf-v">{formatMoney(Math.max(0, kept))}</div><div className="mf-k">To goal</div></div>
+      <span className="card-label">Money flow {"·"} {currentMonthName()}</span>
+      <div className="mf2-row">
+        <div><div className="mf2-k">In</div><div className="mf2-v mf2-in">{formatMoney(income)}</div></div>
+        <div style={{ textAlign: "right" }}><div className="mf2-k">Out</div><div className="mf2-v">{formatMoney(out)}</div></div>
       </div>
-      <div className="oh-sub" style={{ marginTop: 9 }}>You're keeping <strong>{pence}p of every {"\u00a3"}1</strong> right now.</div>
+      <div className="mf2-bar"><div className="mf2-out" style={{ width: outPct + "%" }} /><div className="mf2-kept" style={{ width: (100 - outPct) + "%" }} /></div>
+      <div className="oh-sub" style={{ marginTop: 12 }}><strong className="mf2-keptv">{formatMoney(kept)} kept</strong> {"→"} straight to your goal.</div>
     </div>
   );
 }
@@ -5301,19 +5299,22 @@ function SavingsRateCard({ transactions }) {
   );
   const cur = pts[pts.length - 1];
   const isBest = cur !== null && cur >= Math.max(...valid);
-  const W = 200, H = 44;
+  const avg = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+  const climbing = cur !== null && cur > avg;
+  const W = 150, H = 44;
   const step = W / Math.max(pts.length - 1, 1);
   const line = pts.map((v, i) => v === null ? null : (i * step) + "," + (H - 4 - (v / 100) * (H - 10))).filter(Boolean).join(" ");
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Savings rate {"—"} last 6 months</span>
-      <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
-        <polyline points={line} fill="none" stroke="var(--pos)" strokeWidth="2.5" />
-      </svg>
-      <div className="sr-foot">
-        <span className="sr-num">{cur !== null ? cur + "%" : "—"}</span>
+      <div className="sr2-head">
+        <span className="card-label" style={{ margin: 0 }}>Savings rate {"·"} 6 mo</span>
         {isBest && <span className="cst-chip cst-ok">best month yet</span>}
       </div>
+      <div className="sr2-body">
+        <span className="sr2-num">{cur !== null ? cur + "%" : "—"}</span>
+        <svg viewBox={"0 0 " + W + " " + H} width="150" height={H} preserveAspectRatio="none"><polyline points={line} fill="none" stroke="var(--pos)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </div>
+      <div className="oh-sub" style={{ marginTop: 12 }}>{climbing ? "Climbing steadily — up from a " + avg + "% average." : "Holding around your " + avg + "% average."}</div>
     </div>
   );
 }
@@ -5329,42 +5330,61 @@ function ContributionBarsCard({ transactions }) {
       <div className="oh-sub" style={{ marginTop: 8 }}>Contributions appear once a month ends with money kept.</div>
     </div>
   );
-  const curIsMax = vals[vals.length - 1] >= max;
+  const n = vals.length;
+  const curIsMax = vals[n - 1] >= max;
+  const shade = (i) => i === n - 1 ? "var(--accent-solid)" : "color-mix(in srgb, var(--accent-solid) " + Math.round(28 + (i / Math.max(n - 1, 1)) * 52) + "%, transparent)";
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Added each month</span>
-      <div className="cb-bars">
-        {vals.map((v, i) => <div key={i} className={i === vals.length - 1 ? "cb-hot" : ""} style={{ height: Math.max(4, (v / max) * 100) + "%" }} />)}
+      <div className="cb2-bars">
+        {vals.map((v, i) => <div key={i} style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} />)}
       </div>
-      <div className="cb-x">{keys.map((k) => <span key={k}>{monthLabelFromKey(k).slice(0, 3)}</span>)}</div>
-      {curIsMax && <div className="oh-sub" style={{ marginTop: 7 }}>{monthLabelFromKey(keys[keys.length - 1])}'s your biggest contribution yet.</div>}
+      <div className="cb2-x">{keys.map((k, i) => <span key={k} className={i === n - 1 ? "cb2-now" : ""}>{monthLabelFromKey(k).slice(0, 3)}</span>)}</div>
+      {curIsMax && <div className="oh-sub" style={{ marginTop: 12 }}>{monthLabelFromKey(keys[n - 1])} is your biggest yet.</div>}
     </div>
   );
 }
 
-function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals }) {
+function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals, plan, banks, accountData }) {
   const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
-  if (s.budget <= 0) return null;
+  const target = plan && plan.targetBalance > 0 ? plan.targetBalance : (goals && goals.length ? goals[0].target : 0);
+  const targetMonth = plan && plan.targetMonth ? plan.targetMonth : null;
+  if (target <= 0) return <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />;
+  const nw = totalEstimatedBalance(banks, accountData, transactions || []);
+  const saved = Math.max(0, nw !== null ? nw : (goals && goals.length ? goals[0].saved : 0));
+  const toGo = Math.max(0, target - saved);
+  const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
   const income = incomeForMonth(transactions || [], s.key);
-  const kept = income - s.spent;
-  const projKept = income > 0 ? Math.max(kept, income - Math.min(s.pot, s.spent + s.reserved + s.perDay * s.daysLeft)) : null;
+  const added = income - s.spent;
+  const contribs = lastNMonthKeys(s.key, 6).map((k) => Math.max(0, incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)));
+  const isBiggest = added > 0 && added >= Math.max(...contribs, 0);
+  const targetDateStr = targetMonth ? (monthLabelFromKey(targetMonth).slice(0, 3) + " " + targetMonth.slice(0, 4)) : null;
+  const proj = goalProjection({ target, saved }, transactions);
+  const targetDateObj = targetMonth ? new Date(Number(targetMonth.slice(0, 4)), Number(targetMonth.slice(5, 7)), 0) : null;
+  const aheadOfTarget = proj && proj.projected && targetDateObj ? proj.projected <= targetDateObj : true;
   return (
-    <div className="safe-hero gg-hero">
-      <div className="gg-col">
-        <span className="safe-hero-label">Safe to spend</span>
-        <span className={"gg-num" + (s.over ? " safe-hero-over" : "")}><CountUp value={s.perDay} format={formatMoney} /><em>/day</em></span>
-        <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")} style={{ marginTop: 7 }}>{s.over ? "Over budget" : "On track"}</span>
+    <div className="safe-hero gg2-hero">
+      <div className="gg2-left">
+        <div className="gg2-goal-head">
+          <span className="fsr-label">Your {formatMoney(target)} goal</span>
+          <span className="gg2-pct">{pct}% there</span>
+        </div>
+        <div className="gg2-togo">{formatMoney(toGo)} <em>to go</em></div>
+        <div className="gg2-bar"><div className="gg2-bar-fill" style={{ width: pct + "%" }} /></div>
+        <div className="gg2-scale"><span><strong>{formatMoney(saved)}</strong> saved</span><span>{formatMoney(target)}</span></div>
+        {targetDateStr && aheadOfTarget && <div className="fsr-goal" style={{ marginTop: 16, marginBottom: 0 }}>{"🎯"} On track to finish ahead of your {targetDateStr} target</div>}
+        {targetDateStr && !aheadOfTarget && <div className="gg2-behind" style={{ marginTop: 16 }}>Lift your pace to reach your {targetDateStr} target</div>}
       </div>
-      <div className="gg-vr" />
-      <div className="gg-col">
-        <span className="safe-hero-label">Added to your goal this month</span>
-        <span className="gg-num gg-pos">{kept >= 0 ? "+" : "−"}<CountUp value={Math.abs(kept)} format={formatMoney} /></span>
-        {projKept !== null && projKept > kept && !s.over && (
-          <span className="oh-sub" style={{ marginTop: 6 }}>Stay under {formatMoney(s.perDay)}/day and this becomes <strong>{"≈"} {formatMoney(Math.round(projKept))}</strong> by month end.</span>
-        )}
-        {s.over && (
-          <span className="oh-sub" style={{ marginTop: 6 }}>Over budget this month slows your goal {"—"} trimming spend now gets you back on pace.</span>
-        )}
+      <div className="gg2-right">
+        <div>
+          <span className="fsr-label">Added in {monthLabelFromKey(s.key)}</span>
+          <div className={"gg2-added" + (added < 0 ? " gg2-added-neg" : "")}>{added >= 0 ? "+" : "−"}{formatMoney(Math.abs(added))}</div>
+          {isBiggest && <div className="oh-sub" style={{ marginTop: 7 }}>Your biggest month yet {"🎉"}</div>}
+        </div>
+        <div className="gg2-safe">
+          <span className="fsr-label">Safe to spend</span>
+          <div className="gg2-safe-v">{formatMoney(s.perDay)} <em>/day {"·"} {s.over ? "over" : "on track"}</em></div>
+        </div>
       </div>
     </div>
   );
@@ -5628,11 +5648,10 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "\u2193" : "\u2191") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
   if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: null, good: kept >= 50 });
   if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: null, good: true });
-  if (proj && proj.projected) stats.push({ k: "Goal ETA", v: shortDate(proj.projected), s: null, good: true });
   if (!stats.length) return null;
   return (
     <div className="pv-band">
-      {stats.slice(0, 5).map((st, i) => (
+      {stats.slice(0, 4).map((st, i) => (
         <div className="pv-stat" key={i}>
           <div className="pv-k">{st.k}</div>
           <div className="pv-v">{st.v}</div>
@@ -5656,6 +5675,7 @@ function CategoryDeltaCard({ transactions }) {
     return { c, s, pct };
   }).filter(Boolean).sort((x, y) => y.s - x.s);
   if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">{"Δ"} vs 3-mo avg</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs a few months of statements.</div></div>;
+  const hot = rows.filter((r) => r.pct !== null && r.pct > 0).sort((a, b) => b.pct - a.pct)[0];
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Category {"Δ"} vs 3-mo avg</span>
@@ -5665,6 +5685,7 @@ function CategoryDeltaCard({ transactions }) {
           <span className="pvr-v">{formatMoney(Math.round(r.s))}{r.pct !== null && <em className={r.pct > 0 ? "cvt-bad" : "cvt-ok"}> {r.pct > 0 ? "+" : "−"}{Math.abs(r.pct)}%</em>}</span>
         </div>
       ))}
+      <div className="cvt2-foot">{hot ? displayCat(hot.c) + " running hot; everything else below your rolling 3-month average." : "Everything below your rolling 3-month average."}</div>
     </div>
   );
 }
@@ -5677,16 +5698,23 @@ function MerchantsProCard({ transactions }) {
   const rows = Object.entries(by).sort((a, b) => b[1] - a[1]);
   const total = rows.reduce((s, [, v]) => s + v, 0);
   if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Top merchants</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
-  const conc = Math.round((rows.slice(0, 3).reduce((s, [, v]) => s + v, 0) / Math.max(total, 1)) * 100);
+  const top = rows.slice(0, 3);
+  const conc = Math.round((top.reduce((s, [, v]) => s + v, 0) / Math.max(total, 1)) * 100);
+  const shades = ["var(--accent-solid)", "color-mix(in srgb, var(--accent-solid) 68%, transparent)", "color-mix(in srgb, var(--accent-solid) 42%, transparent)"];
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Top merchants <span className="pv-mut">{"·"} top 3 = {conc}%</span></span>
-      {rows.slice(0, 5).map(([n, v], i) => (
-        <div className="pvr" key={i}>
-          <span className="pvr-n">{n}</span>
-          <span className="pvr-v">{formatMoney(Math.round(v))} <em className="pv-mut">{Math.round((v / total) * 100)}%</em></span>
-        </div>
-      ))}
+      <div className="mpc2-head"><span className="card-label" style={{ margin: 0 }}>Top merchants</span><span className="pv-mut">top 3 = {conc}%</span></div>
+      <div className="mpc2-list">
+        {top.map(([n, v], i) => {
+          const pc = Math.round((v / Math.max(total, 1)) * 100);
+          return (
+            <div key={i}>
+              <div className="mpc2-row"><span className="mpc2-nm">{n}</span><span className="mpc2-v">{formatMoney(Math.round(v))} <span className="pv-mut">{"·"} {pc}%</span></span></div>
+              <div className="mpc2-track"><div style={{ width: pc + "%", background: shades[i] }} /></div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -5868,6 +5896,7 @@ function BillsChecklistCard({ transactions, billExcludes }) {
 
 const HOME_WIDGETS = {
   breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => <MiniBreakdown transactions={p.transactions} /> },
+  breakdown_wide: { label: "Where it's gone (wide)", section: "month", full: true, render: (p) => <MiniBreakdown transactions={p.transactions} /> },
   in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
   transactions_mini: { label: "Recent transactions", section: "month", render: (p) => <TransactionFeed limit={5} transactions={p.transactions} /> },
   merchants: { label: "Top merchants", section: "month", render: (p) => <MerchantsCard transactions={p.transactions} /> },
@@ -6021,7 +6050,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
             {persona === "fresh_start"
               ? <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
               : persona === "goal_getter"
-              ? <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} />
+              ? <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} />
               : persona === "budget_hawk"
               ? <BudgetHawkHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
               : persona === "power_view"
@@ -6046,7 +6075,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         <>
           <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
           <TourTarget active={runTour && tourStep === 2}>
-            <div className="oh-grid">
+            <div className={"oh-grid" + (layout.big.length === 3 ? " oh-grid-3" : "")}>
               {layout.big.map((k) => (
                 <div className="oh-grid-cell" key={k}>{HOME_WIDGETS[k].render(widgetProps)}</div>
               ))}
@@ -9175,6 +9204,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-grid-cell { min-width: 0; display: flex; }
   .oh-grid-cell > .glass-card, .oh-grid-cell > .dash-card { flex: 1; }
   .oh-grid .glass-card { padding: 18px 20px; min-height: 0; }
+  .oh-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 900px) { .oh-grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .oh-grid-3 { grid-template-columns: 1fr; } }
   .oh-io { display: flex; gap: 48px; flex: 1; align-items: center; margin-top: 10px; }
   .oh-io > div { flex: 1; }
   .oh-io-k { font-size: 12px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -9322,12 +9354,52 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cb-bars > div.cb-hot { background: var(--accent-solid); }
   .cb-x { display: flex; gap: 6px; font-size: 9.5px; color: var(--ink-3); font-weight: 600; margin-top: 5px; }
   .cb-x span { flex: 1; text-align: center; }
-  .gg-hero { display: grid; grid-template-columns: 1fr 1px 1.25fr; gap: 20px; align-items: center; }
-  .gg-col { display: flex; flex-direction: column; align-items: flex-start; }
-  .gg-vr { width: 1px; align-self: stretch; background: var(--accent); opacity: 0.3; }
-  .gg-num { font-size: 30px; font-weight: 700; color: var(--ink); margin-top: 4px; line-height: 1; }
-  .gg-num em { font-style: normal; font-size: 13px; color: var(--ink-3); font-weight: 500; }
-  .gg-pos { color: var(--pos); }
+  /* Goal Getter hero (goal-getter-6a) */
+  .gg2-hero { display: grid; grid-template-columns: 1fr 260px; gap: 28px; align-items: center; }
+  .gg2-left { padding-right: 28px; border-right: 1px solid var(--line-strong); }
+  .gg2-goal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .gg2-pct { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .gg2-togo { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); margin-bottom: 14px; }
+  .gg2-togo em { font-style: normal; font-size: 15px; font-weight: 600; color: var(--ink-2); margin-left: 4px; }
+  .gg2-bar { height: 12px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-bottom: 10px; }
+  .gg2-bar-fill { height: 100%; border-radius: 99px; background: var(--accent-solid); }
+  .gg2-scale { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); }
+  .gg2-scale strong { color: var(--ink); font-weight: 700; }
+  .gg2-right { display: flex; flex-direction: column; gap: 18px; }
+  .gg2-added { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; color: var(--pos); margin-top: 8px; line-height: 1; }
+  .gg2-added-neg { color: var(--neg); }
+  .gg2-safe { border-top: 1px solid var(--line-strong); padding-top: 15px; }
+  .gg2-safe-v { font-size: 24px; font-weight: 800; color: var(--ink); margin-top: 8px; line-height: 1; }
+  .gg2-safe-v em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .gg2-behind { display: inline-flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--warn) 13%, transparent); color: var(--warn); border-radius: 10px; padding: 9px 13px; font-size: 13px; font-weight: 600; }
+  @media (max-width: 760px) { .gg2-hero { grid-template-columns: 1fr; } .gg2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; } }
+  /* Money flow (goal-getter-6a) */
+  .mf2-row { display: flex; justify-content: space-between; margin: 14px 0; }
+  .mf2-k { font-size: 11px; font-weight: 600; color: var(--ink-3); margin-bottom: 7px; }
+  .mf2-v { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .mf2-in { color: var(--pos); }
+  .mf2-bar { display: flex; height: 12px; border-radius: 99px; overflow: hidden; background: var(--surface-3); }
+  .mf2-out { background: var(--ink); height: 100%; }
+  .mf2-kept { background: var(--pos); height: 100%; }
+  .mf2-keptv { color: var(--pos); font-weight: 800; }
+  /* Savings rate (goal-getter-6a) */
+  .sr2-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .sr2-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .sr2-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--pos); line-height: 1; }
+  /* Contribution bars (goal-getter-6a) */
+  .cb2-bars { display: flex; align-items: flex-end; gap: 8px; height: 58px; margin-top: 16px; }
+  .cb2-bars > div { flex: 1; border-radius: 4px 4px 0 0; }
+  .cb2-x { display: flex; gap: 8px; margin-top: 7px; }
+  .cb2-x > span { flex: 1; text-align: center; font-size: 9.5px; font-weight: 500; color: var(--ink-3); }
+  .cb2-x .cb2-now { color: var(--accent-solid); font-weight: 700; }
+  /* Top merchants share bars (power-view-6b) */
+  .mpc2-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .mpc2-list { display: flex; flex-direction: column; gap: 15px; }
+  .mpc2-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; font-size: 13px; gap: 10px; }
+  .mpc2-nm { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mpc2-v { font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mpc2-track { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+  .mpc2-track > div { height: 100%; border-radius: 99px; }
   .fs-hero { display: flex; align-items: center; gap: 20px; }
   .fs-dial { flex-shrink: 0; }
   .fs-side { flex: 1; min-width: 0; }
