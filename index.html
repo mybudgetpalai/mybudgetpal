@@ -931,7 +931,7 @@ function remainingBillsThisMonth(txs, excludes) {
     (txs || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key).map((t) => norm(t.name))
   );
   return detectRecurringBills(txs || [])
-    .filter((b) => !ex.includes(b.name))
+    .filter((b) => ex.includes(b.name))
     .map((b) => {
       const dueDay = parseInt(b.due, 10) || 0;
       const paid = paidThisMonth.has(norm(b.name));
@@ -2686,7 +2686,8 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack, bankRows }) {
 
 /* ---------------- Target setting ---------------- */
 
-function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, banks, accountData, isEdit }) {
+function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, banks, accountData, isEdit, overlay }) {
+  const wrapCls = overlay ? "modal-overlay" : "page stage-fade";
   const categories = TX_CATEGORIES;
   const avg = React.useMemo(() => avgSpendByCategory(transactions), [transactions]);
   const typInc = React.useMemo(() => Math.round(typicalIncome(transactions, null)) || 0, [transactions]);
@@ -2794,7 +2795,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
   };
 
   if (step === "method") return (
-    <div className="page stage-fade">
+    <div className={wrapCls}>
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card size-md">
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
@@ -2822,7 +2823,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
   );
 
   if (step === "goal") return (
-    <div className="page stage-fade">
+    <div className={wrapCls}>
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card size-md">
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
@@ -2871,7 +2872,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
   );
 
   return (
-    <div className="page stage-fade">
+    <div className={wrapCls}>
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card target-card">
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
@@ -2987,7 +2988,7 @@ const PERSONA_TEMPLATES = {
   },
 };
 
-function BuildingDashboardScreen({ personaKey, onDone }) {
+function BuildingDashboardScreen({ personaKey, onDone, overlay }) {
   const t = PERSONA_TEMPLATES[personaKey] || PERSONA_TEMPLATES.budget_hawk;
   const [phase, setPhase] = useState(0);
   React.useEffect(() => {
@@ -2996,7 +2997,7 @@ function BuildingDashboardScreen({ personaKey, onDone }) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
   return (
-    <div className="page stage-fade">
+    <div className={overlay ? "modal-overlay" : "page stage-fade"}>
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card size-md" style={{ minHeight: 0, textAlign: "center" }}>
         {phase < 2 ? (
@@ -3954,44 +3955,108 @@ function TrendsCard({ transactions, compact }) {
   );
 }
 
-function BillsCard({ transactions, excludes, onToggleExclude, editable }) {
-  const [editing, setEditing] = useState(false);
-  const ex = excludes || [];
+function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
+  const [dismissed, setDismissed] = useState([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const conf = confirmed || [];
   const detected = detectRecurringBills(transactions || []);
-  if (!detected.length) return <EmptyState text="No recurring payments detected yet — they show up once the same payment appears in 2+ months." />;
-  const bills = detected.filter((b) => !ex.includes(b.name));
-  const excluded = detected.filter((b) => ex.includes(b.name));
-  const total = bills.reduce((s, b) => s + b.amount, 0);
+  const detectedNames = new Set(detected.map((b) => b.name));
+  const confirmedBills = detected.filter((b) => conf.includes(b.name));
+  const manualBills = conf.filter((n) => !detectedNames.has(n)).map((n) => {
+    const rows = (transactions || []).filter((t) => t.amount < 0 && t.name === n);
+    const avg = rows.length ? rows.reduce((s, t) => s + Math.abs(t.amount), 0) / rows.length : 0;
+    return { name: n, amount: Math.round(avg * 100) / 100, frequency: "Monthly", due: "" };
+  });
+  const myBills = [...confirmedBills, ...manualBills].sort((a, b) => b.amount - a.amount);
+  const total = myBills.reduce((s, b) => s + b.amount, 0);
+
+  if (!editable) {
+    if (!myBills.length) return <EmptyState text="No bills yet \u2014 head to Bills & Subscriptions to pick which recurring payments are bills." />;
+    return (
+      <div className="glass-card dash-card">
+        <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
+        <div className="tx-list">
+          {myBills.map((b) => (
+            <div className="tx-row" key={b.name}>
+              <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
+              <span className="tx-amount">{formatMoney(-b.amount)}</span>
+            </div>
+          ))}
+        </div>
+        <p className="summary-note">Total recurring: {formatMoney(total)} / month</p>
+      </div>
+    );
+  }
+
+  const suspected = detected.filter((b) => !conf.includes(b.name) && !dismissed.includes(b.name));
+  const merchantMap = {};
+  (transactions || []).filter((t) => t.amount < 0 && t.name).forEach((t) => {
+    merchantMap[t.name] = (merchantMap[t.name] || 0) + Math.abs(t.amount);
+  });
+  const allMerchants = Object.keys(merchantMap)
+    .filter((n) => !conf.includes(n))
+    .filter((n) => n.toLowerCase().includes(search.trim().toLowerCase()))
+    .sort((a, b) => a.localeCompare(b));
+
   return (
     <div className="glass-card dash-card">
-      <div className="summary-head">
-        <span className="card-label">Bills & subscriptions</span>
-        
-      </div>
-      {editable && <p className="subtitle" style={{ margin: "0 0 8px" }}>These are payments that repeat each month. Tap {"\u201C"}Not a bill{"\u201D"} on anything that isn't really a bill or subscription — a coffee, a shop, a one-off — and it'll stop being counted.</p>}
-      <div className="tx-list">
-        {bills.map((b) => (
-          <div className="tx-row" key={b.name}>
-            <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} {"\u00B7"} due {b.due}</span></div>
-            <div className="bill-right">
-              <span className="tx-amount">{formatMoney(-b.amount)}</span>
-              {editable && <button className="bill-remove" onClick={() => onToggleExclude(b.name)}>Not a bill</button>}
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="summary-note">Total recurring: {formatMoney(total)} / month</p>
-      {editable && excluded.length > 0 && (
-        <div className="bill-excluded">
-          <span className="card-label" style={{ display: "block", margin: "14px 0 6px" }}>Not counted as bills</span>
-          {excluded.map((b) => (
+      <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
+      <p className="subtitle" style={{ margin: "0 0 12px" }}>Nothing's counted as a bill until you say so. We've spotted a few regular payments below {"\u2014"} tell us which are really bills, and add any we missed.</p>
+
+      {suspected.length > 0 && (
+        <div style={{ marginBottom: 4 }}>
+          <span className="card-label" style={{ display: "block", margin: "0 0 6px" }}>Is this a bill?</span>
+          {suspected.map((b) => (
             <div className="tx-row" key={b.name}>
-              <div className="tx-info"><span className="tx-name">{b.name}</span></div>
-              <button className="link-btn inline" onClick={() => onToggleExclude(b.name)}>Restore</button>
+              <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} {"\u00B7"} ~{formatMoney(b.amount)}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
+              <div className="bill-right">
+                <button className="glass-btn primary" style={{ padding: "5px 12px", fontSize: 13 }} onClick={() => onToggleConfirm(b.name)}>Yes</button>
+                <button className="bill-remove" onClick={() => setDismissed((d) => [...d, b.name])}>No</button>
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <span className="card-label" style={{ display: "block", margin: "16px 0 6px" }}>Your bills</span>
+      {myBills.length === 0 ? (
+        <p className="subtitle" style={{ margin: "0 0 4px" }}>No bills added yet {"\u2014"} confirm the ones above, or add your own below.</p>
+      ) : (
+        <>
+          <div className="tx-list">
+            {myBills.map((b) => (
+              <div className="tx-row" key={b.name}>
+                <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
+                <div className="bill-right">
+                  <span className="tx-amount">{formatMoney(-b.amount)}</span>
+                  <button className="bill-remove" onClick={() => onToggleConfirm(b.name)}>Remove</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="summary-note">Total recurring: {formatMoney(total)} / month</p>
+        </>
+      )}
+
+      <div style={{ marginTop: 14 }}>
+        <button className="glass-btn" onClick={() => setPickerOpen((v) => !v)}>{pickerOpen ? "Close" : "Add another bill"}</button>
+        {pickerOpen && (
+          <div style={{ marginTop: 10 }}>
+            <input className="catman-input" style={{ width: "100%", marginBottom: 8 }} placeholder="Search all your payments\u2026" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="tx-list" style={{ maxHeight: 280, overflowY: "auto" }}>
+              {allMerchants.length === 0 ? (
+                <p className="subtitle" style={{ margin: 0 }}>No payments match.</p>
+              ) : allMerchants.slice(0, 60).map((n) => (
+                <div className="tx-row" key={n}>
+                  <div className="tx-info"><span className="tx-name">{n}</span><span className="tx-category">~{formatMoney(merchantMap[n])} total</span></div>
+                  <button className="glass-btn" style={{ padding: "5px 12px", fontSize: 13 }} onClick={() => onToggleConfirm(n)}>Add</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -4740,7 +4805,7 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     case "transactions": return hasData ? <TransactionFeed limit={5} transactions={transactions} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
     case "breakdown": return hasData ? <BreakdownCard transactions={transactions} targets={targets} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
     case "trends": return hasData ? <TrendsCard transactions={transactions} compact /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-    case "bills": return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+    case "bills": return hasData ? <BillsCard transactions={transactions} confirmed={billExcludes} /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
     case "accounts": return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
     case "merchants": return hasData ? <MerchantsCard transactions={transactions} /> : <EmptyState text="No merchant data yet — upload a statement to get started." />;
     case "insights": return hasData ? <InsightsCard transactions={transactions} targets={targets} /> : <EmptyState text="No insights yet — upload a statement to get started." />;
@@ -5671,7 +5736,7 @@ const HOME_WIDGETS = {
   in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
   transactions_mini: { label: "Recent transactions", section: "month", render: (p) => <TransactionFeed limit={5} transactions={p.transactions} /> },
   merchants: { label: "Top merchants", section: "month", render: (p) => <MerchantsCard transactions={p.transactions} /> },
-  bills: { label: "Bills & subscriptions", section: "month", render: (p) => <BillsCard transactions={p.transactions} excludes={p.billExcludes} /> },
+  bills: { label: "Bills & subscriptions", section: "month", render: (p) => <BillsCard transactions={p.transactions} confirmed={p.billExcludes} /> },
   trend: { label: "Spending trend", section: "month", render: (p) => <TrendsCard transactions={p.transactions} compact /> },
   category_status: { label: "Where it's gone (bars)", section: "month", render: (p) => <CategoryStatusCard transactions={p.transactions} targets={p.targets} /> },
   pace_gauge: { label: "Your pace", section: "month", render: (p) => <PaceGaugeCard transactions={p.transactions} targets={p.targets} /> },
@@ -5768,7 +5833,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const needs = [];
   if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
   const ex = billExcludes || [];
-  const detected = detectRecurringBills(txs).filter((b) => !ex.includes(b.name));
+  const detected = detectRecurringBills(txs).filter((b) => ex.includes(b.name));
   const todayDate = today().getDate();
   const dueSoonTotal = detected.filter((b) => { const d = parseInt(b.due, 10); return d && d >= todayDate; }).reduce((s, b) => s + b.amount, 0);
   if (dueSoonTotal > 0) needs.push({ icon: "calendar", color: "var(--ink-2)", text: formatMoney(dueSoonTotal) + " in bills still due this month", cta: null });
@@ -6112,7 +6177,7 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} plan={plan} onEditPlan={onEditPlan} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-  if (view === "bills") return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} onToggleExclude={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+  if (view === "bills") return hasData ? <BillsCard transactions={transactions} confirmed={billExcludes} onToggleConfirm={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
   if (view === "categories") return <CategoryManager transactions={transactions} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} onRecategorize={onRecategorize} />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
@@ -6238,7 +6303,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, catConfig, onSaveCatConfig, onRescanCategories }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -6303,6 +6368,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
         <CategoriseReviewModal transactions={viewTransactions} onRecategorize={onRecategorize} onClose={() => setCatReviewOpen(false)} />
       )}
       {feedbackOpen && <FeedbackModal name={name} pushToast={pushToast} onClose={() => setFeedbackOpen(false)} onSubmitted={() => { setFeedbackDone(true); setFeedbackOpen(false); }} />}
+      {overlayScreen}
       {setupIntroOpen && <SetupIntroModal name={name} onStart={onSetupStart} onSkip={onSetupSkip} />}
       {setupQuestionsOpen && <SetupQuestionsScreen {...setupQuestionsProps} />}
       {uploadOpen && (
@@ -7370,6 +7436,31 @@ function App() {
   const inApp = ["dashboard", "settings", "mapping", "planSetup", "admin"].includes(stage);
 
   let content;
+  let overlayScreen = null;
+  if (stage === "targets") {
+    overlayScreen = <TargetSettingScreen overlay userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => {
+      setTargets(t); setPlan(p || null);
+      if (!setupResume) setSignupMonth(new Date().toISOString().slice(0, 7));
+      if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {});
+      setShowExtraBanner(true);
+      if (setupAnswers) {
+        const pk = scorePersona(setupAnswers);
+        const tpl = PERSONA_TEMPLATES[pk];
+        if (tpl) {
+          setHomeLayout(tpl.layout);
+          if (userId) supabaseClient.from("profiles").upsert({ id: userId, home_layout: tpl.layout, persona: pk }).then(() => {}, () => {});
+        }
+        setPersonaKey(pk);
+        setStage("buildingDashboard");
+      } else {
+        if (!setupResume) setRunTour(true);
+        setSetupResume(false);
+        setStage("dashboard");
+      }
+    }} />;
+  } else if (stage === "buildingDashboard") {
+    overlayScreen = <BuildingDashboardScreen overlay personaKey={personaKey} onDone={() => { const first = !setupResume; setSetupResume(false); setSetupAnswers(null); if (first) setRunTour(true); setStage("dashboard"); }} />;
+  }
   if (stage === "landing") {
     content = (
       <LandingScreen
@@ -7463,29 +7554,6 @@ function App() {
     content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => { setSetupIntroOpen(true); setStage("dashboard"); }} />;
-  } else if (stage === "targets") {
-    content = <TargetSettingScreen userId={userId} transactions={customTransactions} pushToast={pushToast} banks={banks} accountData={{ statements, bankRows }} onBack={() => setStage(setupResume ? "setupQuestions" : "breakdown")} onDone={(t, p) => {
-      setTargets(t); setPlan(p || null);
-      if (!setupResume) setSignupMonth(new Date().toISOString().slice(0, 7));
-      if (userId) fetchAllTargets(userId).then(setAllTargets).catch(() => {});
-      setShowExtraBanner(true);
-      if (setupAnswers) {
-        const pk = scorePersona(setupAnswers);
-        const tpl = PERSONA_TEMPLATES[pk];
-        if (tpl) {
-          setHomeLayout(tpl.layout);
-          if (userId) supabaseClient.from("profiles").upsert({ id: userId, home_layout: tpl.layout, persona: pk }).then(() => {}, () => {});
-        }
-        setPersonaKey(pk);
-        setStage("buildingDashboard");
-      } else {
-        if (!setupResume) setRunTour(true);
-        setSetupResume(false);
-        setStage("dashboard");
-      }
-    }} />;
-  } else if (stage === "buildingDashboard") {
-    content = <BuildingDashboardScreen personaKey={personaKey} onDone={() => { const first = !setupResume; setSetupResume(false); setSetupAnswers(null); if (first) setRunTour(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
     content = (
       <ExtraQuestionsScreen
@@ -7573,6 +7641,7 @@ function App() {
         allTargets={allTargets}
         billExcludes={billExcludes}
         onToggleBillExclude={handleToggleBillExclude}
+        overlayScreen={overlayScreen}
         catConfig={catConfig}
         onSaveCatConfig={handleSaveCatConfig}
         onRescanCategories={rescanCategories}
