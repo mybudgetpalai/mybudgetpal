@@ -301,20 +301,24 @@ function plannedCatFor(allTargets, k, c, fallbackAvg) {
 }
 function buildProportionalPlan(txs, monthKeys, monthlySave, incomeOverride) {
   const income = Math.round(incomeOverride != null ? incomeOverride : (typicalIncome(txs, null) || 0));
-  const spendBudget = Math.max(0, income - Math.round(monthlySave));
   const avg = avgSpendByCategory(txs);
   const totalAvg = TX_CATEGORIES.reduce((s, c) => s + (avg[c] || 0), 0);
-  const month = {};
-  let allocated = 0;
-  TX_CATEGORIES.forEach((c, i) => {
-    let v;
-    if (i === TX_CATEGORIES.length - 1) v = Math.max(0, spendBudget - allocated);
-    else { v = totalAvg > 0 ? Math.round(spendBudget * ((avg[c] || 0) / totalAvg)) : Math.round(spendBudget / TX_CATEGORIES.length); allocated += v; }
-    month[c] = v;
-  });
-  month["Income"] = income;
+  /* monthlySave may be a single number (same every month) or a per-month array that sums to the exact goal */
+  const saves = Array.isArray(monthlySave) ? monthlySave : monthKeys.map(() => Math.round(monthlySave));
   const out = {};
-  monthKeys.forEach((k) => { out[k] = { ...month }; });
+  monthKeys.forEach((k, mi) => {
+    const spendBudget = Math.max(0, income - Math.round(saves[mi] || 0));
+    const month = {};
+    let allocated = 0;
+    TX_CATEGORIES.forEach((c, i) => {
+      let v;
+      if (i === TX_CATEGORIES.length - 1) v = Math.max(0, spendBudget - allocated);
+      else { v = totalAvg > 0 ? Math.round(spendBudget * ((avg[c] || 0) / totalAvg)) : Math.round(spendBudget / TX_CATEGORIES.length); allocated += v; }
+      month[c] = v;
+    });
+    month["Income"] = income;
+    out[k] = month;
+  });
   return out;
 }
 /* Suggest how to trim `perMonth` out of the flexible categories, in proportion to their current targets. */
@@ -510,9 +514,8 @@ const DEMO_CAT_RULES = [
   [/amazon|noon|flower|mall|store|shop/i, "Shopping"],
 ];
 function demoCategorize(name, amount) {
-  if (amount > 0) return "Income";
-  for (const [re, cat] of DEMO_CAT_RULES) if (re.test(name)) return cat;
-  return "Uncategorized";
+  /* Use the same full ruleset as real uploads so recognisable merchants never fall through to "Needs review". */
+  return categorizeByRules(name, amount);
 }
 
 const SAMPLE_BANK_BY_CUR = { GBP: "Sample UK Bank", AED: "Sample UAE Bank", USD: "Sample US Bank", EUR: "Sample EU Bank" };
@@ -2705,15 +2708,22 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
   };
   const buildFromGoal = () => {
     const bal = Number(curBal) || 0;
-    let keys, monthlySave;
+    let keys, targetSave;
     if (method === "balance") {
       keys = monthKeysBetween(curKey, goalMonth);
-      monthlySave = Math.round(((Number(goalBalance) || 0) - bal) / keys.length);
+      targetSave = Math.round((Number(goalBalance) || 0) - bal);
     } else {
       keys = monthKeysBetween(curKey, addMonths(curKey, Math.max(1, Number(saveMonths) || 6) - 1));
-      monthlySave = Math.round((Number(saveAmount) || 0) / keys.length);
+      targetSave = Math.round(Number(saveAmount) || 0);
     }
-    startGrid(keys, buildProportionalPlan(transactions, keys, monthlySave, typInc || undefined));
+    /* Spread the target so the SUM is exact — individual months may differ by £1, final total lands on the goal. */
+    const n = keys.length || 1;
+    const base = Math.trunc(targetSave / n);
+    let rem = targetSave - base * n;
+    const step = rem >= 0 ? 1 : -1;
+    rem = Math.abs(rem);
+    const saves = keys.map((_, i) => base + (i < rem ? step : 0));
+    startGrid(keys, buildProportionalPlan(transactions, keys, saves, typInc || undefined));
   };
 
   const monthNet = (k) => (Number(budgets[k] && budgets[k].Income) || 0) - categories.reduce((s, c) => s + (Number(budgets[k][c]) || 0), 0);
