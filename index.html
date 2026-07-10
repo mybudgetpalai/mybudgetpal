@@ -5153,7 +5153,7 @@ function SinceLastMonthCard({ transactions }) {
 function goalProjection(goal, transactions) {
   if (!goal || goal.target <= 0) return null;
   const remaining = Math.max(0, goal.target - goal.saved);
-  const keys = lastNMonthKeys(currentMonthKey(), 4).slice(0, 3);
+  const keys = lastNMonthKeys(currentMonthKey(), 4).filter((k) => k !== currentMonthKey()).slice(0, 3);
   const paces = keys.map((k) => incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)).filter((v) => v > 0);
   const pace = paces.length ? paces.reduce((a, b) => a + b, 0) / paces.length : 0;
   if (pace <= 0) return { remaining, pace: 0, projected: null };
@@ -5166,7 +5166,7 @@ function shortDate(d) { return d ? d.getDate() + " " + MONTHS_LABEL[d.getMonth()
 
 function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
   let goal = goals && goals.length ? goals[0] : null;
-  if (!goal && plan && plan.targetBalance > 0) { const nw = totalEstimatedBalance(banks, accountData, transactions || []); goal = { name: "Savings plan", saved: Math.max(0, nw || 0), target: plan.targetBalance, targetDate: plan.targetMonth ? plan.targetMonth + "-01" : null }; }
+  if (!goal && plan && plan.targetBalance > 0) { const nw = totalEstimatedBalance(banks, accountData, transactions || []); goal = { name: "Savings plan", saved: Math.max(0, nw || 0), target: plan.targetBalance, targetDate: plan.targetMonth ? plan.targetMonth + "-01" : null, synthetic: true }; }
   if (!goal) return (
     <div className="glass-card dash-card">
       <span className="card-label">Savings goal</span>
@@ -5174,7 +5174,7 @@ function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
     </div>
   );
   const pct = goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
-  const proj = goalProjection(goal, transactions);
+  const proj = goal.synthetic ? null : goalProjection(goal, transactions);
   const targetD = goal.targetDate ? new Date(goal.targetDate + "T00:00:00") : null;
   let etaChip = null;
   if (proj && proj.projected && targetD && !isNaN(targetD)) {
@@ -5339,18 +5339,12 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
   const R = 52, C = 2 * Math.PI * R;
   return (
     <div className="safe-hero fs-hero">
-      <div className="fs-dial-wrap">
-        <svg viewBox="0 0 130 130" width="112" height="112" className="fs-dial">
-          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--card)" strokeWidth="13" />
-          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="13" strokeLinecap="round" strokeDasharray={Math.max(0.04, 1 - pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
-        </svg>
-        <div className="fs-dial-txt"><span className="fs-dial-num">{formatMoney(s.perDay)}</span><span className="fs-dial-sub">a day</span></div>
-      </div>
       <div className="fs-side">
         <div className="fs-head">
           <span className="safe-hero-label">Safe to spend</span>
           <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
         </div>
+        <div className="fs-bignum">{formatMoney(s.perDay)} <em>a day</em></div>
         <div className="oh-sub" style={{ marginTop: 4 }}>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget {"\u2014"} upcoming bills are already accounted for.</div>
         <div className="oh-sub" style={{ marginTop: 6 }}>{fsPaceLine}</div>
         <div className="fs-budget-row" style={{ marginTop: 12 }}>
@@ -5754,18 +5748,28 @@ function BillsChecklistCard({ transactions, billExcludes }) {
   if (!bills.length) return (
     <div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>No bills confirmed yet — mark a recurring payment as a bill to track it here.</div></div>
   );
-  const remaining = bills.filter((b) => !b.paid).reduce((s, b) => s + b.amount, 0);
+  const overdueTotal = bills.filter((b) => !b.paid && !b.upcoming).reduce((s, b) => s + b.amount, 0);
+  const upcomingTotal = bills.filter((b) => !b.paid && b.upcoming).reduce((s, b) => s + b.amount, 0);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Bills this month</span>
-      {bills.map((b, i) => (
-        <div className="blc-row" key={i}>
-          <span className={"blc-ic " + (b.paid ? "blc-paid" : "blc-due")}>{b.paid ? <Icon name="check" size={12} strokeWidth={3.2} /> : <Icon name="calendar" size={12} />}</span>
-          <span className={"blc-nm" + (b.paid ? " blc-done" : "")}>{b.name}{b.paid ? "" : " · due " + ordinalDay(b.dueDay)}</span>
-          <span className={"blc-amt" + (b.paid ? " blc-done" : "")}>{formatMoney(b.amount)}</span>
-        </div>
-      ))}
-      <div className="oh-sub" style={{ marginTop: 8 }}>{remaining > 0 ? <><strong>{formatMoney(remaining)}</strong> left to pay this month.</> : "All paid — you're clear for " + currentMonthName() + "."}</div>
+      {bills.map((b, i) => {
+        const overdue = !b.paid && !b.upcoming;
+        return (
+          <div className="blc-row" key={i}>
+            <span className={"blc-ic " + (b.paid ? "blc-paid" : overdue ? "blc-overdue" : "blc-due")}>{b.paid ? <Icon name="check" size={12} strokeWidth={3.2} /> : overdue ? <Icon name="alert" size={12} /> : <Icon name="calendar" size={12} />}</span>
+            <span className={"blc-nm" + (b.paid ? " blc-done" : "")}>{b.name}{b.paid ? "" : overdue ? " · overdue (was due " + ordinalDay(b.dueDay) + ")" : " · due " + ordinalDay(b.dueDay)}</span>
+            <span className={"blc-amt" + (b.paid ? " blc-done" : overdue ? " blc-amt-od" : "")}>{formatMoney(b.amount)}</span>
+          </div>
+        );
+      })}
+      <div className="oh-sub" style={{ marginTop: 8 }}>
+        {overdueTotal > 0
+          ? <><strong className="blc-od-txt">{formatMoney(overdueTotal)} overdue</strong>{upcomingTotal > 0 ? <> · {formatMoney(upcomingTotal)} still to come</> : ""}</>
+          : upcomingTotal > 0
+          ? <><strong>{formatMoney(upcomingTotal)}</strong> still to come this month.</>
+          : "All paid — you're clear for " + currentMonthName() + "."}
+      </div>
     </div>
   );
 }
@@ -9205,6 +9209,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fs-dial-txt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .fs-dial-num { font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: -0.02em; }
   .fs-dial-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+  .fs-bignum { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin: 8px 0 2px; color: var(--ink); }
+  .fs-bignum em { font-style: normal; font-size: 15px; color: var(--ink-3); font-weight: 500; }
+  .blc-overdue { background: rgba(217,45,32,0.12); color: var(--neg); border: 1px solid rgba(217,45,32,0.35); }
+  .blc-amt-od { color: var(--neg); }
+  .blc-od-txt { color: var(--neg); }
   .fs-budget-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .fs-budget-val { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
   .fs-budget-of { font-size: 12px; font-weight: 500; color: var(--ink-3); }
