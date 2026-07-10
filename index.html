@@ -5762,7 +5762,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets };
   const [editOpen, setEditOpen] = useState(false);
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
-  const noBudget = totalBudget <= 0;
+  const noBudget = totalBudget <= 0 || persona === "no_targets";
 
   const needs = [];
   if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
@@ -6577,7 +6577,7 @@ function AdminBar({ onOpen }) {
 }
 
 function TestingBar({ personaKey, onSetPersona }) {
-  const opts = Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name }));
+  const opts = [...Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name })), { key: "no_targets", name: "Default (no targets)" }];
   return (
     <div className="admin-bar" style={{ background: "#C2410C", flexWrap: "wrap", gap: 8 }}>
       <span className="admin-bar-dot" />
@@ -7222,6 +7222,12 @@ function App() {
     }
   };
   const handleSetPersona = (key) => {
+    if (key === "no_targets") {
+      setPersonaKey(key);
+      setHomeLayout(DEFAULT_HOME_LAYOUT);
+      if (userId) supabaseClient.from("profiles").upsert({ id: userId, home_layout: DEFAULT_HOME_LAYOUT, persona: key }).then(() => {}, () => {});
+      return;
+    }
     const tpl = PERSONA_TEMPLATES[key];
     if (!tpl) return;
     setPersonaKey(key);
