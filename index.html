@@ -362,7 +362,7 @@ function parseHomeLayout(profile) {
   return { month, big };
 }
 const HOME_WIDGET_KEYS = {
-  month: ["breakdown_mini", "in_out", "category_status", "category_vs_target", "pace_gauge", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "bills_checklist", "trend"],
+  month: ["breakdown_mini", "in_out", "category_status", "category_vs_target", "pace_gauge", "pace_full", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "bills_checklist", "trend"],
   big: ["net_worth", "net_worth_pro", "goal", "goal_ring", "accounts", "since_last_month", "contribution_bars", "month_end_projection", "money_score"],
 };
 function parseNavLayout(profile) {
@@ -2990,7 +2990,7 @@ const PERSONA_TEMPLATES = {
   fresh_start: {
     name: "Fresh Start",
     blurb: "A clear, visual view \u2014 what you can spend, how each budget is doing, and what's coming up.",
-    layout: { month: ["breakdown_mini", "in_out", "pace_gauge", "bills_checklist"], big: ["goal_ring", "net_worth"] },
+    layout: { month: ["pace_full", "breakdown_mini", "bills_checklist"], big: ["goal_ring", "net_worth"] },
   },
   goal_getter: {
     name: "Goal Getter",
@@ -4959,7 +4959,7 @@ function MiniBreakdown({ transactions }) {
           {seg.map((s, i) => { const len = (s.v / total) * C; const el = <circle key={i} cx="42" cy="42" r={R} fill="none" stroke={s.color} strokeWidth="15" strokeDasharray={len + " " + (C - len)} strokeDashoffset={-off} transform="rotate(-90 42 42)" />; off += len; return el; })}
         </svg>
         <div className="oh-mb-legend">
-          {seg.map((s, i) => (<div key={i} className="oh-mb-item"><span className="oh-mb-dot" style={{ background: s.color }} /><span className="oh-mb-label">{s.label}</span><span className="oh-mb-pct">{Math.round((s.v / total) * 100)}%</span></div>))}
+          {seg.map((s, i) => (<div key={i} className="oh-mb-item"><span className="oh-mb-dot" style={{ background: s.color }} /><span className="oh-mb-label">{s.label}</span><span className="oh-mb-amt">{formatMoney(s.v)}</span><span className="oh-mb-pct">{Math.round((s.v / total) * 100)}%</span></div>))}
         </div>
       </div>
     </div>
@@ -4996,13 +4996,17 @@ function NetWorthCard({ banks, accountData, transactions }) {
       <div className="oh-sub" style={{ marginTop: 8 }}>Add opening balances to your statements to see an estimate.</div>
     </div>
   );
-  const nms = (banks || []).filter(Boolean);
-  const acctHint = nms.length ? "across " + nms.slice(0, 3).join(", ") + (nms.length > 3 ? " +" + (nms.length - 3) + " more" : "") : "across your linked accounts";
+  const statements = (accountData && accountData.statements) || [];
+  const bankRows = (accountData && accountData.bankRows) || [];
+  const names = Array.from(new Set([...(banks || []).filter(Boolean), ...((transactions || []).map((t) => t.bank).filter(Boolean))]));
+  const acctRows = names.map((b) => ({ b, bal: computeBankBalance(b, statements, transactions || [], bankRows.find((r) => r.bank_name === b)) })).filter((r) => r.bal !== null);
   return (
-    <div className="glass-card dash-card">
+    <div className="glass-card dash-card nw-card">
       <span className="card-label">Net worth</span>
-      <div className="oh-big">{formatMoney(netWorth)}</div>
-      <div className="oh-sub">{acctHint}</div>
+      <div className="nw-big">{formatMoney(netWorth)}</div>
+      <div className="nw-accts">
+        {acctRows.map((r, i) => (<div className="nw-acct" key={i}><span>{r.b}</span><strong>{formatMoney(r.bal)}</strong></div>))}
+      </div>
     </div>
   );
 }
@@ -5084,6 +5088,43 @@ function PaceGaugeCard({ transactions, targets }) {
         <div className="pace-mark-lb" style={{ left: pctExpected + "%" }}>expected by today</div>
       </div>
       <div className="oh-sub" style={{ marginTop: 26 }}>You've spent <strong>{formatMoney(spent)}</strong> so far. By day {day} you'd typically be around <strong>{formatMoney(Math.round(expected))}</strong> — you're <strong>{formatMoney(Math.abs(diff))} {under ? "under" : "over"}</strong> where you'd expect for a {formatMoney(Math.round(budget))} monthly budget.</div>
+    </div>
+  );
+}
+
+function PaceFullCard({ transactions, targets, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return <div className="glass-card dash-card"><span className="card-label">Your pace</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to see your spending pace.</div></div>;
+  const day = today().getDate(), dim = s.daysInMonth;
+  const expected = s.budget * (day / dim);
+  const under = s.spent <= expected;
+  const diff = Math.round(expected - s.spent);
+  const projEnd = Math.round(projectMonthEnd(s.spent));
+  const pctSpent = Math.min(100, (s.spent / Math.max(s.budget, 1)) * 100);
+  const pctExpected = Math.min(100, (expected / Math.max(s.budget, 1)) * 100);
+  return (
+    <div className="glass-card dash-card pf-card">
+      <div className="pace-head-row"><span className="card-label" style={{ margin: 0 }}>Your pace</span><span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace" : "Over pace"}</span></div>
+      <div className="pf-grid">
+        <div className="pf-left">
+          <div className="fs-budget-row"><span className="safe-hero-label" style={{ fontSize: 11 }}>This month's spend budget</span><span className="fs-budget-val">{formatMoney(s.spent)} <span className="fs-budget-of">of {formatMoney(s.budget)}</span></span></div>
+          <div className="pace-track" style={{ marginTop: 12 }}>
+            <div className="pace-fill2" style={{ width: pctSpent + "%", background: under ? "var(--pos)" : "var(--neg)" }} />
+            <div className="pace-mark" style={{ left: pctExpected + "%" }} />
+            <div className="pace-mark-lb" style={{ left: pctExpected + "%" }}>expected by today</div>
+          </div>
+          <div className="safe-hero-legend" style={{ marginTop: 28 }}>
+            <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
+            {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
+            <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} {s.over ? "over" : "free"}</span>
+          </div>
+        </div>
+        <div className="pf-right">
+          <div className="oh-sub">You've spent <strong>{formatMoney(s.spent)}</strong> so far. By day {day} you'd typically be around <strong>{formatMoney(Math.round(expected))}</strong> — that's <strong>{formatMoney(Math.abs(diff))} {under ? "under" : "over"}</strong> your usual pace for a {formatMoney(Math.round(s.budget))} monthly budget.</div>
+          <div className="oh-sub" style={{ marginTop: 12 }}>Keep this up and you're on track to finish {currentMonthName()} around <strong>{formatMoney(projEnd)}</strong>{projEnd < s.budget ? ", comfortably inside budget" : ""}.</div>
+          {s.reserved > 0 && <div className="oh-sub" style={{ marginTop: 12 }}>{formatMoney(s.reserved)} of upcoming bills is already set aside, so your <strong>{formatMoney(s.perDay)}/day</strong> safe-to-spend stays honest.</div>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -5348,19 +5389,6 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
         <div className="fs-bignum">{formatMoney(s.perDay)} <em>a day</em></div>
         <div className="oh-sub" style={{ marginTop: 4 }}>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget {"\u2014"} upcoming bills are already accounted for.</div>
         <div className="oh-sub" style={{ marginTop: 6 }}>{fsPaceLine}</div>
-        <div className="fs-budget-row" style={{ marginTop: 12 }}>
-          <span className="safe-hero-label" style={{ fontSize: 11 }}>This month's spend budget</span>
-          <span className="fs-budget-val">{formatMoney(s.spent)} <span className="fs-budget-of">of {formatMoney(s.budget)}</span></span>
-        </div>
-        <div className="safe-hero-track safe-hero-seg" style={{ marginTop: 6 }}>
-          <div className="seg-spent" style={{ width: bpw(s.spent) + "%", background: s.over ? "var(--neg)" : undefined }} />
-          {!s.over && <div className="seg-reserved" style={{ width: bpw(s.reserved) + "%" }} />}
-        </div>
-        <div className="safe-hero-legend">
-          <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
-          {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
-          <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} {s.over ? "over" : "free"}</span>
-        </div>
       </div>
     </div>
   );
@@ -5785,6 +5813,7 @@ const HOME_WIDGETS = {
   trend: { label: "Spending trend", section: "month", render: (p) => <TrendsCard transactions={p.transactions} compact /> },
   category_status: { label: "Where it's gone (bars)", section: "month", render: (p) => <CategoryStatusCard transactions={p.transactions} targets={p.targets} /> },
   pace_gauge: { label: "Your pace", section: "month", render: (p) => <PaceGaugeCard transactions={p.transactions} targets={p.targets} /> },
+  pace_full: { label: "Your pace (wide)", section: "month", full: true, render: (p) => <PaceFullCard transactions={p.transactions} targets={p.targets} rollovers={p.rollovers} billExcludes={p.billExcludes} /> },
   bills_upcoming: { label: "Bills coming up", section: "month", render: (p) => <BillsUpcomingCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
   net_worth: { label: "Net worth", section: "big", render: (p) => <NetWorthCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
   since_last_month: { label: "Since last month", section: "big", render: (p) => <SinceLastMonthCard transactions={p.transactions} /> },
@@ -5870,7 +5899,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
-  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan };
+  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers };
   const [editOpen, setEditOpen] = useState(false);
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
@@ -5942,7 +5971,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
       {layout.month.length > 0 && (!runTour || tourStep >= 1) && (
         <div className="oh-grid">
           {layout.month.map((k, i) => (
-            <TourTarget key={k} active={runTour && tourStep === 1 && i === 0} className="oh-grid-cell">
+            <TourTarget key={k} active={runTour && tourStep === 1 && i === 0} className={"oh-grid-cell" + (HOME_WIDGETS[k] && HOME_WIDGETS[k].full ? " oh-cell-full" : "")}>
               {HOME_WIDGETS[k].render(widgetProps)}
             </TourTarget>
           ))}
@@ -9100,7 +9129,19 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-mb-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 0; color: var(--ink-2); }
   .oh-mb-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
   .oh-mb-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .oh-mb-pct { color: var(--ink-3); font-weight: 600; }
+  .oh-mb-pct { color: var(--ink-3); font-weight: 600; min-width: 38px; text-align: right; }
+  .oh-mb-amt { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .oh-cell-full { grid-column: 1 / -1; }
+  .pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 14px; align-items: start; }
+  .pf-left { min-width: 0; }
+  .pf-right { min-width: 0; }
+  @media (max-width: 640px) { .pf-grid { grid-template-columns: 1fr; gap: 18px; } }
+  .nw-card { display: flex; flex-direction: column; }
+  .nw-big { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.02; color: var(--ink); margin: 10px 0 16px; }
+  .nw-accts { margin-top: auto; }
+  .nw-acct { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .nw-acct span { color: var(--ink-3); }
+  .nw-acct strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 
   .oh-greet-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .ev-open-btn { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; cursor: pointer; transition: background 0.15s; }
