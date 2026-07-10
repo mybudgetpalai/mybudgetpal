@@ -5638,24 +5638,23 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   const elapsed = today().getDate() / s.daysInMonth;
   const spentVsAvg = avgTotal > 0 ? Math.round(((s.spent - avgTotal * elapsed) / Math.max(avgTotal * elapsed, 1)) * 100) : null;
   const nw = totalEstimatedBalance(banks, accountData, transactions || []);
-  const goal = goals && goals.length ? goals[0] : null;
-  const proj = goal ? goalProjection(goal, transactions) : null;
+  const acctCount = Array.from(new Set([...(banks || []).filter(Boolean), ...((transactions || []).map((t) => t.bank).filter(Boolean))])).length;
   const day = today().getDate();
   const expected = s.budget * (day / s.daysInMonth);
   const paceD = Math.round(s.spent - expected);
   const stats = [];
-  if (s.budget > 0) stats.push({ k: "Safe/day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "−" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
-  stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "\u2193" : "\u2191") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
-  if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: null, good: kept >= 50 });
-  if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: null, good: true });
+  if (s.budget > 0) stats.push({ k: "Safe / day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "−" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
+  stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "↓" : "↑") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
+  if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: "of income", mut: true });
+  if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
   if (!stats.length) return null;
   return (
-    <div className="pv-band">
+    <div className="pv-kpis">
       {stats.slice(0, 4).map((st, i) => (
-        <div className="pv-stat" key={i}>
-          <div className="pv-k">{st.k}</div>
-          <div className="pv-v">{st.v}</div>
-          {st.s && <div className={"pv-s " + (st.good ? "pv-good" : "pv-bad")}>{st.s}</div>}
+        <div className="pv-kpi" key={i}>
+          <div className="pv-kpi-k">{st.k}</div>
+          <div className="pv-kpi-v">{st.v}</div>
+          {st.s && <div className={"pv-kpi-s " + (st.mut ? "pv-kpi-mut" : (st.good ? "pv-good" : "pv-bad"))}>{st.s}</div>}
         </div>
       ))}
     </div>
@@ -5679,12 +5678,15 @@ function CategoryDeltaCard({ transactions }) {
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Category {"Δ"} vs 3-mo avg</span>
-      {rows.slice(0, 5).map((r) => (
-        <div className="pvr" key={r.c}>
-          <span className="pvr-n">{displayCat(r.c)}</span>
-          <span className="pvr-v">{formatMoney(Math.round(r.s))}{r.pct !== null && <em className={r.pct > 0 ? "cvt-bad" : "cvt-ok"}> {r.pct > 0 ? "+" : "−"}{Math.abs(r.pct)}%</em>}</span>
-        </div>
-      ))}
+      <div className="pvg">
+        {rows.slice(0, 5).map((r) => (
+          <React.Fragment key={r.c}>
+            <span className="pvg-n">{displayCat(r.c)}</span>
+            <span className="pvg-v">{formatMoney(Math.round(r.s))}</span>
+            <span className={"pvg-d " + (r.pct === null ? "pvg-mut" : (r.pct > 0 ? "cvt-bad" : "cvt-ok"))}>{r.pct === null ? "—" : (r.pct > 0 ? "+" : "−") + Math.abs(r.pct) + "%"}</span>
+          </React.Fragment>
+        ))}
+      </div>
       <div className="cvt2-foot">{hot ? displayCat(hot.c) + " running hot; everything else below your rolling 3-month average." : "Everything below your rolling 3-month average."}</div>
     </div>
   );
@@ -5735,12 +5737,15 @@ function BiggestMoversCard({ transactions }) {
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Biggest movers MoM <span className="pv-mut">{"·"} pace-adjusted</span></span>
-      {movers.slice(0, 5).map((m) => (
-        <div className="pvr" key={m.c}>
-          <span className="pvr-n">{displayCat(m.c)}</span>
-          <span className={"pvr-v " + (m.d > 0 ? "cvt-bad" : "cvt-ok")}>{m.d > 0 ? "+" : "−"}{formatMoney(Math.round(Math.abs(m.d)))}{m.pct !== null ? " " + (m.d > 0 ? "\u2191" : "\u2193") + Math.abs(m.pct) + "%" : ""}</span>
-        </div>
-      ))}
+      <div className="pvg">
+        {movers.slice(0, 5).map((m) => (
+          <React.Fragment key={m.c}>
+            <span className="pvg-n">{displayCat(m.c)}</span>
+            <span className={"pvg-v " + (m.d > 0 ? "cvt-bad" : "cvt-ok")}>{m.d > 0 ? "+" : "−"}{formatMoney(Math.round(Math.abs(m.d)))}</span>
+            <span className={"pvg-d " + (m.pct === null ? "pvg-mut" : (m.d > 0 ? "cvt-bad" : "cvt-ok"))}>{m.pct === null ? "new" : (m.d > 0 ? "↑" : "↓") + Math.abs(m.pct) + "%"}</span>
+          </React.Fragment>
+        ))}
+      </div>
     </div>
   );
 }
@@ -5749,7 +5754,7 @@ function Trend12Card({ transactions }) {
   const keys = lastNMonthKeys(currentMonthKey(), 12);
   const vals = keys.map((k) => spendForMonth(transactions || [], k));
   const withData = vals.filter((v) => v > 0);
-  if (withData.length < 3) return <div className="glass-card dash-card"><span className="card-label">Spend {"—"} trailing 12 months</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload more history to unlock the long trend.</div></div>;
+  if (withData.length < 3) return <div className="glass-card dash-card"><span className="card-label">Spend {"·"} trailing 12 mo</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload more history to unlock the long trend.</div></div>;
   const avg = withData.reduce((a, b) => a + b, 0) / withData.length;
   const max = Math.max(...vals, avg, 1);
   const W = 560, H = 60;
@@ -5758,7 +5763,7 @@ function Trend12Card({ transactions }) {
   const avgY = H - 6 - (avg / max) * (H - 14);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Spend {"—"} trailing 12 months <span className="pv-mut">{"·"} dashed = avg {formatMoney(Math.round(avg))}</span></span>
+      <span className="card-label">Spend {"·"} trailing 12 mo <span className="pv-mut">{"·"} dashed = avg {formatMoney(Math.round(avg))}</span></span>
       <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
         <line x1="0" y1={avgY} x2={W} y2={avgY} stroke="var(--line-strong)" strokeWidth="1.5" strokeDasharray="5 5" />
         <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2.5" />
@@ -5781,26 +5786,25 @@ function NetWorthProCard({ banks, accountData, transactions }) {
     if (bal !== null) { const cur = FX.bankCurrency[b] || "GBP"; byCur[cur] = (byCur[cur] || 0) + bal; }
   });
   const curs = Object.keys(byCur);
-  const homeTotals = curs.map((c) => ({ c, native: byCur[c], home: c === FX.home ? byCur[c] : fxConvert(byCur[c], c, nowMonth()) }));
-  const totalHome = homeTotals.reduce((s, x) => s + x.home, 0);
+  let homeTotals = curs.map((c) => ({ c, native: byCur[c], home: c === FX.home ? byCur[c] : fxConvert(byCur[c], c, nowMonth()) }));
+  if (!homeTotals.length) homeTotals = [{ c: FX.home || "GBP", native: nw, home: nw }];
+  const totalHome = homeTotals.reduce((s, x) => s + x.home, 0) || 1;
   const palette = ["var(--accent-solid)", "#1D9E75", "#B54708", "#7A5AF8"];
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Net worth {"·"} currency split</span>
       <div className="oh-big">{formatMoney(Math.round(nw))}</div>
-      {curs.length > 1 && (
-        <>
-          <div className="nwp-bar">
-            {homeTotals.map((x, i) => <div key={x.c} style={{ width: Math.max(2, (x.home / Math.max(totalHome, 1)) * 100) + "%", background: palette[i % palette.length] }} />)}
+      <div className="nwp-bar">
+        {homeTotals.map((x, i) => <div key={x.c} style={{ width: Math.max(2, (x.home / totalHome) * 100) + "%", background: palette[i % palette.length] }} />)}
+      </div>
+      <div className="nwp-legend">
+        {homeTotals.map((x, i) => (
+          <div className="nwp-leg" key={x.c}>
+            <span className="nwp-leg-l"><span className="seg-dot" style={{ background: palette[i % palette.length] }} /> {x.c}</span>
+            <span className="nwp-leg-r"><strong>{(CURRENCY_SYMBOLS[x.c] || "")}{Math.round(x.native).toLocaleString()}</strong>{x.c !== FX.home ? " ≈ " + formatMoney(Math.round(x.home)) : ""} {"·"} {Math.round((x.home / totalHome) * 100)}%</span>
           </div>
-          <div className="nwp-legend">
-            {homeTotals.map((x, i) => (
-              <span key={x.c}><span className="seg-dot" style={{ background: palette[i % palette.length] }} /> {x.c} {(CURRENCY_SYMBOLS[x.c] || "")}{Math.round(x.native).toLocaleString()}{x.c !== FX.home ? " ≈ " + formatMoney(Math.round(x.home)) : ""} {"·"} {Math.round((x.home / Math.max(totalHome, 1)) * 100)}%</span>
-            ))}
-          </div>
-        </>
-      )}
-      {curs.length <= 1 && <div className="oh-sub" style={{ marginTop: 6 }}>across your linked accounts</div>}
+        ))}
+      </div>
     </div>
   );
 }
@@ -5838,23 +5842,16 @@ function MoneyScoreCard({ transactions, targets, billExcludes }) {
     if (overs.length) { score -= 4 * Math.min(3, overs.length); drag = displayCat(overs[0]); }
   }
   score = Math.max(5, Math.min(98, Math.round(score)));
-  const col = score >= 70 ? "var(--pos)" : score >= 45 ? "var(--warn)" : "var(--neg)";
-  const R = 31, C = 2 * Math.PI * R;
+  const ringCol = score >= 70 ? "var(--pos)" : score >= 45 ? "var(--warn)" : "var(--neg)";
   return (
-    <div className="glass-card dash-card">
-      <div className="ms-row">
-        <svg viewBox="0 0 80 80" width="62" height="62">
-          <circle cx="40" cy="40" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="9" />
-          <circle cx="40" cy="40" r={R} fill="none" stroke={col} strokeWidth="9" strokeLinecap="round" strokeDasharray={(score / 100) * C + " " + C} transform="rotate(-90 40 40)" />
-          <text x="40" y="46" textAnchor="middle" fontSize="17" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{score}</text>
-        </svg>
-        <div>
-          <span className="card-label" style={{ marginBottom: 3, display: "block" }}>Money score</span>
-          <div className="oh-sub" style={{ marginTop: 0 }}>
-            {parts.map((pt, i) => <span key={i}>{pt.t} {pt.ok ? "\u2713" : "\u2717"}{i < parts.length - 1 ? " · " : ""}</span>)}
-            {drag && <span> {"·"} <strong>{drag} drag</strong></span>}
-          </div>
-        </div>
+    <div className="glass-card dash-card ms2-card">
+      <span className="card-label" style={{ alignSelf: "flex-start" }}>Money score</span>
+      <div className="ms2-ring" style={{ background: "conic-gradient(" + ringCol + " 0% " + score + "%, var(--surface-3) " + score + "% 100%)" }}>
+        <div className="ms2-hole">{score}</div>
+      </div>
+      <div className="ms2-checks">
+        {parts.map((pt, i) => <span key={i}>{pt.t} {pt.ok ? "✓" : "✗"}{i < parts.length - 1 ? " · " : ""}</span>)}
+        {drag && <span> {"·"} <strong>{drag} drag</strong></span>}
       </div>
     </div>
   );
@@ -9581,8 +9578,34 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pvr-v em { font-style: normal; font-weight: 700; font-size: 11px; }
   .tr12-x { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
   .nwp-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; margin-top: 10px; }
-  .nwp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11px; color: var(--ink-2); margin-top: 6px; }
+  .nwp-legend { display: flex; flex-direction: column; margin-top: 12px; }
   .ms-row { display: flex; align-items: center; gap: 13px; }
+  /* Power View KPI tiles (power-view-6b) */
+  .pv-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 4px 12px; }
+  @media (max-width: 760px) { .pv-kpis { grid-template-columns: 1fr 1fr; } }
+  .pv-kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-card); padding: 16px; min-width: 0; }
+  .pv-kpi-k { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
+  .pv-kpi-v { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .pv-kpi-s { font-size: 12px; font-weight: 600; margin-top: 9px; }
+  .pv-kpi-mut { color: var(--ink-3); }
+  /* Power View analytical grid rows (delta / movers) */
+  .pvg { display: grid; grid-template-columns: 1fr auto auto; row-gap: 13px; column-gap: 14px; align-items: baseline; margin-top: 14px; }
+  .pvg-n { font-size: 13px; color: var(--ink-2); }
+  .pvg-v { font-size: 13px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  .pvg-d { font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; min-width: 52px; }
+  .pvg-mut { color: var(--ink-3); font-weight: 500; }
+  /* Net worth currency legend rows (power-view-6b) */
+  .nwp-leg { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; color: var(--ink-2); }
+  .nwp-leg + .nwp-leg { margin-top: 8px; }
+  .nwp-leg-l { display: inline-flex; align-items: center; gap: 8px; }
+  .nwp-leg-r { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .nwp-leg-r strong { color: var(--ink); font-weight: 700; }
+  /* Money score centred ring (power-view-6b) */
+  .ms2-card { display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
+  .ms2-ring { position: relative; width: 82px; height: 82px; border-radius: 50%; margin: 14px 0 12px; flex: none; }
+  .ms2-hole { position: absolute; inset: 13px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
+  .ms2-checks { font-size: 12px; color: var(--ink-2); }
+  .ms2-checks strong { color: var(--ink); font-weight: 700; }
   @media (max-width: 640px) {
     .bh-hero { grid-template-columns: 1fr; }
     .cvt-row { grid-template-columns: 74px 1fr 74px 60px; }
