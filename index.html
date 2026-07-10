@@ -5335,6 +5335,7 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
   const fsPace = s.spent - s.budget * (fsDay / s.daysInMonth);
   const fsPaceLine = s.over ? "You are spending a little faster than planned — easing off now keeps you on budget." : (fsPace <= 0 ? "You are pacing nicely — a touch under where you would expect by day " + fsDay + "." : "Slightly ahead of pace, but still within budget — nothing to worry about yet.");
   const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(s.pot, 1)) * 100));
+  const bpw = (v) => Math.min(100, Math.max(0, (v / Math.max(s.budget, 1)) * 100));
   const R = 52, C = 2 * Math.PI * R;
   return (
     <div className="safe-hero fs-hero">
@@ -5352,19 +5353,19 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
         </div>
         <div className="oh-sub" style={{ marginTop: 4 }}>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget {"\u2014"} upcoming bills are already accounted for.</div>
         <div className="oh-sub" style={{ marginTop: 6 }}>{fsPaceLine}</div>
-        {!s.over && (
-          <>
-            <div className="safe-hero-track safe-hero-seg" style={{ marginTop: 10 }}>
-              <div className="seg-spent" style={{ width: pw(s.spent) + "%" }} />
-              <div className="seg-reserved" style={{ width: pw(s.reserved) + "%" }} />
-            </div>
-            <div className="safe-hero-legend">
-              <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
-              {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
-              <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} free</span>
-            </div>
-          </>
-        )}
+        <div className="fs-budget-row" style={{ marginTop: 12 }}>
+          <span className="safe-hero-label" style={{ fontSize: 11 }}>This month's spend budget</span>
+          <span className="fs-budget-val">{formatMoney(s.spent)} <span className="fs-budget-of">of {formatMoney(s.budget)}</span></span>
+        </div>
+        <div className="safe-hero-track safe-hero-seg" style={{ marginTop: 6 }}>
+          <div className="seg-spent" style={{ width: bpw(s.spent) + "%", background: s.over ? "var(--neg)" : undefined }} />
+          {!s.over && <div className="seg-reserved" style={{ width: bpw(s.reserved) + "%" }} />}
+        </div>
+        <div className="safe-hero-legend">
+          <span><span className="seg-dot seg-dot-spent" /> {formatMoney(s.spent)} spent</span>
+          {s.reserved > 0 && <span><span className="seg-dot seg-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
+          <span><span className="seg-dot seg-dot-free" /> {formatMoney(Math.max(0, s.free))} {s.over ? "over" : "free"}</span>
+        </div>
       </div>
     </div>
   );
@@ -9203,6 +9204,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fs-dial-txt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .fs-dial-num { font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: -0.02em; }
   .fs-dial-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+  .fs-budget-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .fs-budget-val { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .fs-budget-of { font-size: 12px; font-weight: 500; color: var(--ink-3); }
   .pace-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .pace-track { position: relative; height: 12px; background: var(--surface-2); border-radius: 99px; margin: 16px 0 4px; }
   .pace-fill2 { height: 100%; border-radius: 99px; transition: width .4s ease; }
