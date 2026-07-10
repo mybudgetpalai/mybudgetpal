@@ -825,6 +825,11 @@ function spendByCategoryForMonth(txs, k) {
   txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k).forEach((t) => { o[t.category] = (o[t.category] || 0) + Math.abs(t.amount); });
   return o;
 }
+function spendByCategoryForMonthUpToDay(txs, k, day) {
+  const o = {};
+  txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k && (+t.date.slice(8, 10)) <= day).forEach((t) => { o[t.category] = (o[t.category] || 0) + Math.abs(t.amount); });
+  return o;
+}
 function catColor(c) { return customCatColor(c) || CATEGORY_COLORS[c] || "#9aa4b8"; }
 function displayCat(c) { if (c === "Uncategorized") return "Needs review"; return (CAT_CONFIG.renames && CAT_CONFIG.renames[c]) || c; }
 function addMonths(key, n) { let y = +key.slice(0, 4), m = +key.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + "-" + pad2(m); }
@@ -962,14 +967,29 @@ function buildInsights(txs, targets) {
   const out = [];
   const cur = latestMonthKey(txs);
   const prev = lastNMonthKeys(cur, 2)[0];
-  const curCats = spendByCategoryForMonth(txs, cur);
-  const prevCats = spendByCategoryForMonth(txs, prev);
-  Object.keys(curCats).forEach((c) => {
+  /* Comparisons must be like-for-like: a month still in progress is only
+     compared against the SAME day-of-month last month, otherwise early in
+     the month a partial total vs a full month always reads as a huge drop
+     (day 1 => -99%). Completed months compare full vs full as normal. */
+  const inProgress = cur === currentMonthKey();
+  const dom = today().getDate();
+  const cmpSuffix = inProgress ? "% vs the same point last month." : "% vs last month.";
+  let curCats, prevCats, enoughData;
+  if (inProgress) {
+    curCats = spendByCategoryForMonthUpToDay(txs, cur, dom);
+    prevCats = spendByCategoryForMonthUpToDay(txs, prev, dom);
+    enoughData = dom >= 5;
+  } else {
+    curCats = spendByCategoryForMonth(txs, cur);
+    prevCats = spendByCategoryForMonth(txs, prev);
+    enoughData = true;
+  }
+  if (enoughData) Object.keys(curCats).forEach((c) => {
     const a = curCats[c], b = prevCats[c];
     if (b > 20 && a > 20) {
       const chg = Math.round(((a - b) / b) * 100);
-      if (chg >= 25) out.push({ type: "warning", text: displayCat(c) + " spend is up " + chg + "% vs last month." });
-      else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " spend is down " + Math.abs(chg) + "% vs last month." });
+      if (chg >= 25) out.push({ type: "warning", text: displayCat(c) + " spend is up " + chg + cmpSuffix });
+      else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " spend is down " + Math.abs(chg) + cmpSuffix });
     }
   });
   const totalTarget = Object.values(targets || {}).reduce((s, v) => s + (Number(v) || 0), 0);
@@ -4893,8 +4913,6 @@ function SpentSoFarHero({ transactions }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const spent = spendForMonth(txs, key);
-  const income = incomeForMonth(txs, key);
-  const kept = income - spent;
   return (
     <div className="safe-hero">
       <div className="safe-hero-row">
@@ -4903,8 +4921,7 @@ function SpentSoFarHero({ transactions }) {
           <span className="safe-hero-num"><CountUp value={spent} format={formatMoney} /></span>
         </div>
         <div className="safe-hero-side">
-          <span>{income > 0 ? formatMoney(income) + " in \u00b7 " + formatMoney(kept) + " kept" : "day " + today().getDate() + " of " + daysInCurrentMonth()}</span>
-          {income > 0 && <span className="safe-hero-roll">day {today().getDate()} of {daysInCurrentMonth()}</span>}
+          <span>day {today().getDate()} of {daysInCurrentMonth()}</span>
         </div>
       </div>
     </div>
@@ -4953,8 +4970,6 @@ function InOutCard({ transactions }) {
   const txs = transactions || [];
   const income = incomeForMonth(txs, key);
   const out = spendForMonth(txs, key);
-  const kept = income - out;
-  const saveRate = income > 0 ? Math.round((kept / income) * 100) : null;
   if (income <= 0) return (
     <div className="glass-card dash-card">
       <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
@@ -4967,9 +4982,7 @@ function InOutCard({ transactions }) {
       <div className="oh-io">
         <div><div className="oh-io-k">In</div><div className="oh-io-v" style={{ color: "var(--pos)" }}>{formatMoney(income)}</div></div>
         <div><div className="oh-io-k">Out</div><div className="oh-io-v">{formatMoney(out)}</div></div>
-        <div><div className="oh-io-k">Kept</div><div className="oh-io-v">{formatMoney(kept)}</div></div>
       </div>
-      {saveRate !== null && kept >= 0 && <><div className="oh-track"><div className="oh-track-fill" style={{ width: Math.min(100, saveRate) + "%", background: "var(--pos)" }} /></div><div className="oh-track-cap">saving {saveRate}% of income so far</div></>}
     </div>
   );
 }
