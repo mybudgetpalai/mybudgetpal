@@ -4949,19 +4949,23 @@ function MiniBreakdown({ transactions }) {
   const otherTotal = entries.slice(4).reduce((s, e) => s + e[1], 0);
   const seg = top.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
   if (otherTotal > 0) seg.push({ label: "Other", v: otherTotal, color: "#9aa4b8" });
-  const R = 44, C = 2 * Math.PI * R; let off = 0;
+  let acc = 0;
+  const stops = seg.map((sg) => { const start = (acc / total) * 100; acc += sg.v; const end = (acc / total) * 100; return sg.color + " " + start + "% " + end + "%"; }).join(", ");
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Where it's gone</span>
-      <div className="oh-mb">
-        <svg viewBox="0 0 108 108" width="104" height="104" className="oh-mb-ring">
-          <circle cx="54" cy="54" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="18" />
-          {seg.map((s, i) => { const len = (s.v / total) * C; const el = <circle key={i} cx="54" cy="54" r={R} fill="none" stroke={s.color} strokeWidth="18" strokeDasharray={len + " " + (C - len)} strokeDashoffset={-off} transform="rotate(-90 54 54)" />; off += len; return el; })}
-        <text x="54" y="50" textAnchor="middle" fontSize="18" fontWeight="800" fill="var(--ink)" fontFamily="inherit">{formatMoney(total)}</text>
-          <text x="54" y="65" textAnchor="middle" fontSize="8" letterSpacing="1" fill="var(--ink-3)" fontFamily="inherit">SPENT</text>
-        </svg>
-        <div className="oh-mb-legend">
-          {seg.map((s, i) => (<div key={i} className="oh-mb-item"><span className="oh-mb-dot" style={{ background: s.color }} /><span className="oh-mb-label">{s.label}</span><span className="oh-mb-amt">{formatMoney(s.v)}</span><span className="oh-mb-pct">{Math.round((s.v / total) * 100)}%</span></div>))}
+      <div className="mb2">
+        <div className="mb2-donut" style={{ background: "conic-gradient(" + stops + ")" }}>
+          <div className="mb2-hole"><span className="mb2-amt">{formatMoney(total)}</span><span className="mb2-lb">SPENT</span></div>
+        </div>
+        <div className="mb2-legend">
+          {seg.map((sg, i) => (
+            <React.Fragment key={i}>
+              <span className="mb2-name"><span className="mb2-dot" style={{ background: sg.color }} />{sg.label}</span>
+              <span className="mb2-val">{formatMoney(sg.v)}</span>
+              <span className="mb2-pct">{Math.round((sg.v / total) * 100)}%</span>
+            </React.Fragment>
+          ))}
         </div>
       </div>
     </div>
@@ -5003,12 +5007,19 @@ function NetWorthCard({ banks, accountData, transactions }) {
   const names = Array.from(new Set([...(banks || []).filter(Boolean), ...((transactions || []).map((t) => t.bank).filter(Boolean))]));
   const acctRows = names.map((b) => ({ b, bal: computeBankBalance(b, statements, transactions || [], bankRows.find((r) => r.bank_name === b)) })).filter((r) => r.bal !== null);
   return (
-    <div className="glass-card dash-card nw-card">
+    <div className="glass-card dash-card nw-card2">
       <span className="card-label">Net worth</span>
-      <div className="nw-big">{formatMoney(netWorth)}</div>
-      <div className="nw-accts">
-        {acctRows.map((r, i) => (<div className="nw-acct" key={i}><span>{r.b}</span><strong>{formatMoney(r.bal)}</strong></div>))}
-      </div>
+      <div className="nw2-big">{formatMoney(netWorth)}</div>
+      {acctRows.length > 0 && (
+        <div className="nw2-accts">
+          {acctRows.map((r, i) => (
+            <div className="nw2-acct" key={i}>
+              <span className="nw2-acct-l"><span className="nw2-av">{String(r.b || "?").charAt(0).toUpperCase()}</span>{r.b}</span>
+              <strong>{formatMoney(r.bal)}</strong>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -5235,19 +5246,12 @@ function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
     <div className="glass-card dash-card">
       <span className="card-label">{goal.name || "Savings goal"}</span>
       <div className="grc-row">
-        <svg viewBox="0 0 130 130" width="118" height="118" className="grc-ring">
-          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="12" />
-          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="12" strokeLinecap="round" strokeDasharray={(pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
-          <circle cx="65" cy={65 - R} r="5" fill="var(--pos)" />
-          <text x="65" y="61" textAnchor="middle" fontSize="22" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{pct}%</text>
-          <text x="65" y="80" textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="inherit">saved</text>
-        </svg>
+        <div className="grc-donut" style={{ background: "conic-gradient(var(--accent-solid) 0% " + pct + "%, var(--surface-3) " + pct + "% 100%)" }}>
+          <div className="grc-hole"><span className="grc-hole-pct">{pct}%</span><span className="grc-hole-lb">SAVED</span></div>
+        </div>
         <div className="grc-side">
           <div className="grc-amt">{formatMoney(goal.saved)} <span>of {formatMoney(goal.target)}</span></div>
-          {targetD && !isNaN(targetD) && <div className="grc-line"><span>Target date</span><strong>{shortDate(targetD)}</strong></div>}
-          {proj && proj.projected && <div className="grc-line"><span>On current pace</span><strong className={etaChip && etaChip.cls === "cst-warn" ? "grc-late" : "grc-early"}>{shortDate(proj.projected)}</strong></div>}
-          {etaChip && <span className={"cst-chip " + etaChip.cls} style={{ marginTop: 7 }}>{etaChip.text}</span>}
-          <div className="oh-sub" style={{ marginTop: 8 }}><strong>{formatMoney(Math.max(0, goal.target - goal.saved))}</strong> to go to reach your {formatMoney(goal.target)} plan{targetD && !isNaN(targetD) ? " by " + shortDate(targetD) : ""}.</div>
+          <div className="grc-tog"><strong>{formatMoney(Math.max(0, goal.target - goal.saved))}</strong> to go{targetD && !isNaN(targetD) ? " · target " + shortDate(targetD) : ""}</div>
         </div>
       </div>
     </div>
@@ -5799,10 +5803,12 @@ function BillsChecklistCard({ transactions, billExcludes }) {
       <span className="card-label">Bills this month</span>
       {bills.map((b, i) => {
         const overdue = !b.paid && !b.upcoming;
+        const KEEP_UP = ["DD", "UK", "US", "EU", "UAE", "USA", "LLC", "PLC", "VAT"];
+        const nm = String(b.name || "").toLowerCase().split(" ").map((w) => KEEP_UP.includes(w.toUpperCase()) ? w.toUpperCase() : (w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
         return (
           <div className="blc-row" key={i}>
-            <span className={"blc-ic " + (b.paid ? "blc-paid" : overdue ? "blc-overdue" : "blc-due")}>{b.paid ? <Icon name="check" size={12} strokeWidth={3.2} /> : overdue ? <Icon name="alert" size={12} /> : <Icon name="calendar" size={12} />}</span>
-            <span className={"blc-nm" + (b.paid ? " blc-done" : "")}>{b.name}{b.paid ? "" : overdue ? " · overdue (was due " + ordinalDay(b.dueDay) + ")" : " · due " + ordinalDay(b.dueDay)}</span>
+            <span className={"blc-dot " + (b.paid ? "blc-dot-paid" : overdue ? "blc-dot-od" : "blc-dot-up")} />
+            <span className={"blc-nm" + (b.paid ? " blc-done" : "")}>{nm}{b.paid ? "" : overdue ? <span className="blc-od-lb"> · overdue</span> : <span className="blc-due-lb"> · due {ordinalDay(b.dueDay)}</span>}</span>
             <span className={"blc-amt" + (b.paid ? " blc-done" : overdue ? " blc-amt-od" : "")}>{formatMoney(b.amount)}</span>
           </div>
         );
@@ -9145,6 +9151,36 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-mb-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
   .oh-mb-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .oh-mb-pct { color: var(--ink-3); font-weight: 600; min-width: 38px; text-align: right; }
+  .oh-sec-ctx { text-transform: uppercase; letter-spacing: .06em; }
+  .mb2 { display: flex; align-items: center; gap: 22px; margin-top: 12px; }
+  .mb2-donut { position: relative; width: 108px; height: 108px; border-radius: 50%; flex: none; }
+  .mb2-hole { position: absolute; inset: 19px; border-radius: 50%; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .mb2-amt { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); line-height: 1; }
+  .mb2-lb { font-size: 8px; font-weight: 700; letter-spacing: 1px; color: var(--ink-3); margin-top: 3px; }
+  .mb2-legend { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr auto auto; row-gap: 13px; column-gap: 16px; align-items: center; }
+  .mb2-name { display: inline-flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-2); }
+  .mb2-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .mb2-val { font-size: 13.5px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  .mb2-pct { font-size: 12.5px; color: var(--ink-3); text-align: right; min-width: 36px; font-variant-numeric: tabular-nums; }
+  .blc-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .blc-dot-od { background: var(--neg); }
+  .blc-dot-up { background: var(--line-strong); }
+  .blc-dot-paid { background: var(--pos); }
+  .blc-od-lb { color: var(--neg); font-weight: 600; }
+  .blc-due-lb { color: var(--ink-3); }
+  .grc-donut { position: relative; width: 96px; height: 96px; border-radius: 50%; flex: none; }
+  .grc-hole { position: absolute; inset: 15px; border-radius: 50%; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .grc-hole-pct { font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1; letter-spacing: -0.02em; }
+  .grc-hole-lb { font-size: 8px; font-weight: 700; letter-spacing: 1px; color: var(--ink-3); margin-top: 3px; }
+  .grc-tog { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .grc-tog strong { color: var(--ink); font-weight: 700; }
+  .nw-card2 { display: flex; flex-direction: column; justify-content: center; }
+  .nw2-big { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--ink); margin: 12px 0 0; }
+  .nw2-accts { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; display: flex; flex-direction: column; gap: 11px; }
+  .nw2-acct { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; }
+  .nw2-acct-l { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-2); }
+  .nw2-acct strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .nw2-av { width: 22px; height: 22px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-solid); font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .oh-mb-amt { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
   .oh-cell-full { grid-column: 1 / -1; }
   .pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 14px; align-items: start; }
