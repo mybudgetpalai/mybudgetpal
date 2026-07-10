@@ -362,7 +362,7 @@ function parseHomeLayout(profile) {
   return { month, big };
 }
 const HOME_WIDGET_KEYS = {
-  month: ["breakdown_mini", "in_out", "category_status", "category_vs_target", "pace_gauge", "pace_full", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "bills_checklist", "trend"],
+  month: ["breakdown_mini", "in_out", "category_status", "category_vs_target", "pace_gauge", "pace_full", "pace_outlook", "bills_upcoming", "next_7_days", "spend_by_week", "money_flow", "savings_rate", "category_delta", "merchants_pro", "biggest_movers", "trend_12", "transactions_mini", "merchants", "bills", "bills_checklist", "trend"],
   big: ["net_worth", "net_worth_pro", "goal", "goal_ring", "accounts", "since_last_month", "contribution_bars", "month_end_projection", "money_score"],
 };
 function parseNavLayout(profile) {
@@ -1127,7 +1127,7 @@ async function aiAskInsights(question, transactions) {
   const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
     body: { action: "ask", question: String(question).slice(0, 500), data: buildTxDigest(transactions) },
   });
-  if (error || !data || !data.answer) throw new Error((error && error.message) || (data && data.error) || "Couldn\u2019t get an answer just now \u2014 please try again.");
+  if (error || !data || !data.answer) throw new Error((error && error.message) || (data && data.error) || "Couldn\u2019t get an answer just now — please try again.");
   return data.answer;
 }
 
@@ -1463,7 +1463,7 @@ function LpCurrencyDemo() {
   const conv = (n, from) => from === home ? n : Math.round(n * RATE[from + ">" + home]);
   const fmt = (n, cur) => (n < 0 ? "-" : "") + SYM[cur] + Math.abs(Math.round(n)).toLocaleString("en-GB");
   const txs = [
-    { name: "SALARY \u00b7 BRIGHTWAVE", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: 3400 },
+    { name: "SALARY · BRIGHTWAVE", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: 3400 },
     { name: "TESCO EXPRESS", bank: "HSBC", flag: "\uD83C\uDDEC\uD83C\uDDE7", cur: "GBP", native: -72 },
     { name: "CARREFOUR MOE", bank: "Emirates NBD", flag: "\uD83C\uDDE6\uD83C\uDDEA", cur: "AED", native: -452 },
     { name: "DEWA PAYMENT", bank: "Emirates NBD", flag: "\uD83C\uDDE6\uD83C\uDDEA", cur: "AED", native: -308 },
@@ -2989,22 +2989,22 @@ function scorePersona({ savvy, tracking, balanceCheck, goals }) {
 const PERSONA_TEMPLATES = {
   fresh_start: {
     name: "Fresh Start",
-    blurb: "A clear, visual view \u2014 what you can spend, how each budget is doing, and what's coming up.",
+    blurb: "A clear, visual view — what you can spend, how each budget is doing, and what's coming up.",
     layout: { month: ["breakdown_mini", "bills_checklist"], big: ["goal_ring", "net_worth"] },
   },
   goal_getter: {
     name: "Goal Getter",
-    blurb: "Everything points at your goal \u2014 what this month adds, your pace, and the projected finish date.",
+    blurb: "Everything points at your goal — what this month adds, your pace, and the projected finish date.",
     layout: { month: ["in_out", "savings_rate", "breakdown_mini", "pace_gauge"], big: ["goal_ring", "contribution_bars"] },
   },
   budget_hawk: {
     name: "Budget Hawk",
-    blurb: "Full control \u2014 the worked maths behind every number, pacing deltas, and what's about to leave your account.",
-    layout: { month: ["category_vs_target", "spend_by_week", "next_7_days", "pace_gauge"], big: ["month_end_projection", "net_worth"] },
+    blurb: "Full control — the worked maths behind every number, pacing deltas, and what's about to leave your account.",
+    layout: { month: ["category_vs_target", "spend_by_week", "pace_outlook"], big: ["month_end_projection", "net_worth"] },
   },
   power_view: {
     name: "Power View",
-    blurb: "Maximum signal \u2014 deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
+    blurb: "Maximum signal — deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
     layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score"] },
   },
 };
@@ -3032,7 +3032,7 @@ function BuildingDashboardScreen({ personaKey, onDone, overlay }) {
             <div className="bdg-badge"><Icon name="sparkles" size={15} /> {t.name}</div>
             <h1 className="title" style={{ marginTop: 14 }}>We've set you up with the {t.name} view</h1>
             <p className="subtitle">{t.blurb}</p>
-            <p className="subtitle" style={{ fontSize: 12.5, opacity: 0.85 }}>Don't worry {"\u2014"} you can change any widget later with "Edit view" on your overview.</p>
+            <p className="subtitle" style={{ fontSize: 12.5, opacity: 0.85 }}>Don't worry {"—"} you can change any widget later with "Edit view" on your overview.</p>
             <div className="nav-row" style={{ marginTop: 18 }}>
               <button className="glass-btn primary" onClick={onDone}>Show me around</button>
             </div>
@@ -3048,7 +3048,7 @@ function SetupIntroModal({ name, onStart, onSkip }) {
     <div className="modal-overlay setup-intro-overlay">
       <div className="glass-card modal-card" style={{ maxWidth: 480 }}>
         <h1 className="title" style={{ marginTop: 4 }}>Hi {name || "there"}, welcome to {APP_NAME}</h1>
-        <p className="subtitle">This is your overview {"\u2014"} here's a first look behind this card.</p>
+        <p className="subtitle">This is your overview {"—"} here's a first look behind this card.</p>
         <p className="subtitle" style={{ marginTop: 10 }}>Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
         <div className="nav-row" style={{ marginTop: 22 }}>
           <button className="glass-btn ghost" onClick={onSkip}>I'll fill this in later</button>
@@ -3077,7 +3077,7 @@ function SetupQuestionsScreen({ userId, pushToast, onDone, onBack }) {
           id: userId, savvy, tracking, balance_check: balanceCheck, fin_goals: goals, setup_completed: true,
         });
         if (error) throw error;
-      } catch (e) { pushToast("Couldn't save your answers \u2014 " + (e.message || e), "error"); setSubmitting(false); return; }
+      } catch (e) { pushToast("Couldn't save your answers — " + (e.message || e), "error"); setSubmitting(false); return; }
       setSubmitting(false);
       onDone({ savvy, tracking, balanceCheck, goals });
     } else setStep((s) => s + 1);
@@ -3259,7 +3259,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
           </button>
           {inboxOpen && (
             <div className="inbox-menu">
-              <div className="inbox-menu-head">Your tasks{taskList.length ? " \u00b7 " + taskList.length : ""}</div>
+              <div className="inbox-menu-head">Your tasks{taskList.length ? " · " + taskList.length : ""}</div>
               {taskList.length === 0 ? (
                 <div className="inbox-empty"><Icon name="checkcircle" size={15} /> All caught up &mdash; nothing to do right now.</div>
               ) : taskList.map((t) => (
@@ -3993,7 +3993,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
   const total = myBills.reduce((s, b) => s + b.amount, 0);
 
   if (!editable) {
-    if (!myBills.length) return <EmptyState text="No bills yet \u2014 head to Bills & Subscriptions to pick which recurring payments are bills." />;
+    if (!myBills.length) return <EmptyState text="No bills yet — head to Bills & Subscriptions to pick which recurring payments are bills." />;
     return (
       <div className="glass-card dash-card">
         <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
@@ -4023,7 +4023,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
   return (
     <div className="glass-card dash-card">
       <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
-      <p className="subtitle" style={{ margin: "0 0 12px" }}>Nothing's counted as a bill until you say so. We've spotted a few regular payments below {"\u2014"} tell us which are really bills, and add any we missed.</p>
+      <p className="subtitle" style={{ margin: "0 0 12px" }}>Nothing's counted as a bill until you say so. We've spotted a few regular payments below {"—"} tell us which are really bills, and add any we missed.</p>
 
       {suspected.length > 0 && (
         <div style={{ marginBottom: 4 }}>
@@ -4042,7 +4042,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
 
       <span className="card-label" style={{ display: "block", margin: "16px 0 6px" }}>Your bills</span>
       {myBills.length === 0 ? (
-        <p className="subtitle" style={{ margin: "0 0 4px" }}>No bills added yet {"\u2014"} confirm the ones above, or add your own below.</p>
+        <p className="subtitle" style={{ margin: "0 0 4px" }}>No bills added yet {"—"} confirm the ones above, or add your own below.</p>
       ) : (
         <>
           <div className="tx-list">
@@ -4170,7 +4170,7 @@ function InsightsAsk({ transactions }) {
     if (!query || busy) return;
     setQ(query); setBusy(true); setErr(""); setAns("");
     try { const a = await aiAskInsights(query, transactions); setAns(a); }
-    catch (e) { setErr((e && e.message) || "Something went wrong \u2014 please try again."); }
+    catch (e) { setErr((e && e.message) || "Something went wrong — please try again."); }
     setBusy(false);
   };
   const examples = ["How much did I spend on coffee last month?", "What was my biggest expense this month?", "Am I spending more on dining than usual?"];
@@ -4483,7 +4483,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
           <div className={"review-tile " + (spendDiff <= 0 ? "rt-good" : "rt-bad")}>
             <span className="rt-label">You spent</span>
             <span className="rt-actual">{formatMoney(actualSpend)}</span>
-            <span className="rt-planned">planned {hasBudget ? formatMoney(plannedSpend) : "\u2014"}</span>
+            <span className="rt-planned">planned {hasBudget ? formatMoney(plannedSpend) : "—"}</span>
             {hasBudget && <span className="rt-verdict">{spendDiff <= 0 ? formatMoney(-spendDiff) + " under budget" : formatMoney(spendDiff) + " over budget"}</span>}
           </div>
           <div className={"review-tile " + (incomeDiff >= 0 ? "rt-good" : "rt-bad")}>
@@ -4495,7 +4495,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
           <div className={"review-tile " + (netDiff >= 0 ? "rt-good" : "rt-bad")}>
             <span className="rt-label">Left over</span>
             <span className="rt-actual">{formatMoney(actualNet)}</span>
-            <span className="rt-planned">planned {hasBudget ? formatMoney(plannedNet) : "\u2014"}</span>
+            <span className="rt-planned">planned {hasBudget ? formatMoney(plannedNet) : "—"}</span>
             {hasBudget && <span className="rt-verdict">{netDiff >= 0 ? formatMoney(netDiff) + " better than plan" : formatMoney(-netDiff) + " worse than plan"}</span>}
           </div>
         </div>
@@ -4520,7 +4520,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
                   <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
                   <span>{formatMoney(b)}</span>
                   <span>{formatMoney(a)}</span>
-                  <span className={over ? "rv-over" : "rv-under"}>{b === 0 ? "\u2014" : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d))}</span>
+                  <span className={over ? "rv-over" : "rv-under"}>{b === 0 ? "—" : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d))}</span>
                 </div>
               );
             })}
@@ -4529,7 +4529,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
               return (
                 <div className="review-row" key={c}>
                   <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{displayCat(c)}</span>
-                  <span>{"\u2014"}</span>
+                  <span>{"—"}</span>
                   <span>{formatMoney(a)}</span>
                   <span className="rv-over">-{formatMoney(a)} unbudgeted</span>
                 </div>
@@ -4545,7 +4545,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
                   <span className="review-cat">Total</span>
                   <span>{formatMoney(tp)}</span>
                   <span>{formatMoney(ta)}</span>
-                  <span className={over ? "rv-over" : "rv-under"}>{tp === 0 ? "\u2014" : (over ? "-" + formatMoney(td) : "+" + formatMoney(-td))}</span>
+                  <span className={over ? "rv-over" : "rv-under"}>{tp === 0 ? "—" : (over ? "-" + formatMoney(td) : "+" + formatMoney(-td))}</span>
                 </div>
               );
             })()}
@@ -4744,23 +4744,23 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
       <div className="glass-card modal-card catrev-card" onClick={(e) => e.stopPropagation()}>
         <div className="brand-row" style={{ marginBottom: 6, justifyContent: "space-between" }}>
           <span className="brand-name">Categorise transactions</span>
-          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"\u00d7"}</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"×"}</button>
         </div>
         {rows.length === 0 ? (
           <div className="catrev-done">
             <div className="catrev-done-icon"><Icon name="checkcircle" size={26} /></div>
-            <p>All sorted {"\u2014"} every transaction now has a category.</p>
+            <p>All sorted {"—"} every transaction now has a category.</p>
             <button className="glass-btn primary" onClick={onClose}>Done</button>
           </div>
         ) : (
           <>
-            <p className="catrev-sub">{uncats.length} transaction{uncats.length !== 1 ? "s" : ""} across {rows.length} merchant{rows.length !== 1 ? "s" : ""} {"\u2014"} pick a category and it applies to that merchant everywhere.{sortedCount > 0 ? " " + sortedCount + " sorted so far \u2713" : ""}</p>
+            <p className="catrev-sub">{uncats.length} transaction{uncats.length !== 1 ? "s" : ""} across {rows.length} merchant{rows.length !== 1 ? "s" : ""} {"—"} pick a category and it applies to that merchant everywhere.{sortedCount > 0 ? " " + sortedCount + " sorted so far \u2713" : ""}</p>
             <div className="catrev-list">
               {rows.map((r) => (
                 <div className={"catrev-row" + (expandedName === r.name ? " catrev-open" : "")} key={r.name}>
                   <button className="catrev-row-head" onClick={(e) => { const row = e.currentTarget.closest(".catrev-row"); const opening = expandedName !== r.name; setExpandedName(opening ? r.name : null); if (opening && row) setTimeout(() => row.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80); }}>
                     <span className="catrev-name">{r.name}</span>
-                    <span className="catrev-meta">{r.count > 1 ? r.count + " \u00d7 \u00b7 " : ""}{formatMoney(r.total)}{r.latest ? " \u00b7 " + formatTxDate(r.latest) : ""}</span>
+                    <span className="catrev-meta">{r.count > 1 ? r.count + " × · " : ""}{formatMoney(r.total)}{r.latest ? " · " + formatTxDate(r.latest) : ""}</span>
                     <span className="catrev-caret">{expandedName === r.name ? "\u25be" : "\u25b8"}</span>
                   </button>
                   {expandedName === r.name && (
@@ -4880,7 +4880,7 @@ const OVERVIEW_TOUR = [
   { title: "Safe to spend", body: "This is roughly what you can spend each day for the rest of the month and still stay on budget." },
   { title: "Where it's gone", body: "See what you've spent on so far this month, broken down by category." },
   { title: "The big picture", body: "Your overall net worth and how you're tracking towards your savings goal." },
-  { title: "Needs you", body: "Anything that needs a quick action \u2014 like transactions to categorise \u2014 shows up here." },
+  { title: "Needs you", body: "Anything that needs a quick action — like transactions to categorise — shows up here." },
 ];
 
 function TourTarget({ active, className, children }) {
@@ -4918,7 +4918,7 @@ function SpentSoFarHero({ transactions }) {
     <div className="safe-hero">
       <div className="safe-hero-row">
         <div className="safe-hero-main">
-          <span className="safe-hero-label">Spent so far {"\u00b7"} {currentMonthName()}</span>
+          <span className="safe-hero-label">Spent so far {"·"} {currentMonthName()}</span>
           <span className="safe-hero-num"><CountUp value={spent} format={formatMoney} /></span>
         </div>
         <div className="safe-hero-side">
@@ -4933,8 +4933,8 @@ function SetupPushBand({ onResumeSetup }) {
   return (
     <div className="oh-setup-band">
       <span className="oh-setup-ic"><Icon name="sparkles" size={17} /></span>
-      <span className="oh-setup-text"><strong>Want sharper insights?</strong> You're only seeing part of what {APP_NAME} can do {"\u2014"} set your targets to unlock safe-to-spend, pacing alerts and tailored tips. It takes 3 minutes.</span>
-      <button className="oh-setup-cta" onClick={onResumeSetup}>Set up {"\u203a"}</button>
+      <span className="oh-setup-text"><strong>Want sharper insights?</strong> You're only seeing part of what {APP_NAME} can do {"—"} set your targets to unlock safe-to-spend, pacing alerts and tailored tips. It takes 3 minutes.</span>
+      <button className="oh-setup-cta" onClick={onResumeSetup}>Set up {"›"}</button>
     </div>
   );
 }
@@ -4979,13 +4979,13 @@ function InOutCard({ transactions }) {
   const out = spendForMonth(txs, key);
   if (income <= 0) return (
     <div className="glass-card dash-card">
-      <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
+      <span className="card-label">In vs out {"·"} {currentMonthName()}</span>
       <div className="oh-sub" style={{ marginTop: 8 }}>No income recorded yet this month.</div>
     </div>
   );
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">In vs out {"\u00b7"} {currentMonthName()}</span>
+      <span className="card-label">In vs out {"·"} {currentMonthName()}</span>
       <div className="oh-io">
         <div><div className="oh-io-k">In</div><div className="oh-io-v" style={{ color: "var(--pos)" }}>{formatMoney(income)}</div></div>
         <div><div className="oh-io-k">Out</div><div className="oh-io-v">{formatMoney(out)}</div></div>
@@ -5041,7 +5041,7 @@ function GoalCard({ goals, plan, banks, accountData, transactions }) {
       <span className="card-label">{goal.name || "Savings goal"}</span>
       <div className="oh-big">{formatMoney(goal.saved)} <span className="oh-big-sub">of {formatMoney(goal.target)}</span></div>
       <div className="oh-track"><div className="oh-track-fill" style={{ width: pct + "%" }} /></div>
-      <div className="oh-track-cap">{formatMoney(remain)} to go{months !== null ? " \u00b7 " + months + " month" + (months !== 1 ? "s" : "") + " left" : ""}</div>
+      <div className="oh-track-cap">{formatMoney(remain)} to go{months !== null ? " · " + months + " month" + (months !== 1 ? "s" : "") + " left" : ""}</div>
     </div>
   );
 }
@@ -5142,18 +5142,18 @@ function BillsUpcomingCard({ transactions, billExcludes }) {
   const bills = remainingBillsThisMonth(transactions, billExcludes);
   const upcoming = bills.filter((b) => b.upcoming).slice(0, 5);
   const paid = bills.filter((b) => b.paid).length;
-  if (!bills.length) return <div className="glass-card dash-card"><span className="card-label">Bills coming up</span><div className="oh-sub" style={{ marginTop: 8 }}>No recurring bills detected yet {"\u2014"} they appear after 2+ months of statements.</div></div>;
+  if (!bills.length) return <div className="glass-card dash-card"><span className="card-label">Bills coming up</span><div className="oh-sub" style={{ marginTop: 8 }}>No recurring bills detected yet {"—"} they appear after 2+ months of statements.</div></div>;
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Bills coming up</span>
       {upcoming.length === 0
-        ? <div className="oh-sub" style={{ marginTop: 8 }}>All done {"\u2014"} {paid} bill{paid !== 1 ? "s" : ""} paid this month.</div>
+        ? <div className="oh-sub" style={{ marginTop: 8 }}>All done {"—"} {paid} bill{paid !== 1 ? "s" : ""} paid this month.</div>
         : (
           <>
             <div className="bup-list">
               {upcoming.map((b, i) => (
                 <div className="bup-row" key={i}>
-                  <span className="bup-nm">{b.name} {"\u00b7"} {b.due}</span>
+                  <span className="bup-nm">{b.name} {"·"} {b.due}</span>
                   <span className="bup-amt">{formatMoney(b.amount)}</span>
                   <span className="bup-tick"><Icon name="checkcircle" size={15} /></span>
                 </div>
@@ -5272,7 +5272,7 @@ function MoneyFlowCard({ transactions }) {
   const pence = Math.max(0, Math.round((kept / income) * 100));
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Money flow {"\u2014"} what feeds the goal</span>
+      <span className="card-label">Money flow {"—"} what feeds the goal</span>
       <div className="mf-row">
         <div className="mf-box"><div className="mf-v">{formatMoney(income)}</div><div className="mf-k">In</div></div>
         <span className="mf-arr"><Icon name="trending" size={15} /></span>
@@ -5306,12 +5306,12 @@ function SavingsRateCard({ transactions }) {
   const line = pts.map((v, i) => v === null ? null : (i * step) + "," + (H - 4 - (v / 100) * (H - 10))).filter(Boolean).join(" ");
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Savings rate {"\u2014"} last 6 months</span>
+      <span className="card-label">Savings rate {"—"} last 6 months</span>
       <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
         <polyline points={line} fill="none" stroke="var(--pos)" strokeWidth="2.5" />
       </svg>
       <div className="sr-foot">
-        <span className="sr-num">{cur !== null ? cur + "%" : "\u2014"}</span>
+        <span className="sr-num">{cur !== null ? cur + "%" : "—"}</span>
         {isBest && <span className="cst-chip cst-ok">best month yet</span>}
       </div>
     </div>
@@ -5358,12 +5358,12 @@ function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals 
       <div className="gg-vr" />
       <div className="gg-col">
         <span className="safe-hero-label">Added to your goal this month</span>
-        <span className="gg-num gg-pos">{kept >= 0 ? "+" : "\u2212"}<CountUp value={Math.abs(kept)} format={formatMoney} /></span>
+        <span className="gg-num gg-pos">{kept >= 0 ? "+" : "−"}<CountUp value={Math.abs(kept)} format={formatMoney} /></span>
         {projKept !== null && projKept > kept && !s.over && (
-          <span className="oh-sub" style={{ marginTop: 6 }}>Stay under {formatMoney(s.perDay)}/day and this becomes <strong>{"\u2248"} {formatMoney(Math.round(projKept))}</strong> by month end.</span>
+          <span className="oh-sub" style={{ marginTop: 6 }}>Stay under {formatMoney(s.perDay)}/day and this becomes <strong>{"≈"} {formatMoney(Math.round(projKept))}</strong> by month end.</span>
         )}
         {s.over && (
-          <span className="oh-sub" style={{ marginTop: 6 }}>Over budget this month slows your goal {"\u2014"} trimming spend now gets you back on pace.</span>
+          <span className="oh-sub" style={{ marginTop: 6 }}>Over budget this month slows your goal {"—"} trimming spend now gets you back on pace.</span>
         )}
       </div>
     </div>
@@ -5422,22 +5422,23 @@ function BudgetHawkHero({ targets, transactions, rollovers, billExcludes }) {
   const expected = s.budget * (day / s.daysInMonth);
   const delta = s.spent - expected;
   const under = delta <= 0;
+  const spare = Math.round(Math.abs(delta));
   return (
-    <div className="safe-hero bh-hero">
-      <div className="bh-left">
-        <span className="safe-hero-label">Safe to spend</span>
-        <span className={"gg-num" + (s.over ? " safe-hero-over" : "")}><CountUp value={s.perDay} format={formatMoney} /><em>/day</em></span>
-        <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")} style={{ marginTop: 8 }}>
-          {under ? "Under pace" : "Over pace"} {"\u00b7"} {under ? "\u2212" : "+"}{formatMoney(Math.round(Math.abs(delta)))}
-        </span>
+    <div className="safe-hero bh2-hero">
+      <div className="bh2-left">
+        <span className="fsr-label">Safe to spend</span>
+        <div className="bh2-num">{formatMoney(s.perDay)} <em>/day</em></div>
+        <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace · " + formatMoney(spare) + " to spare" : "Over pace · " + formatMoney(spare) + " over"}</span>
       </div>
-      <div className="bh-math">
-        <span className="card-label" style={{ display: "block", marginBottom: 4 }}>How we get this</span>
-        <div className="bh-ln"><span>Monthly budget{s.roll !== 0 ? " + rollover" : ""}</span><strong>{formatMoney(s.pot)}</strong></div>
-        <div className="bh-ln"><span>Spent so far</span><strong>{"\u2212"}{formatMoney(s.spent)}</strong></div>
-        {s.reserved > 0 && <div className="bh-ln"><span>Bills still to come (reserved)</span><strong>{"\u2212"}{formatMoney(s.reserved)}</strong></div>}
-        <div className="bh-ln"><span>Free to spend {"\u00f7"} {s.daysLeft} days left</span><strong>{formatMoney(Math.max(0, s.free))} {"\u00f7"} {s.daysLeft}</strong></div>
-        <div className="bh-ln bh-total"><span>Safe to spend</span><strong>{s.over ? formatMoney(0) : "\u2248 " + formatMoney(s.perDay) + "/day"}</strong></div>
+      <div className="bh2-right">
+        <span className="fsr-label" style={{ display: "block", marginBottom: 14 }}>How we get this</span>
+        <div className="bh2-ledger">
+          <div className="bh2-ln"><span>Monthly budget{s.roll !== 0 ? " + rollover" : ""}</span><span className="bh2-dots" /><strong>{formatMoney(s.pot)}</strong></div>
+          <div className="bh2-ln"><span>− Spent so far</span><span className="bh2-dots" /><strong>{formatMoney(s.spent)}</strong></div>
+          {s.reserved > 0 && <div className="bh2-ln"><span>− Bills reserved</span><span className="bh2-dots" /><strong>{formatMoney(s.reserved)}</strong></div>}
+          <div className="bh2-ln"><span>= Free to spend, ÷ {s.daysLeft} days left</span><span className="bh2-dots" /><strong>{formatMoney(Math.max(0, s.free))}</strong></div>
+          <div className="bh2-ln bh2-total"><span>Safe to spend</span><span className="bh2-dots-blank" /><strong>{s.over ? formatMoney(0) + "/day" : "≈ " + formatMoney(s.perDay) + "/day"}</strong></div>
+        </div>
       </div>
     </div>
   );
@@ -5453,29 +5454,36 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
   if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Category vs target</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to compare against.</div></div>;
   const upcomingBills = remainingBillsThisMonth(transactions, billExcludes).filter((b) => b.upcoming);
   const earliestDue = upcomingBills.length ? Math.min(...upcomingBills.map((b) => b.dueDay || 31)) : null;
+  const tickPct = Math.round(elapsed * 100);
+  const allUnder = rows.every((r) => r.target <= 0 || r.spent <= r.target * elapsed);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Category vs target</span>
-      <div className="cvt-row cvt-hd"><span>Category</span><span></span><span>Spent / Target</span><span>{"\u0394"} vs pace</span></div>
-      {rows.map((r) => {
-        const over = r.target > 0 && r.spent > r.target;
-        const width = r.target > 0 ? Math.min(100, (r.spent / r.target) * 100) : 0;
-        const isBillsPending = r.c === "Bills" && r.spent === 0 && earliestDue !== null;
-        const d = r.spent - r.target * elapsed;
-        return (
-          <div className="cvt-row" key={r.c}>
-            <span className="cvt-nm">{displayCat(r.c)}</span>
-            <div className="cvt-bar"><div style={{ width: width + "%", background: over ? "var(--neg)" : "var(--accent)" }} /></div>
-            <span className="cvt-num">{Math.round(r.spent)} / {Math.round(r.target)}</span>
-            {isBillsPending
-              ? <span className="cvt-d cvt-mut">due {ordinalDay(earliestDue)}</span>
-              : r.target > 0
-              ? <span className={"cvt-d " + (d > 0 ? "cvt-bad" : "cvt-ok")}>{d > 0 ? "+" : "\u2212"}{formatMoney(Math.round(Math.abs(d)))}</span>
-              : <span className="cvt-d cvt-mut">{"\u2014"}</span>}
-          </div>
-        );
-      })}
-      <div className="oh-sub" style={{ marginTop: 8 }}>{"\u0394"} = versus where you'd be on day {day} (target {"\u00d7"} {Math.round(elapsed * 100)}%).</div>
+      <div className="cvt2-head">
+        <span className="card-label" style={{ margin: 0 }}>Category vs target</span>
+        <span className="cvt2-cap">bar fills to target · <span className="cvt2-cap-tick">tick = day-{day} pace ({tickPct}%)</span></span>
+      </div>
+      <div className="cvt2-grid">
+        <span className="cvt2-h">Category</span><span></span><span className="cvt2-h cvt2-r">Spent / target</span><span className="cvt2-h cvt2-r">Δ pace</span>
+        {rows.map((r) => {
+          const over = r.spent - r.target * elapsed > 0;
+          const fill = r.target > 0 ? Math.min(100, (r.spent / r.target) * 100) : 0;
+          const isBillsPending = r.c === "Bills" && r.spent === 0 && r.target > 0 && earliestDue !== null;
+          const d = r.spent - r.target * elapsed;
+          return (
+            <React.Fragment key={r.c}>
+              <span className="cvt2-nm">{displayCat(r.c)}</span>
+              <div className="cvt2-track"><div className="cvt2-fill" style={{ width: fill + "%", background: over ? "var(--neg)" : "var(--accent-solid)" }} /><div className="cvt2-tick" style={{ left: tickPct + "%" }} /></div>
+              <span className="cvt2-num">{formatMoney(Math.round(r.spent))} <span className="cvt2-tgt">/ {Math.round(r.target)}</span></span>
+              {isBillsPending
+                ? <span className="cvt2-d cvt2-mut">due {ordinalDay(earliestDue)}</span>
+                : r.target > 0
+                ? <span className={"cvt2-d " + (over ? "cvt2-bad" : "cvt2-ok")}>{over ? "+" : "−"}{formatMoney(Math.round(Math.abs(d)))}</span>
+                : <span className="cvt2-d cvt2-mut">—</span>}
+            </React.Fragment>
+          );
+        })}
+      </div>
+      <div className="cvt2-foot">{allUnder ? "Every category is left of the pace tick — you're tracking under target across the board." : "Bars past the tick are running ahead of where you'd expect by day " + day + "."}</div>
     </div>
   );
 }
@@ -5483,7 +5491,6 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
 function SpendByWeekCard({ transactions }) {
   const key = currentMonthKey();
   const txs = (transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key);
-  if (!txs.length) return <div className="glass-card dash-card"><span className="card-label">Spend by week</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
   const dim = daysInCurrentMonth();
   const nWeeks = Math.ceil(dim / 7);
   const weeks = Array.from({ length: nWeeks }, () => 0);
@@ -5491,18 +5498,26 @@ function SpendByWeekCard({ transactions }) {
   const curW = Math.min(nWeeks - 1, Math.floor((today().getDate() - 1) / 7));
   const max = Math.max(...weeks, 1);
   const hotIdx = weeks.indexOf(Math.max(...weeks));
+  const anySpend = weeks.some((v) => v > 0);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Spend by week</span>
-      <div className="cb-bars" style={{ height: 50 }}>
-        {weeks.map((v, i) => (
-          <div key={i}
-            className={i === curW ? "cb-hot" : ""}
-            style={{ height: Math.max(4, (v / max) * 100) + "%", background: i === hotIdx && hotIdx !== curW && v > 0 ? "var(--neg)" : undefined, opacity: i > curW ? 0.35 : 1 }} />
-        ))}
+      <div className="sbw2-plot">
+        {weeks.map((v, i) => {
+          const future = i > curW, now = i === curW;
+          const bg = future ? "var(--surface-3)" : now ? "color-mix(in srgb, var(--accent-solid) 45%, transparent)" : "var(--accent-solid)";
+          return (
+            <div className="sbw2-col" key={i}>
+              {!future && v > 0 && <span className="sbw2-val">{formatMoney(Math.round(v))}</span>}
+              <div className="sbw2-bar" style={{ height: (!future && v > 0) ? Math.max(8, (v / max) * 100) + "%" : "6px", background: bg }} />
+            </div>
+          );
+        })}
       </div>
-      <div className="cb-x">{weeks.map((_, i) => <span key={i}>W{i + 1}{i === curW ? " \u00b7 now" : ""}</span>)}</div>
-      {weeks[hotIdx] > 0 && <div className="oh-sub" style={{ marginTop: 7 }}>W{hotIdx + 1} is your heaviest so far: <strong>{formatMoney(Math.round(weeks[hotIdx]))}</strong>.</div>}
+      <div className="sbw2-x">{weeks.map((_, i) => <span key={i} className={i === curW ? "sbw2-xnow" : (i > curW ? "sbw2-xfut" : "")}>W{i + 1}{i === curW ? " · now" : ""}</span>)}</div>
+      {anySpend
+        ? <div className="oh-sub" style={{ marginTop: 16 }}>W{hotIdx + 1} is your heaviest so far at <strong>{formatMoney(Math.round(weeks[hotIdx]))}</strong>.{weeks[curW] === 0 ? " This week you've spent nothing yet." : ""}</div>
+        : <div className="oh-sub" style={{ marginTop: 16 }}>No spending yet this month.</div>}
     </div>
   );
 }
@@ -5539,15 +5554,42 @@ function MonthEndProjectionCard({ transactions, targets }) {
   const rate = day > 0 ? spent / day : 0;
   const diff = budget - proj;
   return (
-    <div className="glass-card dash-card">
+    <div className="glass-card dash-card mep2-card">
       <span className="card-label">Month-end projection</span>
-      <div className="oh-big">{formatMoney(proj)} <span className="oh-big-sub">projected spend</span></div>
-      {budget > 0 && (
-        <span className={"cst-chip " + (diff >= 0 ? "cst-ok" : "cst-warn")} style={{ marginTop: 7 }}>
-          {formatMoney(Math.abs(Math.round(diff)))} {diff >= 0 ? "under" : "over"} budget
-        </span>
-      )}
-      <div className="oh-sub" style={{ marginTop: 8 }}>Based on your current daily rate of {formatMoney(Math.round(rate))}.</div>
+      <div className="mep2-big">{formatMoney(proj)} <span>projected spend</span></div>
+      {budget > 0 && <span className={"mep2-pill " + (diff >= 0 ? "mep2-ok" : "mep2-bad")}>{formatMoney(Math.abs(Math.round(diff)))} {diff >= 0 ? "under" : "over"} budget</span>}
+      <div className="oh-sub" style={{ marginTop: 12 }}>Based on your current rate of <strong>{formatMoney(Math.round(rate))}/day</strong>.</div>
+    </div>
+  );
+}
+
+function PaceOutlookCard({ transactions, targets, billExcludes }) {
+  const key = currentMonthKey();
+  const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
+  const spent = spendForMonth(transactions || [], key);
+  const day = today().getDate(), dim = daysInCurrentMonth();
+  if (budget <= 0) return <div className="glass-card dash-card"><span className="card-label">Your pace</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to see your spending pace.</div></div>;
+  const expected = budget * (day / dim);
+  const under = spent <= expected;
+  const diff = Math.round(Math.abs(expected - spent));
+  const spentPct = Math.min(100, (spent / Math.max(budget, 1)) * 100);
+  const expPct = Math.min(100, (expected / Math.max(budget, 1)) * 100);
+  const todayDay = today().getDate();
+  const upcoming = remainingBillsThisMonth(transactions, billExcludes).filter((b) => b.upcoming && b.dueDay <= todayDay + 7).sort((a, b) => a.dueDay - b.dueDay);
+  const n7 = upcoming.length === 0 ? "nothing due." : upcoming.map((b) => b.name + " " + formatMoney(b.amount)).join(", ") + ".";
+  return (
+    <div className="glass-card dash-card pace2-card">
+      <div className="pace2-head">
+        <span className="card-label" style={{ margin: 0 }}>Your pace</span>
+        <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace" : "Over pace"}</span>
+      </div>
+      <div className="pace2-barwrap">
+        <div className="pace2-bar"><div className="pace2-fill" style={{ width: spentPct + "%", background: under ? "var(--accent-solid)" : "var(--neg)" }} /></div>
+        <div className="pace2-mark" style={{ left: expPct + "%" }} />
+        <div className="pace2-lb" style={{ left: expPct + "%" }}>▴ expected by today</div>
+      </div>
+      <div className="oh-sub" style={{ marginTop: 4 }}>You've spent <strong>{formatMoney(spent)}</strong>. By day {day} you'd typically be near <strong>{formatMoney(Math.round(expected))}</strong> — so you're <strong className={under ? "pace2-good" : ""}>{formatMoney(diff)} {under ? "under" : "over"}</strong> for a {formatMoney(Math.round(budget))} budget.</div>
+      <div className="pace2-foot"><strong>Next 7 days:</strong> {n7}</div>
     </div>
   );
 }
@@ -5582,7 +5624,7 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   const expected = s.budget * (day / s.daysInMonth);
   const paceD = Math.round(s.spent - expected);
   const stats = [];
-  if (s.budget > 0) stats.push({ k: "Safe/day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "\u2212" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
+  if (s.budget > 0) stats.push({ k: "Safe/day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "−" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
   stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "\u2193" : "\u2191") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
   if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: null, good: kept >= 50 });
   if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: null, good: true });
@@ -5613,14 +5655,14 @@ function CategoryDeltaCard({ transactions }) {
     const pct = a > 0 ? Math.round(((s - a) / a) * 100) : null;
     return { c, s, pct };
   }).filter(Boolean).sort((x, y) => y.s - x.s);
-  if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">{"\u0394"} vs 3-mo avg</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs a few months of statements.</div></div>;
+  if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">{"Δ"} vs 3-mo avg</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs a few months of statements.</div></div>;
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Category {"\u0394"} vs 3-mo avg</span>
+      <span className="card-label">Category {"Δ"} vs 3-mo avg</span>
       {rows.slice(0, 5).map((r) => (
         <div className="pvr" key={r.c}>
           <span className="pvr-n">{displayCat(r.c)}</span>
-          <span className="pvr-v">{formatMoney(Math.round(r.s))}{r.pct !== null && <em className={r.pct > 0 ? "cvt-bad" : "cvt-ok"}> {r.pct > 0 ? "+" : "\u2212"}{Math.abs(r.pct)}%</em>}</span>
+          <span className="pvr-v">{formatMoney(Math.round(r.s))}{r.pct !== null && <em className={r.pct > 0 ? "cvt-bad" : "cvt-ok"}> {r.pct > 0 ? "+" : "−"}{Math.abs(r.pct)}%</em>}</span>
         </div>
       ))}
     </div>
@@ -5638,7 +5680,7 @@ function MerchantsProCard({ transactions }) {
   const conc = Math.round((rows.slice(0, 3).reduce((s, [, v]) => s + v, 0) / Math.max(total, 1)) * 100);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Top merchants <span className="pv-mut">{"\u00b7"} top 3 = {conc}%</span></span>
+      <span className="card-label">Top merchants <span className="pv-mut">{"·"} top 3 = {conc}%</span></span>
       {rows.slice(0, 5).map(([n, v], i) => (
         <div className="pvr" key={i}>
           <span className="pvr-n">{n}</span>
@@ -5664,11 +5706,11 @@ function BiggestMoversCard({ transactions }) {
   if (!movers.length) return <div className="glass-card dash-card"><span className="card-label">Biggest movers MoM</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs last month's statements to compare.</div></div>;
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Biggest movers MoM <span className="pv-mut">{"\u00b7"} pace-adjusted</span></span>
+      <span className="card-label">Biggest movers MoM <span className="pv-mut">{"·"} pace-adjusted</span></span>
       {movers.slice(0, 5).map((m) => (
         <div className="pvr" key={m.c}>
           <span className="pvr-n">{displayCat(m.c)}</span>
-          <span className={"pvr-v " + (m.d > 0 ? "cvt-bad" : "cvt-ok")}>{m.d > 0 ? "+" : "\u2212"}{formatMoney(Math.round(Math.abs(m.d)))}{m.pct !== null ? " " + (m.d > 0 ? "\u2191" : "\u2193") + Math.abs(m.pct) + "%" : ""}</span>
+          <span className={"pvr-v " + (m.d > 0 ? "cvt-bad" : "cvt-ok")}>{m.d > 0 ? "+" : "−"}{formatMoney(Math.round(Math.abs(m.d)))}{m.pct !== null ? " " + (m.d > 0 ? "\u2191" : "\u2193") + Math.abs(m.pct) + "%" : ""}</span>
         </div>
       ))}
     </div>
@@ -5679,7 +5721,7 @@ function Trend12Card({ transactions }) {
   const keys = lastNMonthKeys(currentMonthKey(), 12);
   const vals = keys.map((k) => spendForMonth(transactions || [], k));
   const withData = vals.filter((v) => v > 0);
-  if (withData.length < 3) return <div className="glass-card dash-card"><span className="card-label">Spend {"\u2014"} trailing 12 months</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload more history to unlock the long trend.</div></div>;
+  if (withData.length < 3) return <div className="glass-card dash-card"><span className="card-label">Spend {"—"} trailing 12 months</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload more history to unlock the long trend.</div></div>;
   const avg = withData.reduce((a, b) => a + b, 0) / withData.length;
   const max = Math.max(...vals, avg, 1);
   const W = 560, H = 60;
@@ -5688,7 +5730,7 @@ function Trend12Card({ transactions }) {
   const avgY = H - 6 - (avg / max) * (H - 14);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Spend {"\u2014"} trailing 12 months <span className="pv-mut">{"\u00b7"} dashed = avg {formatMoney(Math.round(avg))}</span></span>
+      <span className="card-label">Spend {"—"} trailing 12 months <span className="pv-mut">{"·"} dashed = avg {formatMoney(Math.round(avg))}</span></span>
       <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
         <line x1="0" y1={avgY} x2={W} y2={avgY} stroke="var(--line-strong)" strokeWidth="1.5" strokeDasharray="5 5" />
         <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2.5" />
@@ -5716,7 +5758,7 @@ function NetWorthProCard({ banks, accountData, transactions }) {
   const palette = ["var(--accent-solid)", "#1D9E75", "#B54708", "#7A5AF8"];
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Net worth {"\u00b7"} currency split</span>
+      <span className="card-label">Net worth {"·"} currency split</span>
       <div className="oh-big">{formatMoney(Math.round(nw))}</div>
       {curs.length > 1 && (
         <>
@@ -5725,7 +5767,7 @@ function NetWorthProCard({ banks, accountData, transactions }) {
           </div>
           <div className="nwp-legend">
             {homeTotals.map((x, i) => (
-              <span key={x.c}><span className="seg-dot" style={{ background: palette[i % palette.length] }} /> {x.c} {(CURRENCY_SYMBOLS[x.c] || "")}{Math.round(x.native).toLocaleString()}{x.c !== FX.home ? " \u2248 " + formatMoney(Math.round(x.home)) : ""} {"\u00b7"} {Math.round((x.home / Math.max(totalHome, 1)) * 100)}%</span>
+              <span key={x.c}><span className="seg-dot" style={{ background: palette[i % palette.length] }} /> {x.c} {(CURRENCY_SYMBOLS[x.c] || "")}{Math.round(x.native).toLocaleString()}{x.c !== FX.home ? " ≈ " + formatMoney(Math.round(x.home)) : ""} {"·"} {Math.round((x.home / Math.max(totalHome, 1)) * 100)}%</span>
             ))}
           </div>
         </>
@@ -5781,8 +5823,8 @@ function MoneyScoreCard({ transactions, targets, billExcludes }) {
         <div>
           <span className="card-label" style={{ marginBottom: 3, display: "block" }}>Money score</span>
           <div className="oh-sub" style={{ marginTop: 0 }}>
-            {parts.map((pt, i) => <span key={i}>{pt.t} {pt.ok ? "\u2713" : "\u2717"}{i < parts.length - 1 ? " \u00b7 " : ""}</span>)}
-            {drag && <span> {"\u00b7"} <strong>{drag} drag</strong></span>}
+            {parts.map((pt, i) => <span key={i}>{pt.t} {pt.ok ? "\u2713" : "\u2717"}{i < parts.length - 1 ? " · " : ""}</span>)}
+            {drag && <span> {"·"} <strong>{drag} drag</strong></span>}
           </div>
         </div>
       </div>
@@ -5842,10 +5884,11 @@ const HOME_WIDGETS = {
   money_flow: { label: "Money flow", section: "month", render: (p) => <MoneyFlowCard transactions={p.transactions} /> },
   savings_rate: { label: "Savings rate", section: "month", render: (p) => <SavingsRateCard transactions={p.transactions} /> },
   contribution_bars: { label: "Added each month", section: "big", render: (p) => <ContributionBarsCard transactions={p.transactions} /> },
-  category_vs_target: { label: "Category vs target (table)", section: "month", render: (p) => <CategoryVsTargetCard transactions={p.transactions} targets={p.targets} billExcludes={p.billExcludes} /> },
+  category_vs_target: { label: "Category vs target (table)", section: "month", full: true, render: (p) => <CategoryVsTargetCard transactions={p.transactions} targets={p.targets} billExcludes={p.billExcludes} /> },
+  pace_outlook: { label: "Your pace + outlook", section: "month", render: (p) => <PaceOutlookCard transactions={p.transactions} targets={p.targets} billExcludes={p.billExcludes} /> },
   spend_by_week: { label: "Spend by week", section: "month", render: (p) => <SpendByWeekCard transactions={p.transactions} /> },
   next_7_days: { label: "Next 7 days", section: "month", render: (p) => <Next7DaysCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
-  category_delta: { label: "\u0394 vs 3-mo average", section: "month", render: (p) => <CategoryDeltaCard transactions={p.transactions} /> },
+  category_delta: { label: "Δ vs 3-mo average", section: "month", render: (p) => <CategoryDeltaCard transactions={p.transactions} /> },
   merchants_pro: { label: "Top merchants (share)", section: "month", render: (p) => <MerchantsProCard transactions={p.transactions} /> },
   biggest_movers: { label: "Biggest movers", section: "month", render: (p) => <BiggestMoversCard transactions={p.transactions} /> },
   trend_12: { label: "12-month trend", section: "month", render: (p) => <Trend12Card transactions={p.transactions} /> },
@@ -5873,23 +5916,23 @@ function EditViewModal({ layout, onSave, onClose }) {
       <div className="glass-card modal-card ev-modal" onClick={(e) => e.stopPropagation()}>
         <div className="brand-row" style={{ marginBottom: 4, justifyContent: "space-between" }}>
           <span className="brand-name">Edit your overview</span>
-          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"\u00d7"}</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"×"}</button>
         </div>
-        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 12px" }}>Choose what shows in each section. Reorder or remove anything {"\u2014"} you can always reset.</p>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 12px" }}>Choose what shows in each section. Reorder or remove anything {"—"} you can always reset.</p>
         {sections.map((s) => {
           const available = HOME_WIDGET_KEYS[s.key].filter((k) => !draft[s.key].includes(k));
           return (
             <div className="ev-section" key={s.key}>
               <span className="card-label">{s.title}</span>
               <div className="ev-list">
-                {draft[s.key].length === 0 && <div className="ev-empty">Nothing here yet {"\u2014"} add a widget below.</div>}
+                {draft[s.key].length === 0 && <div className="ev-empty">Nothing here yet {"—"} add a widget below.</div>}
                 {draft[s.key].map((k, i) => (
                   <div className="ev-row" key={k}>
                     <span className="ev-row-name">{HOME_WIDGETS[k].label}</span>
                     <div className="ev-row-actions">
                       <button className="ev-ctl" disabled={i === 0} onClick={() => move(s.key, i, -1)} aria-label="Move up">{"\u2191"}</button>
                       <button className="ev-ctl" disabled={i === draft[s.key].length - 1} onClick={() => move(s.key, i, 1)} aria-label="Move down">{"\u2193"}</button>
-                      <button className="ev-ctl ev-remove" onClick={() => remove(s.key, i)} aria-label="Remove">{"\u00d7"}</button>
+                      <button className="ev-ctl ev-remove" onClick={() => remove(s.key, i)} aria-label="Remove">{"×"}</button>
                     </div>
                   </div>
                 ))}
@@ -5957,14 +6000,14 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
               <div className="oh-need" key={i}>
                 <span className="oh-need-ic" style={{ color: n.color }}><Icon name={n.icon} size={17} /></span>
                 <span className="oh-need-text">{n.text}</span>
-                {n.action && <button className="oh-need-cta" onClick={n.action}>{n.cta} {"\u203a"}</button>}
+                {n.action && <button className="oh-need-cta" onClick={n.action}>{n.cta} {"›"}</button>}
               </div>
             ))}
           </div>
         </TourTarget>
       )}
 
-      <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} {"\u00b7"} day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
+      <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} {"·"} day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
 
       <TourTarget active={runTour && tourStep === 0}>
         {noBudget ? (
@@ -6020,7 +6063,7 @@ function UncatBanner({ count, onSort, label }) {
   if (!count || hidden) return null;
   return (
     <div className="catrev-banner uncat-banner-block">
-      <span className="catrev-banner-text"><Icon name="tag" size={13} /> <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"\u2014"} still counted in your spending, just not assigned to a category yet.</span>
+      <span className="catrev-banner-text"><Icon name="tag" size={13} /> <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"—"} still counted in your spending, just not assigned to a category yet.</span>
       <div className="catrev-banner-actions">
         <button className="catrev-banner-btn" onClick={onSort}>Sort now</button>
         <button className="catrev-banner-later" onClick={() => setHidden(true)}>Later</button>
@@ -6061,7 +6104,7 @@ function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
         <div className="safe-hero-side">
           {over
             ? <span className="safe-hero-overtext">{formatMoney(Math.abs(free))} over budget this month{reserved > 0 ? " (incl. bills to come)" : ""}</span>
-            : <span>{formatMoney(free)} free {"\u00b7"} {daysLeft} day{daysLeft !== 1 ? "s" : ""} to go</span>}
+            : <span>{formatMoney(free)} free {"·"} {daysLeft} day{daysLeft !== 1 ? "s" : ""} to go</span>}
           {reserved > 0 && <span className="safe-hero-roll">{formatMoney(reserved)} bills set aside</span>}
           {roll !== 0 && <span className="safe-hero-roll">{roll < 0 ? "after " + formatMoney(Math.abs(roll)) + " rollover" : "incl. " + formatMoney(roll) + " rollover"}</span>}
         </div>
@@ -6114,7 +6157,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
   return (
     <div className="glass-card dash-card">
       <div className="summary-head">
-        <span className="card-label">Monthly targets {"\u2014"} all months</span>
+        <span className="card-label">Monthly targets {"—"} all months</span>
         {!editing && (
           <div className="targets-actions">
             {onEditPlan && <button className="glass-btn ghost targets-rebuild-btn" onClick={onEditPlan}>{"\u21bb"} Rebuild from a goal</button>}
@@ -6167,7 +6210,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
 
       {!editing && (
         <div style={{ marginTop: 18 }}>
-          <span className="card-label">This month so far {"\u2014"} {currentMonthName()}</span>
+          <span className="card-label">This month so far {"—"} {currentMonthName()}</span>
           <div className="tx-list" style={{ marginTop: 8 }}>
             {TX_CATEGORIES.map((c) => {
               const v = Number(((allTargets || {})[curKey] || {})[c]) || 0;
@@ -6176,7 +6219,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
                 <div className="tx-row" key={c}>
                   <div className="tx-info">
                     <span className="tx-name"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
-                    <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " \u2014 over target" : ""}</span>
+                    <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " — over target" : ""}</span>
                   </div>
                   <span className="tx-amount" style={v > 0 && spent > v ? { color: "var(--neg)" } : null}>{formatMoney(v)}</span>
                 </div>
@@ -6218,7 +6261,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
     <div className="catman">
       <div className="glass-card dash-card">
         <span className="card-label">Your categories</span>
-        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Rename any to suit you {"\u2014"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"}. Renaming only changes the label; your data stays put. Add your own buckets at the bottom.</p>
+        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Rename any to suit you {"—"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"}. Renaming only changes the label; your data stays put. Add your own buckets at the bottom.</p>
         <div className="catman-list">
           {TX_CATEGORIES.map((c) => (
             <div className="catman-row" key={c}>
@@ -6233,7 +6276,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
                 <span className="cat-dot" style={{ background: c.color }} />
                 <input className="catman-input" value={c.name} onChange={(e) => updateCustom(i, { name: e.target.value })} />
                 <span className="catman-orig">your own</span>
-                <button className="catman-del" onClick={() => removeCustom(i)} aria-label="Delete category">{"\u00d7"}</button>
+                <button className="catman-del" onClick={() => removeCustom(i)} aria-label="Delete category">{"×"}</button>
               </div>
               <div className="catman-swatches">
                 {CAT_PALETTE.map((col) => (
@@ -6361,7 +6404,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
       });
       if (error) throw error;
       if (usr) { try { await supabaseClient.from("profiles").upsert({ id: usr.id, feedback_submitted: true }); } catch (e) {} }
-      pushToast("Thanks \u2014 your feedback's been sent", "success");
+      pushToast("Thanks — your feedback's been sent", "success");
       onSubmitted();
     } catch (e) { pushToast("Couldn't send feedback: " + (e.message || e), "error"); setBusy(false); }
   };
@@ -6370,9 +6413,9 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
       <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="brand-row" style={{ marginBottom: 4, justifyContent: "space-between" }}>
           <span className="brand-name">Share your feedback</span>
-          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"\u00d7"}</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"×"}</button>
         </div>
-        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 14px" }}>A few quick thoughts help shape what comes next {"\u2014"} all optional.</p>
+        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 14px" }}>A few quick thoughts help shape what comes next {"—"} all optional.</p>
         <div className="field-group">
           <label className="field-label">What do you like?</label>
           <textarea className="glass-input" style={ta} value={likes} onChange={(e) => setLikes(e.target.value)} autoFocus />
@@ -6798,7 +6841,7 @@ function AdminScreen({ onBack, pushToast }) {
   };
   useEffect(() => { load(); }, []);
 
-  const fmtDate = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "\u2014";
+  const fmtDate = (s) => s ? new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—";
   const doReset = async (u) => {
     if (!window.confirm("Reset " + u.email + "?\n\nThis deletes all their data and sends them back through onboarding.")) return;
     setBusy(u.id);
@@ -7137,7 +7180,7 @@ function App() {
   };
 
   const notifyUncategorized = (n) => {
-    if (n > 0) pushToast(n + " transaction" + (n !== 1 ? "s" : "") + " couldn't be auto-categorised \u2014 use the tag on your Overview to sort them", "info");
+    if (n > 0) pushToast(n + " transaction" + (n !== 1 ? "s" : "") + " couldn't be auto-categorised — use the tag on your Overview to sort them", "info");
   };
   const runAiFallback = async (txs) => {
     const uncats = txs.filter((t) => t.category === "Uncategorized" && !DEV_FORCED_NAMES.has(t.name));
@@ -7512,10 +7555,10 @@ function App() {
       setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setPlan(null);
       setGoals([]); setCustomTransactions([]); setStatements([]); setBalances({});
       setOverviewSlots(DEFAULT_OVERVIEW_SLOTS); setHomeLayout(DEFAULT_HOME_LAYOUT); setExtraProfile(null); setShowExtraBanner(false); setShowSetupBanner(false); setSetupResume(false); setSetupIntroOpen(false); setSetupQuestionsOpen(false); setSetupAnswers(null); setPersonaKey(null);
-      pushToast("Dev account reset \u2014 starting fresh", "success");
+      pushToast("Dev account reset — starting fresh", "success");
       setStage("onboarding");
     } catch (e) {
-      pushToast("Reset failed \u2014 check connection", "error");
+      pushToast("Reset failed — check connection", "error");
     }
     setCheckingSession(false);
   };
@@ -9371,6 +9414,60 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fsr-dot-spent { background: var(--accent-solid); }
   .fsr-dot-res { background: color-mix(in srgb, var(--accent-solid) 42%, transparent); }
   .fsr-dot-free { background: var(--line-strong); }
+  .bh2-hero { display: grid; grid-template-columns: 280px 1fr; gap: 28px; align-items: center; }
+  @media (max-width: 760px) { .bh2-hero { grid-template-columns: 1fr; gap: 18px; } .bh2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 16px; } }
+  .bh2-left { border-right: 1px solid var(--line-strong); padding-right: 28px; }
+  .bh2-num { display: flex; align-items: baseline; gap: 5px; margin: 12px 0 14px; font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); }
+  .bh2-num em { font-style: normal; font-size: 16px; font-weight: 600; color: var(--ink-3); }
+  .bh2-ledger { display: flex; flex-direction: column; gap: 11px; }
+  .bh2-ln { display: flex; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+  .bh2-ln > span:first-child { white-space: nowrap; }
+  .bh2-dots { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-3px); }
+  .bh2-dots-blank { flex: 1; }
+  .bh2-ln strong { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bh2-total { border-top: 1px solid var(--line-strong); padding-top: 12px; margin-top: 2px; font-size: 14px; font-weight: 700; color: var(--accent-solid); }
+  .bh2-total strong { color: var(--accent-solid); }
+  .cvt2-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+  .cvt2-cap { font-size: 11px; color: var(--ink-3); font-weight: 500; }
+  .cvt2-cap-tick { border-left: 2px solid var(--ink); padding-left: 5px; }
+  .cvt2-grid { display: grid; grid-template-columns: 96px 1fr 96px 66px; row-gap: 15px; column-gap: 16px; align-items: center; }
+  .cvt2-h { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .cvt2-r { text-align: right; }
+  .cvt2-nm { font-size: 13px; color: var(--ink); }
+  .cvt2-track { position: relative; height: 8px; border-radius: 99px; background: var(--surface-3); overflow: visible; }
+  .cvt2-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; }
+  .cvt2-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
+  .cvt2-num { font-size: 13px; font-weight: 600; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .cvt2-tgt { color: var(--ink-3); font-weight: 500; }
+  .cvt2-d { font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  .cvt2-ok { color: var(--pos); }
+  .cvt2-bad { color: var(--neg); }
+  .cvt2-mut { color: var(--ink-3); font-weight: 600; font-size: 12px; }
+  .cvt2-foot { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; font-size: 12px; line-height: 1.4; color: var(--ink-3); }
+  .sbw2-plot { display: flex; align-items: flex-end; gap: 14px; height: 96px; border-bottom: 1px solid var(--line-strong); margin-top: 18px; }
+  .sbw2-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .sbw2-val { font-size: 11px; font-weight: 700; color: var(--accent-solid); margin-bottom: 6px; }
+  .sbw2-bar { width: 100%; max-width: 52px; border-radius: 6px 6px 0 0; }
+  .sbw2-x { display: flex; gap: 14px; margin-top: 8px; }
+  .sbw2-x > span { flex: 1; text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-2); }
+  .sbw2-xnow { color: var(--accent-solid); }
+  .sbw2-xfut { color: var(--ink-3); font-weight: 500; }
+  .pace2-card { display: flex; flex-direction: column; }
+  .pace2-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .pace2-barwrap { position: relative; margin-bottom: 22px; }
+  .pace2-bar { position: relative; height: 12px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+  .pace2-fill { height: 100%; border-radius: 99px; }
+  .pace2-mark { position: absolute; top: -5px; width: 2px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
+  .pace2-lb { position: absolute; top: 18px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .pace2-good { color: var(--pos); }
+  .pace2-foot { border-top: 1px solid var(--line); margin-top: auto; padding-top: 13px; font-size: 13px; color: var(--ink-2); }
+  .pace2-foot strong { color: var(--ink); }
+  .mep2-card { display: flex; flex-direction: column; justify-content: center; }
+  .mep2-big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: 12px 0 12px; display: flex; align-items: baseline; gap: 10px; }
+  .mep2-big span { font-size: 14px; font-weight: 500; color: var(--ink-3); }
+  .mep2-pill { align-self: flex-start; border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+  .mep2-ok { background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); }
+  .mep2-bad { background: color-mix(in srgb, var(--neg) 13%, transparent); color: var(--neg); }
   .fs-hero2 { display: grid; grid-template-columns: 240px 1fr; gap: 32px; align-items: center; }
   @media (max-width: 760px) { .fs-hero2 { grid-template-columns: 1fr; gap: 20px; } }
   .fs2-left { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
