@@ -3350,7 +3350,7 @@ function BudgetRing({ spent, target }) {
   const pct = Math.min(100, Math.round((spent / t) * 100));
   const overspent = spent > t;
   const R = 70, CIRC = 2 * Math.PI * R;
-  const ringColor = overspent ? "#ff8b8b" : "var(--accent)";
+  const ringColor = overspent ? "var(--neg)" : "var(--accent)";
   return (
     <div className="budget-ring-wrap">
       <svg className="budget-ring" viewBox="0 0 160 160">
@@ -3360,7 +3360,7 @@ function BudgetRing({ spent, target }) {
           style={{ transition: "stroke-dashoffset 0.6s ease" }} />
       </svg>
       <div className="budget-ring-center">
-        <span className="budget-ring-pct" style={overspent ? { color: "#ff8b8b" } : null}><CountUp value={pct} duration={700} />%</span>
+        <span className="budget-ring-pct" style={overspent ? { color: "var(--neg)" } : null}><CountUp value={pct} duration={700} />%</span>
         <span className="budget-ring-sub">of budget</span>
       </div>
     </div>
@@ -3384,7 +3384,7 @@ function SummaryCard({ targets, transactions, rollovers }) {
   const overspent = spent > target;
   const filledPct = Math.min(100, pct);
   const R = 70, CIRC = 2 * Math.PI * R;
-  const ringColor = overspent ? "#ff8b8b" : "var(--accent)";
+  const ringColor = overspent ? "var(--neg)" : "var(--accent)";
   return (
     <div className="glass-card dash-card">
       <div className="summary-head">
@@ -6206,7 +6206,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
           <tbody>
             {cats.map((c) => (
               <tr key={c} className={c === "Income" ? "bt-income-row" : ""}>
-                <td className="bt-cat"><span className="cat-dot" style={{ background: c === "Income" ? "#4fe0c0" : catColor(c) }} />{displayCat(c)}</td>
+                <td className="bt-cat"><span className="cat-dot" style={{ background: c === "Income" ? "var(--pos)" : catColor(c) }} />{displayCat(c)}</td>
                 {monthKeys.map((k) => (
                   <td key={k} className="bt-cell">
                     {editing ? (
@@ -7968,7 +7968,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   @keyframes demoNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
   .demo-drop { flex: 1 1 auto; max-width: 220px; min-height: 96px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; border-radius: 16px; border: 2px dashed var(--line); color: var(--ink-2); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.18s; }
   .demo-drop-over { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); transform: scale(1.03); }
-  .demo-drop-done { border-style: solid; border-color: rgba(79,224,192,0.7); background: rgba(79,224,192,0.14); color: #4fe0c0; font-weight: 700; }
+  .demo-drop-done { border-style: solid; border-color: rgba(18,161,80,0.7); background: rgba(18,161,80,0.14); color: var(--pos); font-weight: 700; }
   .demo-skip-empty { opacity: 0.85; }
   .demo-reminder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 16px; padding: 11px 18px; background: #FFF3DC; border-bottom: 1px solid #F0DDB0; }
   .demo-reminder-text { color: #7A4D0B; font-size: 13px; }
@@ -7985,7 +7985,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .settings-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(143,180,255,0.1); border: 1px solid rgba(143,180,255,0.3); color: #1d4ed8; font-size: 13px; }
   .settings-nudge-btn { flex: none; padding: 8px 16px; font-size: 13px; border-radius: 999px; }
   .rollover-note { margin-top: 6px; }
-  .rollover-note.rn-up { color: #4fe0c0; }
+  .rollover-note.rn-up { color: var(--pos); }
   .rollover-note.rn-down { color: #ffb84f; }
   .uncat-pill { margin-left: 12px; vertical-align: middle; background: rgba(143,180,255,0.14); border: 1px solid rgba(143,180,255,0.35); color: var(--accent); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s; }
   .uncat-pill:hover { background: rgba(143,180,255,0.24); }
@@ -8131,14 +8131,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .file-name { color: var(--ink); font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
   .file-size { color: var(--ink-3); font-size: 11px; }
   .file-remove { background: none; border: none; color: var(--ink-3); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px; }
-  .file-remove:hover { color: #ff8b8b; }
+  .file-remove:hover { color: var(--neg); }
 
   .bank-upload-list { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; }
   .bank-upload-block { background: var(--surface-2); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
   .bank-upload-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .bank-upload-name { color: var(--ink); font-size: 14px; font-weight: 600; }
   .bank-upload-count { color: var(--ink-3); font-size: 12px; }
-  .count-good { color: #4fe0c0; }
+  .count-good { color: var(--pos); }
   .balance-row { display: flex; gap: 10px; margin-top: 8px; padding: 0 2px; }
   .balance-field { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .balance-field .glass-input { min-width: 0; width: 100%; }
@@ -8162,12 +8162,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .month-table tbody tr { border-bottom: 1px solid var(--line); }
   .totals-row td { font-weight: 700; border-top: 1px solid var(--line); }
-  .income-row td { color: #4fe0c0; }
+  .income-row td { color: var(--pos); }
   .net-row td { font-weight: 700; border-top: 1px solid var(--line); }
   .opening-row td { color: var(--ink-2); border-top: 1px solid var(--line); font-size: 13px; }
   .closing-row td { color: var(--ink); font-weight: 700; border-top: 1px solid var(--line); }
-  .net-positive { color: #4fe0c0; }
-  .net-negative { color: #ff8b8b; }
+  .net-positive { color: var(--pos); }
+  .net-negative { color: var(--neg); }
 
   /* targets */
   .target-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
@@ -8197,8 +8197,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .menu-item:hover { background: var(--surface-2); }
   .body-row { display: flex; }
   .side-panel { width: 0; overflow: hidden; background: var(--surface-2); border-right: 1px solid var(--line); transition: width 0.25s ease, padding 0.25s ease; padding: 0; flex-shrink: 0; height: calc(100vh - 65px); position: sticky; top: 65px; align-self: flex-start; z-index: 11; display: flex; flex-direction: column; }
-  .side-reset-btn { margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: #ff8b8b; background: rgba(255,139,139,0.1); border: 1px solid rgba(255,139,139,0.35); border-radius: 12px; padding: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-  .side-reset-btn:hover { background: rgba(255,139,139,0.2); }
+  .side-reset-btn { margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: var(--neg); background: rgba(217,45,32,0.1); border: 1px solid rgba(217,45,32,0.35); border-radius: 12px; padding: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .side-reset-btn:hover { background: rgba(217,45,32,0.2); }
   .side-panel-open { width: 220px; padding: 20px 14px; }
   .side-panel-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 8px; }
   .side-panel-label { color: var(--ink-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
@@ -8232,11 +8232,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
   .summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
-  .pace-good { background: rgba(79, 224, 192, 0.18); color: #4fe0c0; }
-  .pace-over { background: rgba(255, 139, 139, 0.18); color: #ff8b8b; }
+  .pace-good { background: rgba(18,161,80,0.18); color: var(--pos); }
+  .pace-over { background: rgba(217,45,32,0.18); color: var(--neg); }
   .pace-note { margin-top: 6px; font-weight: 500; }
-  .pace-note-over { color: #ff8b8b; }
-  .pace-note-under { color: #4fe0c0; }
+  .pace-note-over { color: var(--neg); }
+  .pace-note-under { color: var(--pos); }
   .category-pace { font-size: 11px; margin-top: 5px; }
   .summary-amounts { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }
   .summary-spent { color: var(--ink); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
@@ -8256,7 +8256,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .tx-amt-stack { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
   .tx-amt-conv { font-size: 11px; color: var(--ink-3); font-weight: 500; }
   select.glass-input { appearance: none; -webkit-appearance: none; cursor: pointer; }
-  .tx-positive { color: #4fe0c0; }
+  .tx-positive { color: var(--pos); }
   .tx-count { color: var(--ink-3); font-size: 12px; }
   .tx-instructions { color: var(--ink-2); font-size: 13px; margin: 6px 0 0; line-height: 1.5; }
   .tx-instructions b { color: var(--accent); font-weight: 600; }
@@ -8289,7 +8289,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-pie-wrap { position: relative; margin-top: 8px; }
   .bd-pie-svg { width: 100%; height: auto; max-width: 300px; display: block; margin: 0 auto; }
   .bd-pie-tip { position: absolute; pointer-events: none; background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 500; padding: 5px 9px; border-radius: 8px; white-space: nowrap; transform: translate(12px, -50%); z-index: 5; display: flex; align-items: center; gap: 6px; }
-  .bd-track-over { box-shadow: 0 0 0 1.5px #ff8b8b; }
+  .bd-track-over { box-shadow: 0 0 0 1.5px var(--neg); }
   .bd-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; }
   .bd-legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
   .bd-box-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -8313,13 +8313,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-cat-row:hover { background: var(--surface-2); }
   .bd-cat-row.bd-open { background: var(--surface-2); }
   .bd-amt { color: var(--ink); font-weight: 600; }
-  .bd-amt-over { color: #ff8b8b; }
-  .bd-share-over { color: #ff8b8b; font-weight: 600; }
+  .bd-amt-over { color: var(--neg); }
+  .bd-share-over { color: var(--neg); font-weight: 600; }
   .bd-share { color: var(--ink-3); font-size: 12px; font-weight: 400; margin-left: 6px; }
   .bd-chev { font-size: 14px; color: var(--ink-3); margin-left: 5px; transition: transform 0.2s; vertical-align: middle; }
   .bd-chev-open { transform: rotate(180deg); }
-  .delta-up { color: #ff8b8b; }
-  .delta-down { color: #4fe0c0; }
+  .delta-up { color: var(--neg); }
+  .delta-down { color: var(--pos); }
   .delta-flat { color: var(--ink-3); }
   .bd-tx-list { margin: 8px 0 2px; padding: 4px 0 4px 12px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 9px; }
   .bd-tx-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
@@ -8354,8 +8354,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; display: block; }
   .switch-on { background: var(--grad-2); }
   .switch-on .switch-knob { transform: translateX(18px); }
-  .glass-btn.danger { color: #ff8b8b; background: rgba(255,139,139,0.1); border-color: rgba(255,139,139,0.3); }
-  .glass-btn.danger:hover { background: rgba(255,139,139,0.18); }
+  .glass-btn.danger { color: var(--neg); background: rgba(217,45,32,0.1); border-color: rgba(217,45,32,0.3); }
+  .glass-btn.danger:hover { background: rgba(217,45,32,0.18); }
   .onboard-escape {
     margin-top: 14px; width: 100%; background: none; border: none;
     color: var(--ink-3); font-family: inherit; font-size: 13px;
@@ -8498,7 +8498,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .trend-bar-col:hover .trend-tip { opacity: 1; }
   .trend-bar { width: 60%; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
   .trend-bar-wrap.dual .trend-bar { width: 40%; }
-  .income-bar { background: linear-gradient(180deg, #4fe0c0, #2fae90); }
+  .income-bar { background: linear-gradient(180deg, var(--pos), #2fae90); }
   .spend-bar { background: var(--accent); }
   .trend-bar-label { color: var(--ink-3); font-size: 11px; }
   .legend-row { display: flex; gap: 16px; margin-top: 12px; }
@@ -8509,8 +8509,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .insight-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
   .insight-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; font-size: 13px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
   .insight-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-  .insight-warning .insight-icon { background: rgba(255,139,139,0.2); color: #ff8b8b; }
-  .insight-positive .insight-icon { background: rgba(79,224,192,0.2); color: #4fe0c0; }
+  .insight-warning .insight-icon { background: rgba(217,45,32,0.2); color: var(--neg); }
+  .insight-positive .insight-icon { background: rgba(18,161,80,0.2); color: var(--pos); }
   .insight-info .insight-icon { background: var(--accent-soft); color: var(--accent); }
 
   /* ---------------- landing page ---------------- */
@@ -8562,14 +8562,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lpd-file-name { color: var(--ink); font-size: 12px; font-weight: 600; }
   .lpd-progress { height: 6px; border-radius: 3px; background: var(--surface-3); margin: 16px auto 0; max-width: 260px; overflow: hidden; opacity: 0; }
   .lpd-progress-fill { height: 100%; width: 0; border-radius: 3px; background: var(--grad-2, var(--accent)); }
-  .lpd-done { color: #4fe0c0; font-size: 14px; font-weight: 600; margin-top: 12px; opacity: 0; }
+  .lpd-done { color: var(--pos); font-size: 14px; font-weight: 600; margin-top: 12px; opacity: 0; }
   .in-view .lpd-file { animation: lpdFly 1.5s ease-in-out 0.4s forwards; }
   .in-view .lpd-zone { animation: lpdZonePulse 0.5s ease 1.7s; }
   .in-view .lpd-progress { animation: lpdShow 0.3s ease 1.9s forwards; }
   .in-view .lpd-progress-fill { animation: lpdFill 1s ease 2.1s forwards; }
   .in-view .lpd-done { animation: lpdPop 0.4s ease 3.2s forwards; }
   @keyframes lpdFly { 0% { opacity: 0; transform: translate(-30px,-30px) rotate(-6deg); } 15% { opacity: 1; } 70% { opacity: 1; transform: translate(140px, 70px) rotate(3deg) scale(1); } 100% { opacity: 0; transform: translate(150px, 90px) scale(0.55); } }
-  @keyframes lpdZonePulse { 0% { border-color: var(--line); } 40% { border-color: #4fe0c0; box-shadow: 0 0 0 4px rgba(79,224,192,0.15); } 100% { border-color: var(--line); } }
+  @keyframes lpdZonePulse { 0% { border-color: var(--line); } 40% { border-color: var(--pos); box-shadow: 0 0 0 4px rgba(18,161,80,0.15); } 100% { border-color: var(--line); } }
   @keyframes lpdShow { to { opacity: 1; } }
   @keyframes lpdFill { to { width: 100%; } }
   @keyframes lpdPop { 0% { opacity: 0; transform: translateY(8px) scale(0.9); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
@@ -8602,7 +8602,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lpd-review-row { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr 1.1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--ink); padding: 4px 0; }
   .lpd-review-row > span:nth-child(2), .lpd-review-row > span:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
   .lpd-review-head { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
-  .lpd-under { color: #4fe0c0; font-weight: 600; text-align: right; }
+  .lpd-under { color: var(--pos); font-weight: 600; text-align: right; }
   .lpd-trend { flex-direction: row; align-items: flex-end; gap: 14px; padding: 10px 6px 0; }
   .lpd-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 160px; justify-content: flex-end; }
   .lpd-trend-bar { width: 100%; max-width: 42px; border-radius: 6px 6px 3px 3px; background: var(--grad-2, var(--accent)); transition: height .4s ease; }
@@ -8624,7 +8624,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .lpd-cur-tx-amt { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
   .lpd-cur-tx-amt > span:first-child { font-size: 14px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
   .lpd-cur-conv { font-size: 11px; color: var(--ink-3); font-weight: 500; }
-  .lpd-cur-pos { color: #4fe0c0 !important; }
+  .lpd-cur-pos { color: var(--pos) !important; }
   .lpd-cur-total { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 13px 14px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; }
   .lpd-cur-total span { font-size: 13px; color: var(--ink-2); }
   .lpd-cur-total b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -8654,7 +8654,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .price-period { font-size: 13px; color: var(--ink-3); margin-bottom: 18px; }
   .price-features { list-style: none; padding: 0; margin: 0 0 22px; text-align: left; } .price-card .btn { margin-top: auto; }
   .price-features li { font-size: 13px; color: var(--ink-2); padding: 6px 0; padding-left: 22px; position: relative; }
-  .price-features li::before { content: "✓"; position: absolute; left: 0; color: #4fe0c0; font-weight: 700; }
+  .price-features li::before { content: "✓"; position: absolute; left: 0; color: var(--pos); font-weight: 700; }
 
   .lp-final-cta { text-align: center; padding: 70px 24px 90px; position: relative; z-index: 1; }
   .lp-final-cta h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; color: var(--ink); }
@@ -8726,7 +8726,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-bal-row td { font-weight: 700; background: var(--surface-2); }
   .ltp-net-row td { font-weight: 600; }
   .ltp-close-row td { border-top: 1px solid var(--line); }
-  .ltp-goal-cell { background: rgba(79,224,192,0.14); color: #4fe0c0 !important; font-weight: 800; }
+  .ltp-goal-cell { background: rgba(18,161,80,0.14); color: var(--pos) !important; font-weight: 800; }
 
   /* ---- batch: alignment, rings, inbox, ltp, targets, ask ---- */
   .bt-total-disp { display: inline-flex; align-items: baseline; gap: 1px; padding: 4px 7px; }
@@ -8747,8 +8747,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-net-row td { font-weight: 800 !important; background: var(--accent-soft) !important; }
   .ltp-bal-row .ltp-sticky, .ltp-net-row .ltp-sticky { background: rgba(34,44,74,0.98); color: var(--ink); font-weight: 800; }
   .ltp-close-row td { border-top: 1px solid var(--line); }
-  .ltp-actual-chip { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #4fe0c0; background: rgba(79,224,192,0.16); border: 1px solid rgba(79,224,192,0.4); border-radius: 5px; padding: 1px 4px; vertical-align: middle; }
-  .ltp-table td.ltp-actual { background: rgba(79,224,192,0.045); }
+  .ltp-actual-chip { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pos); background: rgba(18,161,80,0.16); border: 1px solid rgba(18,161,80,0.4); border-radius: 5px; padding: 1px 4px; vertical-align: middle; }
+  .ltp-table td.ltp-actual { background: rgba(18,161,80,0.045); }
 
   .targets-actions { display: flex; align-items: center; gap: 12px; }
   .targets-rebuild-btn { padding: 7px 12px; font-size: 12.5px; white-space: nowrap; }
@@ -8782,7 +8782,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ask-chip:hover { background: var(--surface-3); color: var(--ink); }
   .ask-answer { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--ink); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
   .ask-loading { color: var(--ink-2); }
-  .ask-error { color: #ffb4b4; border-color: rgba(255,139,139,0.4); background: rgba(255,139,139,0.1); }
+  .ask-error { color: #ffb4b4; border-color: rgba(217,45,32,0.4); background: rgba(217,45,32,0.1); }
 
 
   @keyframes mbPop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
@@ -8824,8 +8824,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
 
   /* error states */
-  .dropzone-error { border-color: rgba(255,139,139,0.6); background: rgba(255,139,139,0.06); }
-  .error-text { color: #ff8b8b; font-size: 12px; margin: 6px 2px 0; }
+  .dropzone-error { border-color: rgba(217,45,32,0.6); background: rgba(217,45,32,0.06); }
+  .error-text { color: var(--neg); font-size: 12px; margin: 6px 2px 0; }
   .dropzone-disabled { opacity: 0.45; cursor: not-allowed; }
 
   /* upload modal bank picker */
@@ -8839,8 +8839,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .stmt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; background: var(--surface-2); border-radius: 10px; }
   .stmt-period { color: var(--ink-2); font-size: 12px; }
   .stmt-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-  .stmt-ok { background: rgba(79,224,192,0.16); color: #4fe0c0; }
-  .stmt-bad { background: rgba(255,139,139,0.16); color: #ff8b8b; }
+  .stmt-ok { background: rgba(18,161,80,0.16); color: var(--pos); }
+  .stmt-bad { background: rgba(217,45,32,0.16); color: var(--neg); }
   .stmt-na { background: var(--surface-2); color: var(--ink-3); }
   .stmt-issue { color: #ffb84f; font-size: 12px; margin: 8px 4px 0; background: rgba(255,184,79,0.1); border: 1px solid rgba(255,184,79,0.25); border-radius: 10px; padding: 7px 10px; }
 
@@ -8876,8 +8876,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
     animation: toastIn 0.25s ease;
   }
-  .toast-success { border-color: rgba(79,224,192,0.4); }
-  .toast-error { border-color: rgba(255,139,139,0.4); }
+  .toast-success { border-color: rgba(18,161,80,0.4); }
+  .toast-error { border-color: rgba(217,45,32,0.4); }
   .toast-info { border-color: var(--line); }
   @keyframes toastIn {
     from { opacity: 0; transform: translateY(10px); }
@@ -8934,7 +8934,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .budget-ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .budget-ring-pct { color: var(--ink); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
   .budget-ring-sub { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
-  .overspend-alert { background: rgba(255,139,139,0.15); border: 1px solid rgba(255,139,139,0.4); color: #ff8b8b; font-size: 12px; font-weight: 600; border-radius: 12px; padding: 8px 12px; text-align: center; margin: 6px 0 2px; }
+  .overspend-alert { background: rgba(217,45,32,0.15); border: 1px solid rgba(217,45,32,0.4); color: var(--neg); font-size: 12px; font-weight: 600; border-radius: 12px; padding: 8px 12px; text-align: center; margin: 6px 0 2px; }
   .category-name .cat-dot { display: inline-block; margin-right: 6px; vertical-align: middle; }
   .breakdown-scroll { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; }
 
@@ -8946,9 +8946,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .safe-hero-main { display: flex; flex-direction: column; gap: 2px; }
   .safe-hero-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-2); font-weight: 700; }
   .safe-hero-num { font-size: 38px; font-weight: 800; color: var(--ink); letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
-  .safe-hero-over { color: #ff8a8a; }
+  .safe-hero-over { color: var(--neg); }
   .safe-hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 13px; color: var(--ink-2); text-align: right; }
-  .safe-hero-overtext { color: #ff8a8a; font-weight: 600; }
+  .safe-hero-overtext { color: var(--neg); font-weight: 600; }
   .safe-hero-roll { font-size: 11.5px; color: var(--ink-3); }
   .safe-hero-track { height: 8px; background: var(--surface-2); border-radius: 5px; margin-top: 14px; overflow: hidden; }
   .safe-hero-fill { height: 100%; background: var(--accent); border-radius: 5px; transition: width .4s ease; }
@@ -8963,8 +8963,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .customise-row.customise-on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
   .customise-check { color: var(--accent); font-weight: 700; }
   .bill-right { display: flex; align-items: center; gap: 10px; }
-  .bill-remove { background: rgba(255,139,139,0.14); border: 1px solid rgba(255,139,139,0.4); color: #ff8b8b; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
-  .bill-remove:hover { background: rgba(255,139,139,0.25); }
+  .bill-remove { background: rgba(217,45,32,0.14); border: 1px solid rgba(217,45,32,0.4); color: var(--neg); font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .bill-remove:hover { background: rgba(217,45,32,0.25); }
   .bill-excluded { margin-top: 6px; opacity: 0.85; }
   .insights-merchants { margin-top: 4px; }
 
@@ -8972,14 +8972,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .review-wrap { display: flex; flex-direction: column; gap: 16px; }
   .review-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 4px; }
   .review-tile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-2); }
-  .review-tile.rt-good { border-color: rgba(79,224,192,0.4); }
-  .review-tile.rt-bad { border-color: rgba(255,139,139,0.4); }
+  .review-tile.rt-good { border-color: rgba(18,161,80,0.4); }
+  .review-tile.rt-bad { border-color: rgba(217,45,32,0.4); }
   .rt-label { color: var(--ink-2); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   .rt-actual { color: var(--ink); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
   .rt-planned { color: var(--ink-3); font-size: 12px; }
   .rt-verdict { font-size: 12px; font-weight: 600; margin-top: 4px; }
-  .rt-good .rt-verdict { color: #4fe0c0; }
-  .rt-bad .rt-verdict { color: #ff8b8b; }
+  .rt-good .rt-verdict { color: var(--pos); }
+  .rt-bad .rt-verdict { color: var(--neg); }
   .review-table { display: flex; flex-direction: column; margin-top: 16px; }
   .review-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1.3fr; gap: 16px; align-items: center; padding: 15px 10px; border-bottom: 1px solid var(--line); font-size: 16px; color: var(--ink); }
   .review-row > span:nth-child(2), .review-row > span:nth-child(3), .review-row > span:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
@@ -8988,19 +8988,19 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .review-cat .cat-dot { width: 11px; height: 11px; }
   .review-total { border-bottom: none; border-top: 1.5px solid var(--line); margin-top: 2px; padding-top: 16px; font-weight: 700; }
   .review-total .review-cat { font-weight: 700; }
-  .rv-over { color: #ff8b8b; font-weight: 600; }
-  .rv-under { color: #4fe0c0; font-weight: 600; }
+  .rv-over { color: var(--neg); font-weight: 600; }
+  .rv-under { color: var(--pos); font-weight: 600; }
   .plan-headline { display: flex; flex-direction: column; margin: 12px 0 8px; }
   .plan-big { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; }
   .plan-sub { color: var(--ink-2); font-size: 13px; }
   .plan-verdict { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 12px; }
-  .plan-verdict.rt-good { background: rgba(79,224,192,0.12); color: #4fe0c0; }
-  .plan-verdict.rt-bad { background: rgba(255,139,139,0.12); color: #ff8b8b; }
+  .plan-verdict.rt-good { background: rgba(18,161,80,0.12); color: var(--pos); }
+  .plan-verdict.rt-bad { background: rgba(217,45,32,0.12); color: var(--neg); }
   .plan-grid { grid-template-columns: 1.4fr 1fr 1fr 1fr 1.1fr; }
   .plan-month { display: flex; flex-direction: column; }
   .plan-tag { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
   .plan-forecast-row .plan-tag { color: var(--accent); }
-  .plan-bar-actual { background: #4fe0c0 !important; }
+  .plan-bar-actual { background: var(--pos) !important; }
   .plan-bar-forecast { background: var(--accent) !important; }
   .plan-table { max-height: 340px; overflow-y: auto; }
   @media (max-width: 560px) { .review-cards { grid-template-columns: 1fr; } }
