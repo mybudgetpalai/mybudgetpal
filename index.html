@@ -5204,7 +5204,7 @@ function shortDate(d) { return d ? d.getDate() + " " + MONTHS_LABEL[d.getMonth()
 
 function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
   let goal = goals && goals.length ? goals[0] : null;
-  if (!goal && plan && plan.targetBalance > 0) { const nw = totalEstimatedBalance(banks, accountData, transactions || []); goal = { name: "Savings plan", saved: Math.max(0, nw || 0), target: plan.targetBalance, targetDate: plan.targetMonth ? plan.targetMonth + "-01" : null, synthetic: true }; }
+  if (!goal && plan && plan.targetBalance > 0) { const nw = totalEstimatedBalance(banks, accountData, transactions || []); goal = { name: "Savings plan", saved: Math.max(0, nw || 0), target: plan.targetBalance, targetDate: plan.targetMonth ? plan.targetMonth + "-" + String(new Date(Number(plan.targetMonth.slice(0, 4)), Number(plan.targetMonth.slice(5, 7)), 0).getDate()).padStart(2, "0") : null, synthetic: true }; }
   if (!goal) return (
     <div className="glass-card dash-card">
       <span className="card-label">Savings goal</span>
@@ -5236,7 +5236,6 @@ function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
         <svg viewBox="0 0 130 130" width="118" height="118" className="grc-ring">
           <circle cx="65" cy="65" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="12" />
           <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="12" strokeLinecap="round" strokeDasharray={(pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
-          {milestones.map((m, i) => <circle key={i} cx={m.x} cy={m.y} r="4" fill={m.passed ? "var(--accent)" : "var(--line-strong)"} />)}
           <circle cx="65" cy={65 - R} r="5" fill="var(--pos)" />
           <text x="65" y="61" textAnchor="middle" fontSize="22" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{pct}%</text>
           <text x="65" y="80" textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="inherit">saved</text>
@@ -5246,7 +5245,7 @@ function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
           {targetD && !isNaN(targetD) && <div className="grc-line"><span>Target date</span><strong>{shortDate(targetD)}</strong></div>}
           {proj && proj.projected && <div className="grc-line"><span>On current pace</span><strong className={etaChip && etaChip.cls === "cst-warn" ? "grc-late" : "grc-early"}>{shortDate(proj.projected)}</strong></div>}
           {etaChip && <span className={"cst-chip " + etaChip.cls} style={{ marginTop: 7 }}>{etaChip.text}</span>}
-          {nextAmt && <div className="oh-sub" style={{ marginTop: 8 }}>Grey dots are 25 / 50 / 75% milestones {"\u00b7"} next at {formatMoney(nextAmt)}{nextWks ? ", ~" + nextWks + " week" + (nextWks !== 1 ? "s" : "") + " away" : ""}.</div>}
+          <div className="oh-sub" style={{ marginTop: 8 }}><strong>{formatMoney(Math.max(0, goal.target - goal.saved))}</strong> to go to reach your {formatMoney(goal.target)} plan{targetD && !isNaN(targetD) ? " by " + shortDate(targetD) : ""}.</div>
         </div>
       </div>
     </div>
