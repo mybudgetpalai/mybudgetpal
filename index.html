@@ -7336,6 +7336,34 @@ function App() {
       supabaseClient.from("profiles").upsert({ id: userId, home_layout: tpl.layout, persona: key }).then(() => {}, () => {});
     }
   };
+
+  // DEV ONLY: seed the full dummy-statement dataset + Dec £15,000 goal and jump straight to the dashboard
+  const doSkipToDashboard = () => {
+    const bank = "Citibank";
+    FX.home = "GBP"; FX.ready = true; FX.bankCurrency[bank] = "GBP";
+    let parsed = [];
+    try { parsed = parseStatementCSV(DEMO_CSV_GBP).transactions; } catch (e) { parsed = []; }
+    const txs = parsed.map((t, i) => ({ ...t, id: "skip-" + i, bank, category: demoCategorize(t.name, t.amount) }));
+    const smonth = "2026-07";
+    const tgts = { Groceries: 519, Transport: 104, Dining: 393, Shopping: 411, Subscriptions: 54, Bills: 547 };
+    setCustomTransactions(txs);
+    setUsingDemo(false);
+    setRunTour(false);
+    setBanks([bank]);
+    setBankRows([{ bank_name: bank, starting_balance: 1000, as_of_date: "2026-05-01" }]);
+    setStatements([]);
+    setTargets(tgts);
+    setAllTargets({ [smonth]: tgts });
+    setPlan({ targetBalance: 15000, targetMonth: "2026-12", method: "manual", openingBalance: 1000 });
+    setGoals([]);
+    setSignupMonth(smonth);
+    setName(name || "S");
+    setBillExcludes(detectRecurringBills(txs).map((b) => b.name));
+    const tpl = PERSONA_TEMPLATES.fresh_start;
+    setPersonaKey("fresh_start");
+    setHomeLayout(tpl ? tpl.layout : DEFAULT_HOME_LAYOUT);
+    setStage("dashboard");
+  };
   const handleChangeTheme = (t) => {
     setTheme(t);
     if (userId) {
@@ -7714,6 +7742,9 @@ function App() {
           <input type="date" value={devNow || ""} onChange={(e) => setDevDate(e.target.value)} style={{ fontSize: 12, padding: "2px 4px", borderRadius: 4, border: "1px solid #3a4356", background: "#0f1420", color: "#e8edf4" }} />
           {devNow && <button onClick={() => setDevDate("")} style={{ fontSize: 11, cursor: "pointer", background: "none", border: "none", color: "#8fa3bd", textDecoration: "underline" }}>reset</button>}
         </div>
+      )}
+      {isDev && stage !== "dashboard" && (
+        <button onClick={doSkipToDashboard} title="Load the dummy statement data + Dec £15,000 goal and jump straight to the dashboard" style={{ position: "fixed", bottom: 12, right: 12, zIndex: 9999, background: "#2E5BFF", color: "#fff", padding: "11px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 6px 20px rgba(46,91,255,.4)" }}>⚡ Skip to dashboard</button>
       )}
       {stage === "dashboard" && <NotificationBanner notes={notifications} onDismiss={dismissNote} />}
       {content}
