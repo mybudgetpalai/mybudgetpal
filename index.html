@@ -2989,22 +2989,22 @@ const PERSONA_TEMPLATES = {
   fresh_start: {
     name: "Fresh Start",
     blurb: "A clear, visual view \u2014 what you can spend, how each budget is doing, and what's coming up.",
-    layout: { month: ["category_status", "pace_gauge", "bills_upcoming"], big: ["goal_ring", "net_worth", "since_last_month"] },
+    layout: { month: ["breakdown_mini", "in_out", "pace_gauge", "bills"], big: ["goal_ring", "net_worth"] },
   },
   goal_getter: {
     name: "Goal Getter",
     blurb: "Everything points at your goal \u2014 what this month adds, your pace, and the projected finish date.",
-    layout: { month: ["money_flow", "savings_rate", "category_status"], big: ["goal_ring", "contribution_bars", "net_worth"] },
+    layout: { month: ["in_out", "savings_rate", "breakdown_mini", "pace_gauge"], big: ["goal_ring", "contribution_bars"] },
   },
   budget_hawk: {
     name: "Budget Hawk",
     blurb: "Full control \u2014 the worked maths behind every number, pacing deltas, and what's about to leave your account.",
-    layout: { month: ["category_vs_target", "spend_by_week", "next_7_days"], big: ["month_end_projection", "net_worth", "goal"] },
+    layout: { month: ["category_vs_target", "spend_by_week", "next_7_days", "pace_gauge"], big: ["month_end_projection", "net_worth"] },
   },
   power_view: {
     name: "Power View",
     blurb: "Maximum signal \u2014 deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
-    layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score", "goal_ring"] },
+    layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score"] },
   },
 };
 
