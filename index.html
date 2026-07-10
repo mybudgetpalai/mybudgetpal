@@ -2990,7 +2990,7 @@ const PERSONA_TEMPLATES = {
   fresh_start: {
     name: "Fresh Start",
     blurb: "A clear, visual view \u2014 what you can spend, how each budget is doing, and what's coming up.",
-    layout: { month: ["pace_full", "breakdown_mini", "bills_checklist"], big: ["goal_ring", "net_worth"] },
+    layout: { month: ["breakdown_mini", "bills_checklist"], big: ["goal_ring", "net_worth"] },
   },
   goal_getter: {
     name: "Goal Getter",
@@ -4957,6 +4957,8 @@ function MiniBreakdown({ transactions }) {
         <svg viewBox="0 0 108 108" width="104" height="104" className="oh-mb-ring">
           <circle cx="54" cy="54" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="18" />
           {seg.map((s, i) => { const len = (s.v / total) * C; const el = <circle key={i} cx="54" cy="54" r={R} fill="none" stroke={s.color} strokeWidth="18" strokeDasharray={len + " " + (C - len)} strokeDashoffset={-off} transform="rotate(-90 54 54)" />; off += len; return el; })}
+        <text x="54" y="50" textAnchor="middle" fontSize="18" fontWeight="800" fill="var(--ink)" fontFamily="inherit">{formatMoney(total)}</text>
+          <text x="54" y="65" textAnchor="middle" fontSize="8" letterSpacing="1" fill="var(--ink-3)" fontFamily="inherit">SPENT</text>
         </svg>
         <div className="oh-mb-legend">
           {seg.map((s, i) => (<div key={i} className="oh-mb-item"><span className="oh-mb-dot" style={{ background: s.color }} /><span className="oh-mb-label">{s.label}</span><span className="oh-mb-amt">{formatMoney(s.v)}</span><span className="oh-mb-pct">{Math.round((s.v / total) * 100)}%</span></div>))}
@@ -5367,38 +5369,41 @@ function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals 
 function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
   const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
   if (s.budget <= 0) return null;
-  const day = today().getDate();
-  const expected = s.budget * (day / s.daysInMonth);
+  const day = today().getDate(), dim = s.daysInMonth;
+  const expected = s.budget * (day / dim);
   const projEnd = Math.round(projectMonthEnd(s.spent));
+  const underBy = Math.round(s.budget - projEnd);
   const ratio = expected > 0 ? s.spent / expected : 1;
-  const paceWord = s.over ? "ahead of budget" : ratio >= 0.9 ? "right on pace" : ratio >= 0.7 ? "a little under pace" : ratio >= 0.4 ? "well under pace" : "far below your usual pace";
-  const budgetPct = s.budget > 0 ? Math.min(100, Math.round((s.spent / s.budget) * 100)) : 0;
-  const R = 46, C = 2 * Math.PI * R;
+  const paceWord = s.over ? "a little ahead of" : ratio >= 0.9 ? "right on" : ratio >= 0.7 ? "a little under" : "well under";
+  const pctOf = (v) => Math.min(100, Math.max(0, (v / Math.max(s.budget, 1)) * 100));
+  const spentPct = pctOf(s.spent), resPct = pctOf(s.reserved), expPct = pctOf(expected);
   return (
-    <div className="safe-hero fs-hero2">
-      <div className="fs2-left">
-        <span className="safe-hero-label">Spent this month</span>
-        <div className="fs2-spent">{formatMoney(s.spent)} <span>of {formatMoney(s.budget)}</span></div>
-        <div className="fs2-ring">
-          <svg viewBox="0 0 120 120" width="128" height="128">
-            <circle cx="60" cy="60" r={R} fill="none" stroke="var(--surface-3)" strokeWidth="12" />
-            <circle cx="60" cy="60" r={R} fill="none" stroke="var(--accent)" strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C - C * (budgetPct / 100)} transform="rotate(-90 60 60)" />
-          </svg>
-          <div className="fs2-ring-c"><span className="fs2-ring-pct">{budgetPct}%</span><span className="fs2-ring-sub">of budget</span></div>
-        </div>
+    <div className="safe-hero fsr-hero">
+      <div className="fsr-top">
+        <span className="fsr-label">Safe to spend · {currentMonthName()}</span>
+        <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
       </div>
-      <div className="fs2-right">
-        <div className="fs-head">
-          <span className="safe-hero-label">Safe to spend</span>
-          <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
+      <div className="fsr-main">
+        <div className="fsr-num">{formatMoney(s.perDay)} <em>a day</em></div>
+        <div className="fsr-say">Spend up to this each day and you'll still finish {currentMonthName()} on budget. You've spent just <strong>{formatMoney(s.spent)}</strong> so far — {paceWord} your usual <strong>{formatMoney(Math.round(expected))}</strong> by now.</div>
+      </div>
+      {!s.over && underBy > 0 && <div className="fsr-goal"><Icon name="checkcircle" size={14} /> On track to finish around <strong>{formatMoney(projEnd)}</strong> — about <strong>{formatMoney(underBy)}</strong> under budget</div>}
+      <div className="fsr-pace-head">
+        <span className="fsr-label">Your pace this month</span>
+        <span className="fsr-pace-of"><strong>{formatMoney(s.spent)}</strong> of {formatMoney(s.budget)} budget</span>
+      </div>
+      <div className="fsr-bar-wrap">
+        <div className="fsr-bar">
+          <div className="fsr-seg fsr-seg-spent" style={{ width: spentPct + "%" }} />
+          {s.reserved > 0 && <div className="fsr-seg fsr-seg-res" style={{ width: resPct + "%" }} />}
         </div>
-        <div className="fs-bignum">{formatMoney(s.perDay)} <em>a day</em></div>
-        <ul className="fs2-bullets">
-          <li>Spend up to <strong>{formatMoney(s.perDay)} a day</strong> and you'll still end {currentMonthName()} on budget.</li>
-          <li>You've spent <strong>{formatMoney(s.spent)}</strong> so far — <strong>{paceWord}</strong> for day {day} (usually ≈{formatMoney(Math.round(expected))}).</li>
-          <li>On track to finish around <strong>{formatMoney(projEnd)}</strong>, {projEnd < s.budget ? "well inside" : "close to"} your {formatMoney(Math.round(s.budget))} budget.</li>
-          {s.reserved > 0 && <li><strong>{formatMoney(s.reserved)}</strong> of upcoming bills is already set aside.</li>}
-        </ul>
+        <div className="fsr-mark" style={{ left: expPct + "%" }} />
+        <div className="fsr-mark-lb" style={{ left: expPct + "%" }}>{"▴"} expected by today</div>
+      </div>
+      <div className="fsr-legend">
+        <span><span className="fsr-dot fsr-dot-spent" /> {formatMoney(s.spent)} spent</span>
+        {s.reserved > 0 && <span><span className="fsr-dot fsr-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
+        <span><span className="fsr-dot fsr-dot-free" /> {formatMoney(Math.max(0, s.free))} free</span>
       </div>
     </div>
   );
@@ -9305,6 +9310,31 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pace-fill2 { height: 100%; border-radius: 99px; transition: width .4s ease; }
   .pace-mark { position: absolute; top: -4px; width: 2px; height: 20px; background: var(--ink); border-radius: 2px; }
   .pace-mark-lb { position: absolute; top: 22px; font-size: 10px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .fsr-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .fsr-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .fsr-main { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; }
+  .fsr-num { font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); }
+  .fsr-num em { font-style: normal; font-size: 17px; font-weight: 600; color: var(--ink-3); margin-left: 4px; }
+  .fsr-say { flex: 1; min-width: 300px; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
+  .fsr-say strong { color: var(--ink); font-weight: 700; }
+  .fsr-goal { display: inline-flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); border-radius: 10px; padding: 9px 13px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+  .fsr-goal strong { font-weight: 800; }
+  .fsr-pace-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
+  .fsr-pace-of { font-size: 12.5px; color: var(--ink-3); }
+  .fsr-pace-of strong { color: var(--ink); font-weight: 700; }
+  .fsr-bar-wrap { position: relative; margin-bottom: 28px; }
+  .fsr-bar { position: relative; display: flex; height: 15px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+  .fsr-seg { height: 100%; }
+  .fsr-seg-spent { background: var(--accent-solid); }
+  .fsr-seg-res { background: color-mix(in srgb, var(--accent-solid) 42%, transparent); }
+  .fsr-mark { position: absolute; top: -5px; width: 2px; height: 25px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
+  .fsr-mark-lb { position: absolute; top: 24px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .fsr-legend { display: flex; gap: 18px; flex-wrap: wrap; }
+  .fsr-legend > span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); }
+  .fsr-dot { width: 9px; height: 9px; border-radius: 3px; }
+  .fsr-dot-spent { background: var(--accent-solid); }
+  .fsr-dot-res { background: color-mix(in srgb, var(--accent-solid) 42%, transparent); }
+  .fsr-dot-free { background: var(--line-strong); }
   .fs-hero2 { display: grid; grid-template-columns: 240px 1fr; gap: 32px; align-items: center; }
   @media (max-width: 760px) { .fs-hero2 { grid-template-columns: 1fr; gap: 20px; } }
   .fs2-left { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
