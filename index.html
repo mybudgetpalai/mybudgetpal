@@ -4867,7 +4867,7 @@ function TourTarget({ active, className, children }) {
   React.useEffect(() => {
     if (active && ref.current) {
       const el = ref.current;
-      const t = setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 120);
+      const t = setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 120);
       return () => clearTimeout(t);
     }
   }, [active]);
@@ -9020,7 +9020,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-track { height: 9px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-top: 12px; }
   .oh-track-fill { height: 100%; background: var(--accent); border-radius: 99px; }
   .oh-track-cap { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; }
-  .oh-tour-active { position: relative; z-index: 2; box-shadow: 0 0 0 3px var(--accent-shadow); border-radius: 16px; transition: box-shadow 0.2s; }
+  .oh-tour-active { position: relative; z-index: 2; box-shadow: 0 0 0 3px var(--accent-shadow); border-radius: 16px; transition: box-shadow 0.2s; scroll-margin-top: 120px; scroll-margin-bottom: 220px; }
   @media (max-width: 640px) { .oh-grid { grid-template-columns: 1fr; } }
   .oh-mb { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
   .oh-mb-ring { flex-shrink: 0; }
