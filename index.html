@@ -3992,6 +3992,9 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
   });
   const myBills = [...confirmedBills, ...manualBills].sort((a, b) => b.amount - a.amount);
   const total = myBills.reduce((s, b) => s + b.amount, 0);
+  const _billNorm = (n) => String(n || "").toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim();
+  const _paidThisMonth = new Set((transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === currentMonthKey()).map((t) => _billNorm(t.name)));
+  const billStatus = (b) => { const dueDay = parseInt(b.due, 10) || 0; const paid = dueDay > 0 && _paidThisMonth.has(_billNorm(b.name)); return { overdue: dueDay > 0 && !paid && dueDay < today().getDate() }; };
 
   if (!editable) {
     if (!myBills.length) return <EmptyState text="No bills yet — head to Bills & Subscriptions to pick which recurring payments are bills." />;
@@ -4001,8 +4004,8 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
         <div className="tx-list">
           {myBills.map((b) => (
             <div className="tx-row" key={b.name}>
-              <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
-              <span className="tx-amount">{formatMoney(-b.amount)}</span>
+              <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency}{b.due ? " \u00B7 due " + b.due : ""}{billStatus(b).overdue ? <span className="blc-od-lb"> · overdue</span> : ""}</span></div>
+              <span className={"tx-amount" + (billStatus(b).overdue ? " blc-amt-od" : "")}>{formatMoney(-b.amount)}</span>
             </div>
           ))}
         </div>
@@ -4049,9 +4052,9 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
           <div className="tx-list">
             {myBills.map((b) => (
               <div className="tx-row" key={b.name}>
-                <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
+                <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency}{b.due ? " \u00B7 due " + b.due : ""}{billStatus(b).overdue ? <span className="blc-od-lb"> · overdue</span> : ""}</span></div>
                 <div className="bill-right">
-                  <span className="tx-amount">{formatMoney(-b.amount)}</span>
+                  <span className={"tx-amount" + (billStatus(b).overdue ? " blc-amt-od" : "")}>{formatMoney(-b.amount)}</span>
                   <button className="bill-remove" onClick={() => onToggleConfirm(b.name)}>Remove</button>
                 </div>
               </div>
