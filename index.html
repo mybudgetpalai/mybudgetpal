@@ -5186,7 +5186,6 @@ function SinceLastMonthCard({ transactions }) {
   const spendD = sCur - sPrev;
   const chips = [];
   if (sPrev > 0) chips.push({ v: (spendD <= 0 ? "\u2193 " : "\u2191 ") + formatMoney(Math.abs(spendD)), k: "Spending", good: spendD <= 0 });
-  if (kept !== null) chips.push({ v: kept + "%", k: "Kept", good: kept >= 50 });
   if (drop) chips.push({ v: "\u2193 " + formatMoney(Math.abs(drop.d)), k: displayCat(drop.c), good: true });
   if (rise) chips.push({ v: "\u2191 " + formatMoney(rise.d), k: displayCat(rise.c), good: false });
   if (!chips.length) return <div className="glass-card dash-card"><span className="card-label">Since last month</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload another month of statements to compare.</div></div>;
@@ -5282,7 +5281,6 @@ function MoneyFlowCard({ transactions }) {
         <div style={{ textAlign: "right" }}><div className="mf2-k">Out</div><div className="mf2-v">{formatMoney(out)}</div></div>
       </div>
       <div className="mf2-bar"><div className="mf2-out" style={{ width: outPct + "%" }} /><div className="mf2-kept" style={{ width: (100 - outPct) + "%" }} /></div>
-      <div className="oh-sub" style={{ marginTop: 12 }}><strong className="mf2-keptv">{formatMoney(kept)} kept</strong> {"→"} straight to your goal.</div>
     </div>
   );
 }
@@ -5649,7 +5647,6 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   const stats = [];
   if (s.budget > 0) stats.push({ k: "Safe / day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "−" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
   stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "↓" : "↑") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
-  if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: "of income", mut: true });
   if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
   if (!stats.length) return null;
   return (
