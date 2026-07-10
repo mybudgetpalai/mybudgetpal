@@ -4995,17 +4995,20 @@ function NetWorthCard({ banks, accountData, transactions }) {
       <div className="oh-sub" style={{ marginTop: 8 }}>Add opening balances to your statements to see an estimate.</div>
     </div>
   );
+  const nms = (banks || []).filter(Boolean);
+  const acctHint = nms.length ? "across " + nms.slice(0, 3).join(", ") + (nms.length > 3 ? " +" + (nms.length - 3) + " more" : "") : "across your linked accounts";
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Net worth</span>
       <div className="oh-big">{formatMoney(netWorth)}</div>
-      <div className="oh-sub">across your linked accounts</div>
+      <div className="oh-sub">{acctHint}</div>
     </div>
   );
 }
 
-function GoalCard({ goals }) {
-  const goal = goals && goals.length ? goals[0] : null;
+function GoalCard({ goals, plan, banks, accountData, transactions }) {
+  let goal = goals && goals.length ? goals[0] : null;
+  if (!goal && plan && plan.targetBalance > 0) { const nw = totalEstimatedBalance(banks, accountData, transactions || []); goal = { name: "Savings plan", saved: Math.max(0, nw || 0), target: plan.targetBalance, targetDate: null }; }
   if (!goal) return (
     <div className="glass-card dash-card">
       <span className="card-label">Savings goal</span>
@@ -5037,23 +5040,21 @@ function CategoryStatusCard({ transactions, targets }) {
     return { c, spent, target };
   }).filter((r) => r.spent > 0 || r.target > 0);
   if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
-  const maxRef = Math.max(...rows.map((r) => r.target || r.spent), 1);
+  const spentRows = rows.filter((r) => r.spent > 0).sort((a, b) => b.spent - a.spent);
+  const totalSpent = spentRows.reduce((s, r) => s + r.spent, 0) || 1;
+  if (!spentRows.length) return <div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Where it's gone</span>
       <div className="cst-list">
-        {rows.map((r) => {
-          const over = r.target > 0 && r.spent > r.target;
-          const left = r.target > 0 ? r.target - r.spent : null;
-          const width = Math.min(100, (r.spent / (r.target || maxRef)) * 100);
+        {spentRows.map((r) => {
+          const width = Math.min(100, (r.spent / totalSpent) * 100);
           return (
             <div className="cst-row" key={r.c}>
-              <span className="cst-ic"><Icon name={CAT_ICON[r.c] || "tag"} size={15} /></span>
+              <span className="cst-ic" style={{ color: catColor(r.c) }}><Icon name={CAT_ICON[r.c] || "tag"} size={15} /></span>
               <span className="cst-nm">{displayCat(r.c)}</span>
-              <div className="cst-bar"><div style={{ width: width + "%", background: over ? "var(--neg)" : "var(--accent)" }} /></div>
-              {r.target > 0
-                ? <span className={"cst-chip " + (over ? "cst-warn" : "cst-ok")}>{over ? formatMoney(r.spent - r.target) + " over" : formatMoney(left) + " left"}</span>
-                : <span className="cst-chip cst-mut">{formatMoney(r.spent)}</span>}
+              <div className="cst-bar"><div style={{ width: width + "%", background: catColor(r.c) }} /></div>
+              <span className="cst-amt">{formatMoney(r.spent)} <em>{Math.round((r.spent / totalSpent) * 100)}%</em></span>
             </div>
           );
         })}
@@ -5069,26 +5070,19 @@ function PaceGaugeCard({ transactions, targets }) {
   const day = today().getDate(), dim = daysInCurrentMonth();
   const expected = budget > 0 ? budget * (day / dim) : null;
   if (expected === null) return <div className="glass-card dash-card"><span className="card-label">Your pace</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to see your spending pace.</div></div>;
-  const ratio = Math.min(2, spent / Math.max(expected, 1));
   const under = spent <= expected;
-  const angle = -90 + Math.min(180, ratio * 90);
-  const rad = (angle * Math.PI) / 180;
-  const nx = 45 + 26 * Math.sin(rad), ny = 47 - 26 * Math.cos(rad);
+  const diff = Math.round(expected - spent);
+  const pctSpent = Math.min(100, (spent / Math.max(budget, 1)) * 100);
+  const pctExpected = Math.min(100, (expected / Math.max(budget, 1)) * 100);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Your pace</span>
-      <div className="pace-row">
-        <svg viewBox="0 0 90 52" width="84" height="49">
-          <path d="M9 47 A36 36 0 0 1 81 47" fill="none" stroke="var(--surface-2)" strokeWidth="10" strokeLinecap="round" />
-          <path d="M9 47 A36 36 0 0 1 45 11" fill="none" stroke={under ? "var(--pos)" : "var(--neg)"} strokeWidth="10" strokeLinecap="round" strokeDasharray={Math.min(1, ratio / 2) * 113 + " 113"} />
-          <line x1="45" y1="47" x2={nx} y2={ny} stroke="var(--ink)" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="45" cy="47" r="4" fill="var(--ink)" />
-        </svg>
-        <div>
-          <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace" : "Over pace"}</span>
-          <div className="oh-sub" style={{ marginTop: 6 }}>{formatMoney(spent)} spent {"\u00b7"} expected by day {day}: {formatMoney(Math.round(expected))}</div>
-        </div>
+      <div className="pace-head-row"><span className="card-label" style={{ margin: 0 }}>Your pace</span><span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace" : "Over pace"}</span></div>
+      <div className="pace-track">
+        <div className="pace-fill2" style={{ width: pctSpent + "%", background: under ? "var(--pos)" : "var(--neg)" }} />
+        <div className="pace-mark" style={{ left: pctExpected + "%" }} />
+        <div className="pace-mark-lb" style={{ left: pctExpected + "%" }}>expected by today</div>
       </div>
+      <div className="oh-sub" style={{ marginTop: 26 }}>You've spent <strong>{formatMoney(spent)}</strong> so far. By day {day} you'd typically be around <strong>{formatMoney(Math.round(expected))}</strong> — you're <strong>{formatMoney(Math.abs(diff))} {under ? "under" : "over"}</strong> where you'd expect for a {formatMoney(Math.round(budget))} monthly budget.</div>
     </div>
   );
 }
@@ -5170,8 +5164,9 @@ function goalProjection(goal, transactions) {
 }
 function shortDate(d) { return d ? d.getDate() + " " + MONTHS_LABEL[d.getMonth()] : null; }
 
-function GoalRingCard({ goals, transactions }) {
-  const goal = goals && goals.length ? goals[0] : null;
+function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
+  let goal = goals && goals.length ? goals[0] : null;
+  if (!goal && plan && plan.targetBalance > 0) { const nw = totalEstimatedBalance(banks, accountData, transactions || []); goal = { name: "Savings plan", saved: Math.max(0, nw || 0), target: plan.targetBalance, targetDate: plan.targetMonth ? plan.targetMonth + "-01" : null }; }
   if (!goal) return (
     <div className="glass-card dash-card">
       <span className="card-label">Savings goal</span>
@@ -5343,12 +5338,13 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
   const R = 52, C = 2 * Math.PI * R;
   return (
     <div className="safe-hero fs-hero">
-      <svg viewBox="0 0 130 130" width="112" height="112" className="fs-dial">
-        <circle cx="65" cy="65" r={R} fill="none" stroke="var(--card)" strokeWidth="13" />
-        <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="13" strokeLinecap="round" strokeDasharray={Math.max(0.04, 1 - pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
-        <text x="65" y="60" textAnchor="middle" fontSize="24" fontWeight="600" fill="var(--ink)" fontFamily="inherit">{formatMoney(s.perDay)}</text>
-        <text x="65" y="80" textAnchor="middle" fontSize="11.5" fill="var(--ink-3)" fontFamily="inherit">a day</text>
-      </svg>
+      <div className="fs-dial-wrap">
+        <svg viewBox="0 0 130 130" width="112" height="112" className="fs-dial">
+          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--card)" strokeWidth="13" />
+          <circle cx="65" cy="65" r={R} fill="none" stroke="var(--accent)" strokeWidth="13" strokeLinecap="round" strokeDasharray={Math.max(0.04, 1 - pct / 100) * C + " " + C} transform="rotate(-90 65 65)" />
+        </svg>
+        <div className="fs-dial-txt"><span className="fs-dial-num">{formatMoney(s.perDay)}</span><span className="fs-dial-sub">a day</span></div>
+      </div>
       <div className="fs-side">
         <div className="fs-head">
           <span className="safe-hero-label">Safe to spend</span>
@@ -5786,7 +5782,7 @@ const HOME_WIDGETS = {
   bills_upcoming: { label: "Bills coming up", section: "month", render: (p) => <BillsUpcomingCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
   net_worth: { label: "Net worth", section: "big", render: (p) => <NetWorthCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
   since_last_month: { label: "Since last month", section: "big", render: (p) => <SinceLastMonthCard transactions={p.transactions} /> },
-  goal_ring: { label: "Goal ring & forecast", section: "big", render: (p) => <GoalRingCard goals={p.goals} transactions={p.transactions} /> },
+  goal_ring: { label: "Goal ring & forecast", section: "big", render: (p) => <GoalRingCard goals={p.goals} transactions={p.transactions} plan={p.plan} banks={p.banks} accountData={p.accountData} /> },
   money_flow: { label: "Money flow", section: "month", render: (p) => <MoneyFlowCard transactions={p.transactions} /> },
   savings_rate: { label: "Savings rate", section: "month", render: (p) => <SavingsRateCard transactions={p.transactions} /> },
   contribution_bars: { label: "Added each month", section: "big", render: (p) => <ContributionBarsCard transactions={p.transactions} /> },
@@ -5800,7 +5796,7 @@ const HOME_WIDGETS = {
   month_end_projection: { label: "Month-end projection", section: "big", render: (p) => <MonthEndProjectionCard transactions={p.transactions} targets={p.targets} /> },
   net_worth_pro: { label: "Net worth + currency split", section: "big", render: (p) => <NetWorthProCard banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
   money_score: { label: "Money score", section: "big", render: (p) => <MoneyScoreCard transactions={p.transactions} targets={p.targets} billExcludes={p.billExcludes} /> },
-  goal: { label: "Savings goal", section: "big", render: (p) => <GoalCard goals={p.goals} /> },
+  goal: { label: "Savings goal", section: "big", render: (p) => <GoalCard goals={p.goals} plan={p.plan} banks={p.banks} accountData={p.accountData} transactions={p.transactions} /> },
   accounts: { label: "Bank accounts", section: "big", render: (p) => <BankAccountsCard banks={p.banks} transactions={p.transactions} accountData={p.accountData} /> },
 };
 
@@ -5861,25 +5857,20 @@ function EditViewModal({ layout, onSave, onClose }) {
   );
 }
 
-function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona }) {
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
   const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
-  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets };
+  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan };
   const [editOpen, setEditOpen] = useState(false);
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
 
   const needs = [];
   if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
-  const ex = billExcludes || [];
-  const detected = detectRecurringBills(txs).filter((b) => ex.includes(b.name));
-  const todayDate = today().getDate();
-  const dueSoonTotal = detected.filter((b) => { const d = parseInt(b.due, 10); return d && d >= todayDate; }).reduce((s, b) => s + b.amount, 0);
-  if (dueSoonTotal > 0) needs.push({ icon: "calendar", color: "var(--ink-2)", text: formatMoney(dueSoonTotal) + " in bills still due this month", cta: null });
   const showNeeds = runTour || needs.length > 0;
 
   if (!hasData && !runTour) {
@@ -6212,7 +6203,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
 }
 function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories }) {
   if (view === "overview") return (
-    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} />
+    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} plan={plan} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -9206,6 +9197,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .blc-nm { flex: 1; color: var(--ink-2); }
   .blc-amt { font-weight: 600; color: var(--ink); }
   .blc-done { color: var(--ink-3); text-decoration: line-through; }
+  .cst-amt { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; text-align: right; }
+  .cst-amt em { font-style: normal; color: var(--ink-3); font-weight: 500; margin-left: 4px; }
+  .fs-dial-wrap { position: relative; width: 112px; height: 112px; flex-shrink: 0; }
+  .fs-dial-txt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .fs-dial-num { font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: -0.02em; }
+  .fs-dial-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+  .pace-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .pace-track { position: relative; height: 12px; background: var(--surface-2); border-radius: 99px; margin: 16px 0 4px; }
+  .pace-fill2 { height: 100%; border-radius: 99px; transition: width .4s ease; }
+  .pace-mark { position: absolute; top: -4px; width: 2px; height: 20px; background: var(--ink); border-radius: 2px; }
+  .pace-mark-lb { position: absolute; top: 22px; font-size: 10px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
   .pv-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 0 4px; }
   .pv-stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-card); padding: 10px 13px; }
   .pv-k { font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
