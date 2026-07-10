@@ -370,7 +370,8 @@ function parseNavLayout(profile) {
   let arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : null);
   if (!Array.isArray(arr) || !arr.length || !arr.includes("overview")) return valid;
   /* "targets" was added after early layouts were saved — default it to visible */
-  const wanted = arr.includes("targets") ? arr : [...arr, "targets"];
+  const wantedT = arr.includes("targets") ? arr : [...arr, "targets"];
+  const wanted = wantedT.includes("categories") ? wantedT : [...wantedT, "categories"];
   const out = valid.filter((k) => wanted.includes(k));
   return out.includes("overview") ? out : valid;
 }
@@ -416,6 +417,7 @@ const VIEWS = [
   { key: "trends", label: "Trends" },
   { key: "bills", label: "Bills & Subscriptions" },
   { key: "insights", label: "Insights" },
+  { key: "categories", label: "Manage Categories" },
   { key: "accounts", label: "Bank Accounts" },
 ];
 
@@ -736,8 +738,33 @@ const CATEGORY_RULES = {
   Subscriptions: ["netflix", "spotify", "youtube", "disney", "apple music", "icloud", "prime video", "amazon prime", "openai", "chatgpt", "claude", "anthropic", "adobe", "microsoft 365", "office 365", "playstation", "xbox", "nintendo", "patreon", "dropbox", "canva", "subscription"],
   Bills: ["dewa", "sewa", "addc", "etisalat", " du ", "virgin mobile", "rent", "insurance", "takaful", "gym", "fitness first", "emicool", "empower", "chiller", "electricity", "internet", "broadband", "school fee", "tuition", "loan", "mortgage", "water bill", "british gas", "octopus energy", "ovo energy", "edf energy", "e.on", "eon next", "bulb energy", "scottish power", "shell energy", "thames water", "severn trent", "anglian water", "council tax", "tv licence", "tv license", "vodafone", "o2 ", " ee ", "ee limited", "giffgaff", "tesco mobile", "three.co", "hutchison 3g", "sky digital", "virgin media", "bt group", "plusnet", "talktalk"],
 };
+let CAT_CONFIG = { renames: {}, custom: [] };
+const CAT_PALETTE = ["#E8813A", "#8E7BEF", "#3FA7A0", "#D9557B", "#5A8DEE", "#C2893A", "#4CAF7D", "#B0577E"];
+function customCats() { return (CAT_CONFIG.custom || []).map((c) => c.name); }
+function spendCategories() { return [...TX_CATEGORIES, ...customCats()]; }
+function allSpendCategories() { return [...spendCategories(), "Income", "Other", "Uncategorized"]; }
+function customCatColor(c) { const f = (CAT_CONFIG.custom || []).find((x) => x.name === c); return f ? f.color : null; }
+function customKeywordCategory(desc) {
+  const d = " " + String(desc || "").toLowerCase() + " ";
+  for (const c of (CAT_CONFIG.custom || [])) {
+    if ((c.keywords || []).some((k) => { const kk = String(k || "").toLowerCase().trim(); return kk && d.includes(kk); })) return c.name;
+  }
+  return null;
+}
+function parseCategoryConfig(profile) {
+  const raw = profile && profile.category_config;
+  let o = raw;
+  if (typeof raw === "string") { try { o = JSON.parse(raw); } catch (e) { o = null; } }
+  const renames = (o && o.renames && typeof o.renames === "object") ? o.renames : {};
+  const custom = (o && Array.isArray(o.custom)) ? o.custom
+    .filter((c) => c && typeof c.name === "string" && c.name.trim())
+    .map((c) => ({ name: c.name.trim(), color: c.color || null, keywords: Array.isArray(c.keywords) ? c.keywords.filter((k) => typeof k === "string") : [] })) : [];
+  return { renames, custom };
+}
 function categorizeByRules(desc, amount) {
   if (amount > 0) return "Income";
+  const ck = customKeywordCategory(desc);
+  if (ck) return ck;
   const d = " " + String(desc || "").toLowerCase() + " ";
   /* Multi-word keywords win first (e.g. "tesco mobile" -> Bills before "tesco" -> Groceries) */
   for (const cat of TX_CATEGORIES) {
@@ -798,8 +825,8 @@ function spendByCategoryForMonth(txs, k) {
   txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k).forEach((t) => { o[t.category] = (o[t.category] || 0) + Math.abs(t.amount); });
   return o;
 }
-function catColor(c) { return CATEGORY_COLORS[c] || "#9aa4b8"; }
-function displayCat(c) { return c === "Uncategorized" ? "Needs review" : c; }
+function catColor(c) { return customCatColor(c) || CATEGORY_COLORS[c] || "#9aa4b8"; }
+function displayCat(c) { if (c === "Uncategorized") return "Needs review"; return (CAT_CONFIG.renames && CAT_CONFIG.renames[c]) || c; }
 function addMonths(key, n) { let y = +key.slice(0, 4), m = +key.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + "-" + pad2(m); }
 function isMidMonth() { const d = today(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return d.getDate() < last; }
 function avgSpendByCategory(transactions) {
@@ -913,7 +940,8 @@ function remainingBillsThisMonth(txs, excludes) {
 }
 function detectRecurringBills(txs) {
   const groups = {};
-  txs.filter((t) => t.amount < 0 && t.date).forEach((t) => {
+  const SKIP_BILL_CATS = ["Dining", "Groceries", "Transport"];
+  txs.filter((t) => t.amount < 0 && t.date && !SKIP_BILL_CATS.includes(t.category)).forEach((t) => {
     const key = t.name.toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim();
     (groups[key] = groups[key] || []).push(t);
   });
@@ -3363,7 +3391,7 @@ function CategoryEditor({ value, onChange }) {
   return (
     <select className="cat-select" autoFocus value={value} onBlur={() => setOpen(false)}
       onChange={(e) => { onChange(e.target.value); setOpen(false); }}>
-      {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{displayCat(c)}</option>)}
+      {allSpendCategories().map((c) => <option key={c} value={c}>{displayCat(c)}</option>)}
     </select>
   );
 }
@@ -3525,7 +3553,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   Object.keys(avgByCat).forEach((c) => { avgByCat[c] = avgByCat[c] / avgKeys.length; });
 
   const monthUncat0 = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === activeKey).length;
-  const catSet = new Set([...TX_CATEGORIES, ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
+  const catSet = new Set([...spendCategories(), ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
   if (monthUncat0 > 0) catSet.add("Uncategorized");
   const cats = [...catSet].sort((a, b) => (byCat[b] || 0) - (byCat[a] || 0));
   const total = cats.reduce((s, c) => s + (byCat[c] || 0), 0);
@@ -3677,7 +3705,7 @@ function BreakdownCard({ transactions, targets }) {
   const isCurrentMonth = monthKey === currentMonthKey();
   const byCat = spendByCategoryForMonth(txs, monthKey);
   const monthUncat = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === monthKey).length;
-  const catSet = new Set([...TX_CATEGORIES, ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
+  const catSet = new Set([...spendCategories(), ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
   if (monthUncat > 0) catSet.add("Uncategorized");
   const cats = [...catSet].sort((a, b) => (byCat[b] || 0) - (byCat[a] || 0));
   const total = cats.reduce((s, c) => s + (byCat[c] || 0), 0);
@@ -3905,7 +3933,7 @@ function TrendsCard({ transactions, compact }) {
         <div className="summary-head">
           <span className="card-label">Category trend</span>
           <select className="slot-select trend-cat-select" value={cat} onChange={(e) => setCat(e.target.value)}>
-            {TX_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            {spendCategories().map((c) => <option key={c} value={c}>{displayCat(c)}</option>)}
           </select>
         </div>
         <div className="trend-chart">
@@ -3937,22 +3965,22 @@ function BillsCard({ transactions, excludes, onToggleExclude, editable }) {
     <div className="glass-card dash-card">
       <div className="summary-head">
         <span className="card-label">Bills & subscriptions</span>
-        {editable && <button className="link-btn inline" onClick={() => setEditing((v) => !v)}>{editing ? "Done" : "Edit"}</button>}
+        
       </div>
-      {editing && <p className="subtitle" style={{ margin: "0 0 8px" }}>Remove anything that isn't really a bill — it'll stop being counted here.</p>}
+      {editable && <p className="subtitle" style={{ margin: "0 0 8px" }}>These are payments that repeat each month. Tap {"\u201C"}Not a bill{"\u201D"} on anything that isn't really a bill or subscription — a coffee, a shop, a one-off — and it'll stop being counted.</p>}
       <div className="tx-list">
         {bills.map((b) => (
           <div className="tx-row" key={b.name}>
             <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} {"\u00B7"} due {b.due}</span></div>
             <div className="bill-right">
               <span className="tx-amount">{formatMoney(-b.amount)}</span>
-              {editing && <button className="bill-remove" onClick={() => onToggleExclude(b.name)}>Not a bill</button>}
+              {editable && <button className="bill-remove" onClick={() => onToggleExclude(b.name)}>Not a bill</button>}
             </div>
           </div>
         ))}
       </div>
       <p className="summary-note">Total recurring: {formatMoney(total)} / month</p>
-      {editing && excluded.length > 0 && (
+      {editable && excluded.length > 0 && (
         <div className="bill-excluded">
           <span className="card-label" style={{ display: "block", margin: "14px 0 6px" }}>Not counted as bills</span>
           {excluded.map((b) => (
@@ -4623,7 +4651,7 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
     const list = byName[name];
     return { name, count: list.length, total: list.reduce((s, t) => s + Math.abs(t.amount), 0), latest: list.map((t) => t.date).sort().reverse()[0] || "" };
   }).sort((a, b) => b.total - a.total);
-  const chipCats = [...TX_CATEGORIES, "Income", "Other"];
+  const chipCats = [...spendCategories(), "Income", "Other"];
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="glass-card modal-card catrev-card" onClick={(e) => e.stopPropagation()}>
@@ -4652,7 +4680,7 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
                     <div className="catrev-chips">
                       {chipCats.map((c) => (
                         <button key={c} className="catrev-chip" onClick={() => { onRecategorize(r.name, c); setSortedCount((s) => s + r.count); setExpandedName(null); }}>
-                          <span className="cat-dot" style={{ background: catColor(c) }} />{c}
+                          <span className="cat-dot" style={{ background: catColor(c) }} />{displayCat(c)}
                         </button>
                       ))}
                     </div>
@@ -5900,7 +5928,7 @@ function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
 }
 
 function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, initialEdit, onEditPlan }) {
-  const cats = ["Income", ...TX_CATEGORIES];
+  const cats = ["Income", ...spendCategories()];
   const monthKeys = React.useMemo(() => {
     const ks = Object.keys(allTargets || {}).filter((k) => /^\d{4}-\d{2}$/.test(k)).sort();
     return ks.length ? ks : [currentMonthKey()];
@@ -5953,7 +5981,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
           <tbody>
             {cats.map((c) => (
               <tr key={c} className={c === "Income" ? "bt-income-row" : ""}>
-                <td className="bt-cat"><span className="cat-dot" style={{ background: c === "Income" ? "#4fe0c0" : catColor(c) }} />{c}</td>
+                <td className="bt-cat"><span className="cat-dot" style={{ background: c === "Income" ? "#4fe0c0" : catColor(c) }} />{displayCat(c)}</td>
                 {monthKeys.map((k) => (
                   <td key={k} className="bt-cell">
                     {editing ? (
@@ -6005,7 +6033,82 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
   );
 }
 
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth }) {
+function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCategories, onRecategorize }) {
+  const [renames, setRenames] = useState({ ...(catConfig.renames || {}) });
+  const [custom, setCustom] = useState((catConfig.custom || []).map((c) => ({ ...c, keywords: [...(c.keywords || [])] })));
+  const [newName, setNewName] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  const nextColor = () => { const used = custom.map((c) => c.color); return CAT_PALETTE.find((c) => !used.includes(c)) || CAT_PALETTE[custom.length % CAT_PALETTE.length]; };
+  const setBuiltinName = (canonical, val) => {
+    setRenames((prev) => { const nx = { ...prev }; const t = val.trim(); if (!t || t === canonical) delete nx[canonical]; else nx[canonical] = t; return nx; });
+    setDirty(true);
+  };
+  const addCustom = () => {
+    const nm = newName.trim(); if (!nm) return;
+    const taken = [...spendCategories(), "Income", "Other"].some((c) => c.toLowerCase() === nm.toLowerCase()) || custom.some((c) => c.name.toLowerCase() === nm.toLowerCase());
+    if (taken) return;
+    setCustom((prev) => [...prev, { name: nm, color: nextColor(), keywords: [] }]); setNewName(""); setDirty(true);
+  };
+  const updateCustom = (i, patch) => { setCustom((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c))); setDirty(true); };
+  const removeCustom = (i) => { setCustom((prev) => prev.filter((_, j) => j !== i)); setDirty(true); };
+  const save = (thenRescan) => {
+    const clean = { renames, custom: custom.map((c) => ({ name: c.name.trim(), color: c.color, keywords: (c.keywords || []).map((k) => String(k).trim()).filter(Boolean) })).filter((c) => c.name) };
+    onSaveCatConfig(clean); setDirty(false);
+    if (thenRescan && onRescanCategories) onRescanCategories();
+  };
+
+  return (
+    <div className="catman">
+      <div className="glass-card dash-card">
+        <span className="card-label">Rename categories</span>
+        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Call them whatever makes sense to you {"\u2014"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"} or {"\u201C"}Food{"\u201D"}. This only changes the label; your data stays put.</p>
+        <div className="catman-list">
+          {TX_CATEGORIES.map((c) => (
+            <div className="catman-row" key={c}>
+              <span className="cat-dot" style={{ background: catColor(c) }} />
+              <input className="catman-input" value={renames[c] || ""} placeholder={c} onChange={(e) => setBuiltinName(c, e.target.value)} />
+              {renames[c] && renames[c] !== c && <span className="catman-orig">was {c}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="glass-card dash-card">
+        <span className="card-label">Your own categories</span>
+        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Add buckets like {"\u201C"}Holidays{"\u201D"} or {"\u201C"}Kids{"\u201D"}. Add a few keywords and matching transactions get sorted in automatically {"\u2014"} you can also assign any transaction by hand.</p>
+        <div className="catman-list">
+          {custom.map((c, i) => (
+            <div className="catman-custom" key={i}>
+              <div className="catman-row">
+                <span className="cat-dot" style={{ background: c.color }} />
+                <input className="catman-input" value={c.name} onChange={(e) => updateCustom(i, { name: e.target.value })} />
+                <button className="catman-del" onClick={() => removeCustom(i)} aria-label="Delete category">{"\u00d7"}</button>
+              </div>
+              <div className="catman-swatches">
+                {CAT_PALETTE.map((col) => (
+                  <button key={col} className={"catman-swatch" + (c.color === col ? " on" : "")} style={{ background: col }} onClick={() => updateCustom(i, { color: col })} aria-label="Pick colour" />
+                ))}
+              </div>
+              <input className="catman-kw" value={(c.keywords || []).join(", ")} placeholder="Keywords, comma separated (e.g. airbnb, emirates, booking.com)" onChange={(e) => updateCustom(i, { keywords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+            </div>
+          ))}
+          {custom.length === 0 && <p className="subtitle" style={{ margin: 0 }}>No custom categories yet.</p>}
+        </div>
+        <div className="catman-add">
+          <input className="catman-input" value={newName} placeholder="New category name" onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustom(); }} />
+          <button className="glass-btn" onClick={addCustom}>Add</button>
+        </div>
+      </div>
+
+      <div className="catman-actions">
+        <button className="glass-btn primary" disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : "Saved"}</button>
+        <button className="glass-btn" onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
+      </div>
+    </div>
+  );
+}
+function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories }) {
   if (view === "overview") return (
     <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} />
   );
@@ -6016,6 +6119,7 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
   if (view === "bills") return hasData ? <BillsCard transactions={transactions} excludes={billExcludes} onToggleExclude={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+  if (view === "categories") return <CategoryManager transactions={transactions} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} onRecategorize={onRecategorize} />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
@@ -6140,7 +6244,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, catConfig, onSaveCatConfig, onRescanCategories }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -6185,7 +6289,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} /></div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -6725,6 +6829,7 @@ function App() {
   const [allTargets, setAllTargets] = useState({});
   const [targetsEditReq, setTargetsEditReq] = useState(false);
   const [billExcludes, setBillExcludes] = useState([]);
+  const [catConfig, setCatConfig] = useState({ renames: {}, custom: [] });
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
   const [legalTab, setLegalTab] = useState("privacy");
@@ -6945,14 +7050,14 @@ function App() {
     return rechecked;
   };
 
-  const recategorizeDescription = async (description, newCategory) => {
+  const recategorizeDescription = async (description, newCategory, opts) => {
     setCustomTransactions((prev) => prev.map((t) => (t.name === description ? { ...t, category: newCategory } : t)));
     if (userId) {
       try {
         await supabaseClient.from("transactions").update({ category: newCategory }).eq("user_id", userId).eq("description", description);
       } catch (e) { pushToast("Changed here, but couldn't save to your account", "error"); return; }
     }
-    pushToast("\u201C" + description + "\u201D \u2192 " + displayCat(newCategory), "success");
+    if (!(opts && opts.silent)) pushToast("\u201C" + description + "\u201D \u2192 " + displayCat(newCategory), "success");
   };
 
   const startDemo = (demoCurs) => {
@@ -7051,7 +7156,7 @@ function App() {
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
           setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false); setPersonaKey((profile && profile.persona) || null);
           setNavViews(parseNavLayout(profile));
-          setBillExcludes(parseBillExcludes(profile));
+          setBillExcludes(parseBillExcludes(profile)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
       setPlan(planFromProfile(profile));
           setStage("dashboard");
         } else {
@@ -7141,6 +7246,22 @@ function App() {
       if (userId) supabaseClient.from("profiles").upsert({ id: userId, bill_excludes: next }).then(() => {}, () => {});
       return next;
     });
+  };
+  const handleSaveCatConfig = (next) => {
+    const clean = { renames: next.renames || {}, custom: (next.custom || []).map((c) => ({ name: String(c.name || "").trim(), color: c.color || null, keywords: (c.keywords || []).map((k) => String(k).trim()).filter(Boolean) })).filter((c) => c.name) };
+    CAT_CONFIG = clean; setCatConfig(clean);
+    if (userId) supabaseClient.from("profiles").upsert({ id: userId, category_config: clean }).then(() => {}, () => {});
+    pushToast("Categories saved", "success");
+  };
+  const rescanCategories = async () => {
+    const seen = {}; let n = 0;
+    for (const t of customTransactions) {
+      if (t.amount >= 0 || (t.name in seen)) continue;
+      seen[t.name] = true;
+      const target = customKeywordCategory(t.name) || (t.category === "Uncategorized" ? categorizeByRules(t.name, t.amount) : null);
+      if (target && target !== t.category && target !== "Uncategorized") { await recategorizeDescription(t.name, target, { silent: true }); n++; }
+    }
+    pushToast(n ? (n + " merchant" + (n !== 1 ? "s" : "") + " re-sorted into your categories") : "Nothing new to re-sort", n ? "success" : "info");
   };
   const handleSaveAllTargets = async (byMonth) => {
     const keys = Object.keys(byMonth || {}).filter((k) => /^\d{4}-\d{2}$/.test(k));
@@ -7293,7 +7414,7 @@ function App() {
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
               setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false); setPersonaKey((profile && profile.persona) || null);
               setNavViews(parseNavLayout(profile));
-              setBillExcludes(parseBillExcludes(profile));
+              setBillExcludes(parseBillExcludes(profile)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
       setPlan(planFromProfile(profile));
               setStage("dashboard");
             } else {
@@ -7452,6 +7573,9 @@ function App() {
         allTargets={allTargets}
         billExcludes={billExcludes}
         onToggleBillExclude={handleToggleBillExclude}
+        catConfig={catConfig}
+        onSaveCatConfig={handleSaveCatConfig}
+        onRescanCategories={rescanCategories}
         goals={goals}
         goalsApi={goalsApi}
         accountData={{ statements, bankRows }}
@@ -8982,6 +9106,20 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .bh-hero { grid-template-columns: 1fr; }
     .cvt-row { grid-template-columns: 74px 1fr 74px 60px; }
   }
+  .catman { display: flex; flex-direction: column; gap: 16px; }
+  .catman-list { display: flex; flex-direction: column; gap: 10px; }
+  .catman-row { display: flex; align-items: center; gap: 10px; }
+  .catman-input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--input-bg, rgba(127,127,127,0.06)); color: var(--ink); font: inherit; }
+  .catman-orig { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .catman-del { border: none; background: none; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+  .catman-custom { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .catman-swatches { display: flex; gap: 6px; flex-wrap: wrap; padding-left: 22px; }
+  .catman-swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .catman-swatch.on { border-color: var(--ink); }
+  .catman-kw { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--input-bg, rgba(127,127,127,0.06)); color: var(--ink); font: inherit; }
+  .catman-add { display: flex; gap: 8px; margin-top: 12px; }
+  .catman-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .catman-actions .glass-btn:disabled { opacity: 0.5; cursor: default; }
 </style>
 </body>
 </html>
