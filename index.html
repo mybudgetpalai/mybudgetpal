@@ -3026,7 +3026,8 @@ function SetupIntroModal({ name, onStart, onSkip }) {
     <div className="modal-overlay setup-intro-overlay">
       <div className="glass-card modal-card" style={{ maxWidth: 480 }}>
         <h1 className="title" style={{ marginTop: 4 }}>Hi {name || "there"}, welcome to {APP_NAME}</h1>
-        <p className="subtitle">This is your overview {"\u2014"} here's a first look behind this card. Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
+        <p className="subtitle">This is your overview {"\u2014"} here's a first look behind this card.</p>
+        <p className="subtitle" style={{ marginTop: 10 }}>Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
         <div className="nav-row" style={{ marginTop: 22 }}>
           <button className="glass-btn ghost" onClick={onSkip}>I'll fill this in later</button>
           <button className="glass-btn primary" onClick={onStart}>Let's go</button>
@@ -6061,28 +6062,22 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
   return (
     <div className="catman">
       <div className="glass-card dash-card">
-        <span className="card-label">Rename categories</span>
-        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Call them whatever makes sense to you {"\u2014"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"} or {"\u201C"}Food{"\u201D"}. This only changes the label; your data stays put.</p>
+        <span className="card-label">Your categories</span>
+        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Rename any to suit you {"\u2014"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"}. Renaming only changes the label; your data stays put. Add your own buckets at the bottom.</p>
         <div className="catman-list">
           {TX_CATEGORIES.map((c) => (
             <div className="catman-row" key={c}>
               <span className="cat-dot" style={{ background: catColor(c) }} />
-              <input className="catman-input" value={renames[c] || ""} placeholder={c} onChange={(e) => setBuiltinName(c, e.target.value)} />
+              <input className="catman-input" value={renames[c] || c} onChange={(e) => setBuiltinName(c, e.target.value)} />
               {renames[c] && renames[c] !== c && <span className="catman-orig">was {c}</span>}
             </div>
           ))}
-        </div>
-      </div>
-
-      <div className="glass-card dash-card">
-        <span className="card-label">Your own categories</span>
-        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Add buckets like {"\u201C"}Holidays{"\u201D"} or {"\u201C"}Kids{"\u201D"}. Add a few keywords and matching transactions get sorted in automatically {"\u2014"} you can also assign any transaction by hand.</p>
-        <div className="catman-list">
           {custom.map((c, i) => (
-            <div className="catman-custom" key={i}>
+            <div className="catman-custom" key={"cust-" + i}>
               <div className="catman-row">
                 <span className="cat-dot" style={{ background: c.color }} />
                 <input className="catman-input" value={c.name} onChange={(e) => updateCustom(i, { name: e.target.value })} />
+                <span className="catman-orig">your own</span>
                 <button className="catman-del" onClick={() => removeCustom(i)} aria-label="Delete category">{"\u00d7"}</button>
               </div>
               <div className="catman-swatches">
@@ -6093,10 +6088,9 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
               <input className="catman-kw" value={(c.keywords || []).join(", ")} placeholder="Keywords, comma separated (e.g. airbnb, emirates, booking.com)" onChange={(e) => updateCustom(i, { keywords: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
             </div>
           ))}
-          {custom.length === 0 && <p className="subtitle" style={{ margin: 0 }}>No custom categories yet.</p>}
         </div>
         <div className="catman-add">
-          <input className="catman-input" value={newName} placeholder="New category name" onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustom(); }} />
+          <input className="catman-input" value={newName} placeholder="Add a category (e.g. Holidays, Kids)" onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustom(); }} />
           <button className="glass-btn" onClick={addCustom}>Add</button>
         </div>
       </div>
