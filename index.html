@@ -3315,6 +3315,9 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
           </button>
         </div>
       )}
+      <button className={"side-ask-btn " + (active === "ask" ? "side-ask-active" : "")} onClick={() => setActive("ask")}>
+        <span className="side-ask-ic"><Icon name="sparkles" size={16} /></span>Ask MyBudgetPal
+      </button>
       {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
     </div>
   );
@@ -4186,13 +4189,13 @@ function InsightsAsk({ transactions }) {
   };
   const examples = ["Where am I overspending?", "How much do subscriptions cost me?", "Am I on track this month?"];
   return (
-    <div className="ai-ask">
-      <div className="ai-ask-head">
-        <span className="ai-ask-ico"><Icon name="sparkles" size={17} /></span>
-        <span className="ai-ask-title">Ask MyBudgetPal</span>
+    <div className="ai-ask ai-ask-page">
+      <div className="ai-ask-top">
+        <span className="ai-ask-ico"><Icon name="sparkles" size={26} /></span>
         <span className="ai-ask-badge">AI</span>
       </div>
-      <p className="ai-ask-sub">Ask anything about your spending, bills, or budget — in plain English.</p>
+      <h2 className="ai-ask-title">Ask MyBudgetPal</h2>
+      <p className="ai-ask-sub">Ask anything about your spending, bills, or budget — in plain English. I’ll answer from your own transactions.</p>
       <div className="ai-ask-row">
         <input className="ai-ask-input" placeholder="Can I afford a £250 weekend away?" value={q}
           onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} />
@@ -4214,7 +4217,7 @@ function InsightsCard({ transactions, targets, full, onOpenUpload }) {
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
   const insightList = (
     <div className="glass-card dash-card">
-      <span className="card-label">Highlights</span>
+      <span className="card-label">Insights</span>
       <div className="insight-list">
         {insights.map((ins, i) => (
           <div className={"insight-row insight-" + ins.type} key={i}>
@@ -4226,23 +4229,25 @@ function InsightsCard({ transactions, targets, full, onOpenUpload }) {
     </div>
   );
   if (!full) return insightList;
+  return (
+    <React.Fragment>
+      {insightList}
+      <TrendsCard transactions={transactions} />
+    </React.Fragment>
+  );
+}
+
+function DataGapBanner({ transactions, onOpenUpload }) {
   const dates = (transactions || []).filter((t) => t.date).map((t) => t.date).sort();
   const latest = dates.length ? dates[dates.length - 1] : null;
   const missingDays = latest ? Math.floor((today().getTime() - new Date(latest + "T00:00:00").getTime()) / 86400000) : null;
+  if (missingDays == null || missingDays < 3) return null;
   return (
-    <React.Fragment>
-      <h2 className="page-heading">Insights</h2>
-      {missingDays != null && missingDays >= 3 && (
-        <div className="data-gap">
-          <span className="data-gap-ic"><Icon name="calendar" size={16} /></span>
-          <span className="data-gap-tx">We’re missing the last <strong>{missingDays} days</strong> of data — upload your latest statement for sharper insights.</span>
-          {onOpenUpload && <button className="data-gap-btn" onClick={onOpenUpload}>Upload</button>}
-        </div>
-      )}
-      <InsightsAsk transactions={transactions} />
-      <TrendsCard transactions={transactions} />
-      {insightList}
-    </React.Fragment>
+    <div className="data-gap">
+      <span className="data-gap-ic"><Icon name="calendar" size={16} /></span>
+      <span className="data-gap-tx">We’re missing the last <strong>{missingDays} days</strong> of data — upload your latest statement for sharper insights.</span>
+      {onOpenUpload && <button className="data-gap-btn" onClick={onOpenUpload}>Upload</button>}
+    </div>
   );
 }
 
@@ -5310,12 +5315,13 @@ function MoneyFlowCard({ transactions }) {
         <div><div className="mf2-k">In</div><div className="mf2-v mf2-in">{formatMoney(income)}</div></div>
         <div style={{ textAlign: "right" }}><div className="mf2-k">Out</div><div className="mf2-v">{formatMoney(out)}</div></div>
       </div>
-      <div className="mf2-bar"><div className="mf2-out" style={{ width: outPct + "%" }} /><div className="mf2-kept" style={{ width: (100 - outPct) + "%" }} /></div>
+      <div className="mf2-bar"><div className="mf2-kept" style={{ width: (100 - outPct) + "%" }} /><div className="mf2-out" style={{ width: outPct + "%" }} /></div>
     </div>
   );
 }
 
 function SavingsRateCard({ transactions }) {
+  const [showInfo, setShowInfo] = useState(false);
   const keys = lastNMonthKeys(currentMonthKey(), 6);
   const pts = keys.map((k) => {
     const i = incomeForMonth(transactions || [], k);
@@ -5340,13 +5346,14 @@ function SavingsRateCard({ transactions }) {
     <div className="glass-card dash-card">
       <div className="sr2-head">
         <span className="card-label" style={{ margin: 0 }}>Savings rate {"·"} 6 mo</span>
-        {isBest && <span className="cst-chip cst-ok">best month yet</span>}
+        <div className="sr2-head-right">{isBest && <span className="cst-chip cst-ok">best month yet</span>}<button className="sr-info-btn" onClick={() => setShowInfo((v) => !v)} aria-label="What is savings rate?" title="What is savings rate?"><Icon name="info" size={15} /></button></div>
       </div>
       <div className="sr2-body">
         <span className="sr2-num">{cur !== null ? cur + "%" : "—"}</span>
         <svg viewBox={"0 0 " + W + " " + H} width="150" height={H} preserveAspectRatio="none"><polyline points={line} fill="none" stroke="var(--pos)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </div>
       <div className="oh-sub" style={{ marginTop: 12 }}>{climbing ? "Climbing steadily — up from a " + avg + "% average." : "Holding around your " + avg + "% average."}</div>
+      {showInfo && <div className="sr-info-note">Savings rate = money kept ÷ income — that’s (income − spending) ÷ income, shown as an average across the last 6 months.</div>}
     </div>
   );
 }
@@ -5369,7 +5376,7 @@ function ContributionBarsCard({ transactions }) {
     <div className="glass-card dash-card">
       <span className="card-label">Added each month</span>
       <div className="cb2-bars">
-        {vals.map((v, i) => <div key={i} style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} />)}
+        {vals.map((v, i) => <div key={i} title={monthLabelFromKey(keys[i]) + ": " + formatMoney(Math.round(v))} style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} />)}
       </div>
       <div className="cb2-x">{keys.map((k, i) => <span key={k} className={i === n - 1 ? "cb2-now" : ""}>{monthLabelFromKey(k).slice(0, 3)}</span>)}</div>
       {curIsMax && <div className="oh-sub" style={{ marginTop: 12 }}>{monthLabelFromKey(keys[n - 1])} is your biggest yet.</div>}
@@ -5386,10 +5393,11 @@ function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals,
   const saved = Math.max(0, nw !== null ? nw : (goals && goals.length ? goals[0].saved : 0));
   const toGo = Math.max(0, target - saved);
   const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-  const income = incomeForMonth(transactions || [], s.key);
-  const added = income - s.spent;
-  const contribs = lastNMonthKeys(s.key, 6).map((k) => Math.max(0, incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)));
-  const isBiggest = added > 0 && added >= Math.max(...contribs, 0);
+  const doneKeys = completedMonthsWithData(transactions || []);
+  const addKey = doneKeys.length ? doneKeys[doneKeys.length - 1] : null;
+  const added = addKey ? (incomeForMonth(transactions || [], addKey) - spendForMonth(transactions || [], addKey)) : null;
+  const contribs = doneKeys.map((k) => Math.max(0, incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)));
+  const isBiggest = added != null && added > 0 && added >= Math.max(...contribs, 0);
   const targetDateStr = targetMonth ? (monthLabelFromKey(targetMonth).slice(0, 3) + " " + targetMonth.slice(0, 4)) : null;
   const proj = goalProjection({ target, saved }, transactions);
   const targetDateObj = targetMonth ? new Date(Number(targetMonth.slice(0, 4)), Number(targetMonth.slice(5, 7)), 0) : null;
@@ -5401,18 +5409,25 @@ function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals,
           <span className="fsr-label">Your {formatMoney(target)} goal</span>
           <span className="gg2-pct">{pct}% there</span>
         </div>
-        <div className="gg2-togo">{formatMoney(toGo)} <em>to go</em></div>
+        <div className="gg2-togo">{formatMoney(toGo)}<em>to go</em></div>
         <div className="gg2-bar"><div className="gg2-bar-fill" style={{ width: pct + "%" }} /></div>
         <div className="gg2-scale"><span><strong>{formatMoney(saved)}</strong> saved</span><span>{formatMoney(target)}</span></div>
         {targetDateStr && aheadOfTarget && <div className="fsr-goal" style={{ marginTop: 16, marginBottom: 0 }}>{"🎯"} On track to finish ahead of your {targetDateStr} target</div>}
         {targetDateStr && !aheadOfTarget && <div className="gg2-behind" style={{ marginTop: 16 }}>Lift your pace to reach your {targetDateStr} target</div>}
       </div>
       <div className="gg2-right">
-        <div>
-          <span className="fsr-label">Added in {monthLabelFromKey(s.key)}</span>
-          <div className={"gg2-added" + (added < 0 ? " gg2-added-neg" : "")}>{added >= 0 ? "+" : "−"}{formatMoney(Math.abs(added))}</div>
-          {isBiggest && <div className="oh-sub" style={{ marginTop: 7 }}>Your biggest month yet {"🎉"}</div>}
-        </div>
+        {addKey != null ? (
+          <div>
+            <span className="fsr-label">Added in {monthLabelFromKey(addKey)}</span>
+            <div className={"gg2-added" + (added < 0 ? " gg2-added-neg" : "")}>{added >= 0 ? "+" : "−"}{formatMoney(Math.abs(added))}</div>
+            {isBiggest && <div className="oh-sub" style={{ marginTop: 7 }}>Your biggest month yet {"🎉"}</div>}
+          </div>
+        ) : (
+          <div>
+            <span className="fsr-label">Added so far</span>
+            <div className="oh-sub" style={{ marginTop: 6 }}>Your first full month’s contribution shows once it ends.</div>
+          </div>
+        )}
         <div className="gg2-safe">
           <span className="fsr-label">Safe to spend</span>
           <div className="gg2-safe-v">{formatMoney(s.perDay)} <em>/day {"·"} {s.over ? "over" : "on track"}</em></div>
@@ -6014,7 +6029,7 @@ function EditViewModal({ layout, onSave, onClose }) {
   );
 }
 
-function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan }) {
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan, onOpenUpload }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
@@ -6047,6 +6062,8 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
       </div>
 
       {editOpen && <EditViewModal layout={layout} onSave={onChangeHomeLayout} onClose={() => setEditOpen(false)} />}
+
+      {!runTour && <DataGapBanner transactions={transactions} onOpenUpload={onOpenUpload} />}
 
       {showNeeds && (!runTour || tourStep >= 3) && (
         <TourTarget active={runTour && tourStep === 3}>
@@ -6360,7 +6377,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
 }
 function MainContent({ view, name, onOpenUpload, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories }) {
   if (view === "overview") return (
-    <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} plan={plan} />
+    <OverviewHome onOpenUpload={onOpenUpload} name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} plan={plan} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -6372,6 +6389,7 @@ function MainContent({ view, name, onOpenUpload, targets, banks, plan, onEditPla
   if (view === "categories") return <CategoryManager transactions={transactions} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} onRecategorize={onRecategorize} />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} onOpenUpload={onOpenUpload} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+  if (view === "ask") return <InsightsAsk transactions={transactions} />;
   return null;
 }
 function MappingScreen({ transactions, onRecategorize, onBack, theme }) {
@@ -6502,7 +6520,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
-  const SPECIAL_VIEWS = ["settings", "mapping"];
+  const SPECIAL_VIEWS = ["settings", "mapping", "ask"];
   const effectiveView = runTour ? "overview" : ((navKeys.includes(view) || SPECIAL_VIEWS.includes(view)) ? view : "overview");
   const copy = OVERVIEW_TOUR[tourStep] || { title: "", body: "" };
   const advanceTour = () => { if (tourStep >= OVERVIEW_TOUR.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
@@ -8817,7 +8835,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ai-ask { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 16px; padding: 18px 18px 16px; margin: 0 4px; }
   .ai-ask-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
   .ai-ask-ico { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-solid); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .ai-ask-title { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .ai-ask-title { font-size: 24px; font-weight: 800; color: var(--ink); margin: 0 0 6px; letter-spacing: -0.02em; }
   .ai-ask-badge { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent-solid); background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 9px; letter-spacing: 0.05em; }
   .ai-ask-sub { font-size: 13px; color: var(--ink-2); margin: 0 0 12px; }
   .ai-ask-row { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -8833,6 +8851,20 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .data-gap-tx { font-size: 13px; color: var(--ink); flex: 1; }
   .data-gap-tx strong { font-weight: 700; }
   .data-gap-btn { background: #B26A00; color: #fff; border: none; border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .ai-ask-page { padding: 26px 24px 22px; }
+  .ai-ask-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .ai-ask-page .ai-ask-ico { width: 46px; height: 46px; border-radius: 13px; }
+  .ai-ask-page .ai-ask-sub { font-size: 14px; }
+  .ai-ask-page .ai-ask-input { padding: 13px 15px; font-size: 14px; }
+  .ai-ask-page .ai-ask-btn { font-size: 14px; min-width: 78px; }
+  .side-ask-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; background: var(--accent-solid); color: #fff; border: none; border-radius: 12px; padding: 12px; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .side-ask-btn:hover { filter: brightness(1.06); }
+  .side-ask-active { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent-solid); }
+  .side-ask-ic { display: flex; }
+  .sr2-head-right { display: flex; align-items: center; gap: 8px; }
+  .sr-info-btn { background: none; border: none; color: var(--ink-3); cursor: pointer; padding: 0; display: flex; }
+  .sr-info-btn:hover { color: var(--ink); }
+  .sr-info-note { margin-top: 10px; font-size: 12px; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; line-height: 1.5; }
   .ask-loading { color: var(--ink-2); }
   .ask-error { color: #ffb4b4; border-color: rgba(217,45,32,0.4); background: rgba(217,45,32,0.1); }
 
@@ -9409,8 +9441,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .gg2-goal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
   .gg2-pct { font-size: 12px; font-weight: 600; color: var(--ink-2); }
   .gg2-togo { font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); margin-bottom: 14px; }
-  .gg2-togo em { font-style: normal; font-size: 14px; font-weight: 600; color: var(--ink-2); margin-left: 10px; letter-spacing: normal; }
-  .gg2-bar { height: 12px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin-bottom: 10px; }
+  .gg2-togo em { font-style: normal; font-size: 14px; font-weight: 600; color: var(--ink-2); margin-left: 8px; letter-spacing: normal; }
+  .gg2-bar { height: 12px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line-strong); overflow: hidden; margin-bottom: 10px; }
   .gg2-bar-fill { height: 100%; border-radius: 999px; background: var(--accent-solid); }
   .gg2-scale { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); }
   .gg2-scale strong { color: var(--ink); font-weight: 700; }
