@@ -3004,7 +3004,7 @@ const PERSONA_TEMPLATES = {
   power_view: {
     name: "Power View",
     blurb: "Maximum signal — deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
-    layout: { month: ["category_delta", "merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score", "goal_ring"] },
+    layout: { month: ["merchants_pro", "biggest_movers", "trend_12"], big: ["net_worth_pro", "money_score", "goal_ring"] },
   },
 };
 
@@ -5778,26 +5778,24 @@ function MerchantsProCard({ transactions }) {
 }
 
 function BiggestMoversCard({ transactions }) {
-  const cur = currentMonthKey();
-  const prev = lastNMonthKeys(cur, 2)[0];
-  const cCur = spendByCategoryForMonth(transactions || [], cur);
-  const cPrev = spendByCategoryForMonth(transactions || [], prev);
+  const cur = spendByCategoryForMonth(transactions || [], currentMonthKey());
+  const avg = avg3moSpendByCategory(transactions);
   const elapsed = today().getDate() / daysInCurrentMonth();
-  const movers = Object.keys({ ...cCur, ...cPrev }).map((c) => {
-    const a = cCur[c] || 0, b = (cPrev[c] || 0) * elapsed;
+  const movers = Object.keys({ ...cur, ...avg }).map((c) => {
+    const a = cur[c] || 0, b = (avg[c] || 0) * elapsed;
     const d = a - b;
     const pct = b > 0 ? Math.round((d / b) * 100) : null;
     return { c, d, pct };
   }).filter((m) => Math.abs(m.d) >= 1).sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
-  if (!movers.length) return <div className="glass-card dash-card"><span className="card-label">Biggest movers MoM</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs last month's statements to compare.</div></div>;
+  if (!movers.length) return <div className="glass-card dash-card"><span className="card-label">Biggest changes vs your usual</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs a few months of statements to compare.</div></div>;
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Biggest changes vs last month</span>
-      <p className="pv-desc">The categories that moved most since last month, adjusted for how far through the month you are.</p>
+      <span className="card-label">Biggest changes vs your usual</span>
+      <p className="pv-desc">The categories furthest from what you’d typically have spent by this point in the month, based on your last 3 months.</p>
       <div className="pvg">
         {movers.slice(0, 5).map((m) => (
           <React.Fragment key={m.c}>
-            <span className="pvg-n">{displayCat(m.c)}</span>
+            <span className="pvg-n"><span className="cat-dot" style={{ background: catColor(m.c) }} />{displayCat(m.c)}</span>
             <span className={"pvg-v " + (m.d > 0 ? "cvt-bad" : "cvt-ok")}>{m.d > 0 ? "+" : "−"}{formatMoney(Math.round(Math.abs(m.d)))}</span>
             <span className={"pvg-d " + (m.pct === null ? "pvg-mut" : (m.d > 0 ? "cvt-bad" : "cvt-ok"))}>{m.pct === null ? "new" : (m.d > 0 ? "↑" : "↓") + Math.abs(m.pct) + "%"}</span>
           </React.Fragment>
