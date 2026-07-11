@@ -113,6 +113,7 @@ const ICON_PATHS = {
   alert: "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z|M12 9v4|M12 17h.01",
   edit: "M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z",
   inbox: "M22 12h-6l-2 3h-4l-2-3H2|M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z",
+  upload: "M22 12h-6l-2 3h-4l-2-3H2|M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z|M12 15V3|M8.5 6.5 12 3l3.5 3.5",
   file: "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z|M14 2v6h6",
   chart: "M3 3v18h18|M8 17V9|M13 17V5|M18 17v-3",
   linechart: "M3 3v18h18|M7 15l4-4 3 3 5-6",
@@ -3243,12 +3244,19 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const menuRef = React.useRef(null);
+  const inboxRef = React.useRef(null);
   React.useEffect(() => {
     if (!menuOpen) return;
     const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
     document.addEventListener("pointerdown", h);
     return () => document.removeEventListener("pointerdown", h);
   }, [menuOpen]);
+  React.useEffect(() => {
+    if (!inboxOpen) return;
+    const h = (e) => { if (inboxRef.current && !inboxRef.current.contains(e.target)) setInboxOpen(false); };
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
+  }, [inboxOpen]);
   const taskList = tasks || [];
   const initial = (name[0] || "?").toUpperCase();
   return (
@@ -3259,10 +3267,10 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
       </div>
       <div className="topbar-right">
         <div className="upload-statement-wrap">
-          <button className="btn btn-ghost upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }}>Upload statement</button>
+          <button className="btn btn-ghost upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="upload" size={17} className="upload-btn-icon" /><span className="upload-btn-label">Upload statement</span></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
-        <div className="inbox-wrap">
+        <div className="inbox-wrap" ref={inboxRef}>
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="inbox" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
           </button>
@@ -5393,6 +5401,7 @@ function SavingsRateCard({ transactions }) {
 }
 
 function ContributionBarsCard({ transactions }) {
+  const [sel, setSel] = React.useState(null);
   const keys = lastNMonthKeys(currentMonthKey(), 6);
   const vals = keys.map((k) => Math.max(0, incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)));
   const max = Math.max(...vals, 1);
@@ -5408,12 +5417,15 @@ function ContributionBarsCard({ transactions }) {
   const shade = (i) => i === n - 1 ? "var(--accent-solid)" : "color-mix(in srgb, var(--accent-solid) " + Math.round(28 + (i / Math.max(n - 1, 1)) * 52) + "%, transparent)";
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Added each month</span>
+      <div className="cb2-head">
+        <span className="card-label" style={{ margin: 0 }}>Added each month</span>
+        {sel != null && <span className="cb2-readout">{monthLabelFromKey(keys[sel])} {"·"} <strong>{formatMoney(Math.round(vals[sel]))}</strong></span>}
+      </div>
       <div className="cb2-bars">
-        {vals.map((v, i) => <div key={i} className="cb2-col" title={monthLabelFromKey(keys[i]) + ": " + formatMoney(Math.round(v))}><div className="cb2-bar" style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} /></div>)}
+        {vals.map((v, i) => <div key={i} className={"cb2-col" + (sel === i ? " cb2-col-sel" : "")} role="button" tabIndex={0} title={monthLabelFromKey(keys[i]) + ": " + formatMoney(Math.round(v))} onClick={() => setSel(sel === i ? null : i)}><div className="cb2-bar" style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} /></div>)}
       </div>
       <div className="cb2-x">{keys.map((k, i) => <span key={k} className={i === n - 1 ? "cb2-now" : ""}>{monthLabelFromKey(k).slice(0, 3)}</span>)}</div>
-      {curIsMax && <div className="oh-sub" style={{ marginTop: 12 }}>{monthLabelFromKey(keys[n - 1])} is your biggest yet.</div>}
+      {curIsMax && sel == null && <div className="oh-sub" style={{ marginTop: 12 }}>{monthLabelFromKey(keys[n - 1])} is your biggest yet.</div>}
     </div>
   );
 }
@@ -5564,7 +5576,7 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
         <span className="cvt2-cap">bar fills to target · <span className="cvt2-cap-tick">tick = day-{day} pace ({tickPct}%)</span></span>
       </div>
       <div className="cvt2-grid">
-        <span className="cvt2-h">Category</span><span></span><span className="cvt2-h cvt2-r">Spent / target</span><span className="cvt2-h cvt2-r">Δ pace</span>
+        <span className="cvt2-h">Category</span><span></span><span className="cvt2-h cvt2-r">Spent / target</span><span className="cvt2-h cvt2-r">Vs pace</span>
         {rows.map((r) => {
           const over = r.spent - r.target * elapsed > 0;
           const fill = r.target > 0 ? Math.min(100, (r.spent / r.target) * 100) : 0;
@@ -5573,12 +5585,12 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
           return (
             <div className="cvt2-row" key={r.c}>
               <span className="cvt2-nm">{displayCat(r.c)}</span>
-              <div className="cvt2-track"><div className="cvt2-fill" style={{ width: fill + "%", background: over ? "var(--neg)" : "var(--accent-solid)" }} /><div className="cvt2-tick" style={{ left: tickPct + "%" }} /></div>
+              <div className="cvt2-track"><div className="cvt2-fill" style={{ width: fill + "%", background: catColor(r.c) }} /><div className="cvt2-tick" style={{ left: tickPct + "%" }} /></div>
               <span className="cvt2-num">{formatMoney(Math.round(r.spent))} <span className="cvt2-tgt">/ {Math.round(r.target)}</span></span>
               {isBillsPending
                 ? <span className="cvt2-d cvt2-mut">due {ordinalDay(earliestDue)}</span>
                 : r.target > 0
-                ? <span className={"cvt2-d " + (over ? "cvt2-bad" : "cvt2-ok")}>{over ? "+" : "−"}{formatMoney(Math.round(Math.abs(d)))}</span>
+                ? <span className={"cvt2-d " + (over ? "cvt2-bad" : "cvt2-ok")}>{formatMoney(Math.round(Math.abs(d)))} {over ? "over" : "under"}</span>
                 : <span className="cvt2-d cvt2-mut">—</span>}
             </div>
           );
@@ -5609,7 +5621,7 @@ function SpendByWeekCard({ transactions }) {
           const bg = future ? "var(--surface-3)" : now ? "color-mix(in srgb, var(--accent-solid) 45%, transparent)" : "var(--accent-solid)";
           return (
             <div className="sbw2-col" key={i}>
-              {!future && v > 0 && <span className="sbw2-val">{formatMoney(Math.round(v))}</span>}
+              {(now || (!future && v > 0)) && <span className="sbw2-val">{formatMoney(Math.round(v))}</span>}
               <div className="sbw2-bar" style={{ height: (!future && v > 0) ? Math.max(8, (v / max) * 100) + "%" : "6px", background: bg }} />
             </div>
           );
@@ -5726,7 +5738,6 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   const stats = [];
   if (s.budget > 0) stats.push({ k: "Safe to spend / day", v: formatMoney(s.perDay), s: formatMoney(Math.abs(paceD)) + (paceD <= 0 ? " under your usual pace" : " over your usual pace"), good: paceD <= 0 });
   stats.push({ k: "Spent this month", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : Math.abs(spentVsAvg) + "% " + (spentVsAvg <= 0 ? "below" : "above") + " your 3-month average", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
-  if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: "across " + acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
   if (!stats.length) return null;
   return (
     <div className="pv-kpis">
@@ -5794,7 +5805,7 @@ function MerchantsProCard({ transactions }) {
   const shades = ["var(--accent-solid)", "color-mix(in srgb, var(--accent-solid) 68%, transparent)", "color-mix(in srgb, var(--accent-solid) 42%, transparent)"];
   return (
     <div className="glass-card dash-card">
-      <div className="mpc2-head"><span className="card-label" style={{ margin: 0 }}>Top merchants</span><span className="pv-mut">top 3 = {conc}%</span></div>
+      <div className="mpc2-head"><span className="card-label" style={{ margin: 0 }}>Top merchants</span></div>
       <p className="pv-desc">Where most of your money went this month.</p>
       <div className="mpc2-list">
         {top.map((r, i) => {
@@ -6588,7 +6599,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
 }
 
 function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate }) {
-  const [panelOpen, setPanelOpen] = useState(!runTour);
+  const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -8322,7 +8333,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
   .brand { color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
-  .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; }
+  .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
+  .upload-btn-icon { display: none; }
   .avatar-wrap { position: relative; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .avatar-menu { position: absolute; top: 44px; right: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-pop); padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
@@ -9257,7 +9269,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
     .topbar-left .brand { min-width: 0; white-space: nowrap; flex-shrink: 0; }
     .topbar-right { flex-shrink: 0; }
-    .upload-statement-btn { white-space: nowrap; }
+    .upload-statement-btn { white-space: nowrap; padding: 8px; }
+    .upload-btn-label { display: none; }
+    .upload-btn-icon { display: block; }
 
     /* Sidebar drawer: show close control, allow it to scroll */
     .side-close-btn { display: inline-flex; align-items: center; justify-content: center; }
@@ -9542,7 +9556,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .gg2-safe-v { font-size: 22px; font-weight: 800; color: var(--ink); margin-top: 8px; line-height: 1; }
   .gg2-safe-v em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: normal; margin-left: 8px; }
   .gg2-behind { display: inline-flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--warn) 13%, transparent); color: var(--warn); border-radius: 12px; padding: 9px 13px; font-size: 13px; font-weight: 600; }
-  @media (max-width: 760px) { .gg2-hero { grid-template-columns: 1fr; } .gg2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; } }
+  @media (max-width: 760px) { .gg2-hero { grid-template-columns: 1fr; gap: 16px; align-items: stretch; } .gg2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 16px; } }
   /* Money flow (goal-getter-6a) */
   .mf2-row { display: flex; justify-content: space-between; margin: 14px 0; }
   .mf2-k { font-size: 11px; font-weight: 600; color: var(--ink-3); margin-bottom: 7px; }
@@ -9557,8 +9571,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .sr2-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
   .sr2-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--pos); line-height: 1; }
   /* Contribution bars (goal-getter-6a) */
+  .cb2-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .cb2-readout { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+  .cb2-readout strong { color: var(--ink); font-weight: 800; }
   .cb2-bars { display: flex; align-items: flex-end; gap: 8px; height: 58px; margin-top: 16px; }
-  .cb2-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .cb2-col { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: pointer; }
+  .cb2-col-sel .cb2-bar { outline: 2px solid var(--accent-solid); outline-offset: 1px; }
   .cb2-bar { width: 100%; border-radius: 4px 4px 0 0; }
   .cb2-x { display: flex; gap: 8px; margin-top: 7px; }
   .cb2-x > span { flex: 1; text-align: center; font-size: 10px; font-weight: 500; color: var(--ink-3); }
@@ -9647,7 +9665,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fsr-pace-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
   .fsr-pace-of { font-size: 13px; color: var(--ink-3); }
   .fsr-pace-of strong { color: var(--ink); font-weight: 700; }
-  .fsr-bar-wrap { position: relative; margin-bottom: 28px; }
+  .fsr-bar-wrap { position: relative; margin-bottom: 46px; }
   .fsr-bar { position: relative; display: flex; height: 15px; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; }
   .fsr-seg { height: 100%; }
   .fsr-seg-spent { background: var(--accent-solid); }
@@ -9662,8 +9680,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fsr-dot-res { background: color-mix(in srgb, var(--accent-solid) 42%, transparent); }
   .fsr-dot-free { background: var(--line-strong); }
   .bh2-hero { display: grid; grid-template-columns: 280px 1fr; gap: 28px; align-items: center; }
-  @media (max-width: 760px) { .bh2-hero { grid-template-columns: 1fr; gap: 18px; } .bh2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 16px; } }
   .bh2-left { border-right: 1px solid var(--line-strong); padding-right: 28px; }
+  @media (max-width: 760px) { .bh2-hero { grid-template-columns: 1fr; gap: 18px; } .bh2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 16px; } }
   .bh2-num { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 14px; font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); }
   .bh2-num em { font-style: normal; font-size: 16px; font-weight: 600; color: var(--ink-3); letter-spacing: normal; }
   .bh2-ledger { display: flex; flex-direction: column; gap: 11px; }
@@ -9677,7 +9695,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cvt2-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
   .cvt2-cap { font-size: 11px; color: var(--ink-3); font-weight: 500; }
   .cvt2-cap-tick { border-left: 2px solid var(--ink); padding-left: 5px; }
-  .cvt2-grid { display: grid; grid-template-columns: 96px 1fr 96px 66px; row-gap: 15px; column-gap: 16px; align-items: center; }
+  .cvt2-grid { display: grid; grid-template-columns: 92px 1fr 96px 104px; row-gap: 15px; column-gap: 16px; align-items: center; }
   .cvt2-row { display: contents; }
   .cvt2-h { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .cvt2-r { text-align: right; }
@@ -9703,10 +9721,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   @media (max-width: 560px) {
     /* 1 · Safe-to-spend hero */
     .fsr-say { min-width: 0; }
+    .fsr-main { flex-direction: column; align-items: flex-start; gap: 10px; }
     .fsr-num em { letter-spacing: normal; white-space: nowrap; margin-left: 10px; }
     .fsr-goal { display: block; line-height: 1.6; padding: 11px 14px; margin-bottom: 18px; }
     .fsr-goal .ic { vertical-align: -2px; margin-right: 5px; }
-    .fsr-goal-brk { display: block; }
+    .fsr-goal-brk { display: none; }
+    .fsr-bar-wrap { margin-bottom: 50px; }
+    /* Edit view is a desktop-only control */
+    .ev-open-btn { display: none; }
     /* 2 · Category vs target — stacked rows */
     .cvt2-grid { display: block; }
     .cvt2-grid > span { display: none; }
@@ -9721,7 +9743,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
   .pace2-card { display: flex; flex-direction: column; }
   .pace2-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-  .pace2-barwrap { position: relative; margin-bottom: 22px; }
+  .pace2-barwrap { position: relative; margin-bottom: 40px; }
   .pace2-bar { position: relative; height: 12px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line-strong); overflow: hidden; }
   .pace2-fill { height: 100%; border-radius: 999px; }
   .pace2-mark { position: absolute; top: -5px; width: 2px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
@@ -9730,7 +9752,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pace2-foot { border-top: 1px solid var(--line); margin-top: auto; padding-top: 13px; font-size: 13px; color: var(--ink-2); }
   .pace2-foot strong { color: var(--ink); }
   .mep2-card { display: flex; flex-direction: column; justify-content: center; }
-  .mep2-big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: 12px 0 12px; display: flex; align-items: baseline; gap: 8px; }
+  .mep2-big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: 12px 0 12px; display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; }
+  .mep2-big span { white-space: nowrap; }
   .mep2-big span { font-size: 14px; font-weight: 500; color: var(--ink-3); }
   .mep2-pill { align-self: flex-start; border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
   .mep2-ok { background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); }
