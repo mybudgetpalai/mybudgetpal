@@ -6152,7 +6152,14 @@ function computePaceV2(s) {
   return { day, dim, paceDay, projected, diff, under, showProj, spentPct, resPct, expPct, usedPct };
 }
 
-function PaceTileV2({ s, p, pre, post }) {
+function PaceTileV2({ s, p, pre, post, legendBelow }) {
+  const legend = (
+    <div className={"v2-legend " + (legendBelow ? "v2-legend-below" : "v2-legend-tr")}>
+      <span><span className="v2-dot" style={{ background: "var(--accent-solid)" }} /> {formatMoney(s.spent)} spent</span>
+      <span><span className="v2-dot" style={{ background: "var(--line-strong)" }} /> {formatMoney(Math.max(0, s.free))} free</span>
+      {s.reserved > 0 && <span><span className="v2-dot v2-hatch" /> {formatMoney(s.reserved)} bills to come</span>}
+    </div>
+  );
   return (
     <div className="v2-ptile">
       <div className="v2-ptile-head">
@@ -6162,11 +6169,7 @@ function PaceTileV2({ s, p, pre, post }) {
       <div className="v2-ptile-big">{formatMoney(s.spent)} <span className="v2-of">of {formatMoney(s.pot)}</span></div>
       <div className="v2-ptile-caprow">
         <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {p.usedPct}% used</div>
-        <div className="v2-legend v2-legend-tr">
-          <span><span className="v2-dot" style={{ background: "var(--accent-solid)" }} /> {formatMoney(s.spent)} spent</span>
-          <span><span className="v2-dot" style={{ background: "var(--line-strong)" }} /> {formatMoney(Math.max(0, s.free))} free</span>
-          {s.reserved > 0 && <span><span className="v2-dot v2-hatch" /> {formatMoney(s.reserved)} bills to come</span>}
-        </div>
+        {!legendBelow && legend}
       </div>
       {pre}
       <div className="v2-pace-wrap">
@@ -6177,6 +6180,7 @@ function PaceTileV2({ s, p, pre, post }) {
         <div className="v2-mark" style={{ left: p.expPct + "%" }} />
         <div className="v2-mark-lb" style={{ left: p.expPct + "%" }}><span className="fsr-caret">{"\u25B4"}</span>expected by today</div>
       </div>
+      {legendBelow && legend}
       {post}
     </div>
   );
@@ -6226,7 +6230,7 @@ function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
           <div className="v2-ln v2-total"><span>Can still spend / day</span><span className="v2-dots-blank" /><b>{"\u2248"} {formatMoney(s.perDay)}/day</b></div>
         </div>
       </div>
-      <PaceTileV2 s={s} p={p} pre={pre} />
+      <PaceTileV2 s={s} p={p} pre={pre} legendBelow />
     </div>
   );
 }
@@ -10102,7 +10106,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-lab { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-3); display: block; }
   .v2-hero { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
   .v2-big { font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; margin: 10px 0 0; }
-  .v2-big em { font-size: 18px; font-weight: 600; color: var(--ink-3); font-style: normal; margin-left: 8px; letter-spacing: 0; }
+  .v2-big em { font-size: 18px; font-weight: 600; color: var(--ink-3); font-style: normal; margin-left: 8px; letter-spacing: normal; white-space: nowrap; vertical-align: baseline; }
   .v2-fs-line { font-size: 13px; color: var(--ink-2); margin: 11px 0 0; line-height: 1.5; }
   .v2-ledger { margin-top: 12px; }
   .v2-ln { display: flex; align-items: baseline; font-size: 12.5px; color: var(--ink-2); padding: 5px 0; gap: 6px; }
@@ -10118,8 +10122,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-pvk-s { font-size: 11px; font-weight: 500; color: var(--ink-3); }
   .v2-gg-head { display: flex; justify-content: space-between; align-items: baseline; }
   .v2-gg-pct { font-size: 12px; font-weight: 700; color: var(--pos); }
-  .v2-gg-togo { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; margin: 8px 0 12px; }
-  .v2-gg-togo em { font-size: 15px; font-weight: 600; color: var(--ink-3); font-style: normal; margin-left: 8px; }
+  .v2-gg-togo { font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; margin: 8px 0 12px; }
+  .v2-gg-togo em { font-size: 18px; font-weight: 600; color: var(--ink-3); font-style: normal; margin-left: 8px; letter-spacing: normal; white-space: nowrap; vertical-align: baseline; }
   .v2-gg-bar { position: relative; height: 11px; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 99px; overflow: hidden; }
   .v2-gg-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--pos); }
   .v2-gg-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 7px; }
@@ -10135,7 +10139,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-pill-g { background: color-mix(in srgb, var(--pos) 12%, transparent); color: var(--pos); }
   .v2-pill-r { background: color-mix(in srgb, var(--neg) 12%, transparent); color: var(--neg); }
   .v2-ptile-big { font-size: 52px; font-weight: 800; letter-spacing: -0.03em; margin: 10px 0 0; line-height: .9; }
-  .v2-ptile-big .v2-of { font-size: 18px; font-weight: 600; color: var(--ink-3); margin-left: 8px; letter-spacing: 0; }
+  .v2-ptile-big .v2-of { font-size: 18px; font-weight: 600; color: var(--ink-3); margin-left: 8px; letter-spacing: normal; white-space: nowrap; vertical-align: baseline; }
   .v2-ptile-cap { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
   .v2-pace-wrap { position: relative; margin: 12px 0 44px; }
   .v2-pace-bar { position: relative; height: 12px; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 99px; overflow: hidden; }
@@ -10148,6 +10152,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-ptile-caprow { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
   .v2-ptile-caprow .v2-ptile-cap { margin: 0; }
   .v2-legend-tr { margin-top: 4px; justify-content: flex-end; }
+  .v2-legend-below { margin-top: 12px; justify-content: flex-start; }
   @media (max-width: 560px) { .v2-legend-tr { justify-content: flex-start; } }
   .v2-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
   .v2-hatch { background: repeating-linear-gradient(45deg, var(--line-strong) 0 3px, var(--surface-3) 3px 6px); }
