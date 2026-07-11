@@ -6407,10 +6407,11 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
         <div className="v2pt-cap">bar fills to target · <span className="v2pt-tk">tick = day-{day} pace ({tickPct}%)</span></div>
         <div className="v2pt-rows">
           {enrich.map((r) => (
-            <div className="v2pt-row" key={r.c}>
+            <div className="v2pt-row v2pt-full" key={r.c}>
               <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
               <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /><span className="v2pt-tick" style={{ left: tickPct + "%" }} /></div>
-              <span className="v2pt-val"><strong>{formatMoney(Math.round(r.spent))}</strong>/{formatMoney(Math.round(r.target))}<span className={"v2pt-d " + (r.over ? "v2-bad" : "v2-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span></span>
+              <span className="v2pt-st"><strong>{formatMoney(Math.round(r.spent))}</strong> / {formatMoney(Math.round(r.target))}</span>
+              <span className={"v2pt-dd " + (r.over ? "v2-bad" : "v2-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
             </div>
           ))}
         </div>
@@ -6432,9 +6433,7 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
           </div>
         ))}
       </div>
-      {goal
-        ? <div className="v2-goalnote">{netUnder >= 0 ? "You're " + formatMoney(netUnder) + " under your day-" + day + " pace so far — that underspend is heading toward your goal." : "You're " + formatMoney(-netUnder) + " over your day-" + day + " pace so far — worth easing off to keep the goal on track."}</div>
-        : <div className="v2wg-foot">You're <strong className={netUnder >= 0 ? "v2-good" : "v2-bad"}>{formatMoney(Math.abs(netUnder))} {netUnder >= 0 ? "under" : "over"}</strong> your day-{day} pace — {aheadPhrase}.</div>}
+      <div className="v2wg-foot">You're <strong className={netUnder >= 0 ? "v2-good" : "v2-bad"}>{formatMoney(Math.abs(netUnder))} {netUnder >= 0 ? "under" : "over"}</strong> your day-{day} pace — {goal ? (netUnder >= 0 ? "that underspend is heading toward your goal." : "worth easing off to keep the goal on track.") : aheadPhrase}.</div>
     </div>
   );
 }
@@ -6489,7 +6488,7 @@ function BillsV2({ transactions, billExcludes, depth }) {
         })}
       </div>
       {depth === "goal"
-        ? <div className="v2-goalnote"><strong>{formatMoney(toLeave)} still needs to leave</strong> for bills — whatever's left after that is free to move toward your goal.</div>
+        ? <div className="v2wg-foot"><strong>{formatMoney(toLeave)} still needs to leave</strong> for bills — whatever's left after that is free to move toward your goal.</div>
         : <div className="v2wg-foot">{foot}</div>}
       {extra}
     </div>
@@ -6519,8 +6518,8 @@ function TopMerchantsV2({ transactions, depth }) {
 
   let foot = null;
   if (depth === "plain") foot = <span>{top[0].disp} was your biggest this month, at {formatMoney(Math.round(top[0].amt))}.</span>;
-  else if (depth === "detailed") foot = <span>Top {top.length} = <strong>{formatMoney(Math.round(top.reduce((s, r) => s + r.amt, 0)))}</strong> ({conc}% of spend) · {top.map((r) => r.disp + " " + formatMoney(Math.round(r.amt))).join(" · ")}.</span>;
-  else if (depth === "analytical") foot = <span><strong>{conc}% concentrated</strong> in {top.length} merchant{top.length !== 1 ? "s" : ""} · {top.map((r) => r.disp + " " + pctOfTotal(r.amt) + "%").join(" · ")}.</span>;
+  else if (depth === "detailed") foot = <span>Your top {top.length} merchants are <strong>{formatMoney(Math.round(top.reduce((s, r) => s + r.amt, 0)))}</strong> — {conc}% of your spend this month.</span>;
+  else if (depth === "analytical") foot = <span>Your top {top.length} merchants account for <strong>{conc}%</strong> of spend this month.</span>;
 
   return (
     <div className="glass-card dash-card">
@@ -6534,7 +6533,7 @@ function TopMerchantsV2({ transactions, depth }) {
         ))}
       </div>
       {depth === "goal"
-        ? <div className="v2-goalnote">Easing back on your top few merchants is the quickest way to free up more for your goal.</div>
+        ? <div className="v2wg-foot">Easing back on your top few merchants is the quickest way to free up more for your goal.</div>
         : <div className="v2wg-foot">{foot}</div>}
     </div>
   );
@@ -6551,7 +6550,7 @@ function ThisMonthV2({ persona, transactions, targets, billExcludes }) {
   const d = V2_DEPTHS[persona] || V2_DEPTHS.budget_hawk;
   const hasTargets = TX_CATEGORIES.some((c) => Number((targets || {})[c]) > 0);
   return (
-    <div className="oh-grid oh-grid-tight">
+    <div className="oh-grid oh-grid-v2">
       <div className="oh-grid-cell"><CompositionCardV2 transactions={transactions} depth={d.comp} /></div>
       {hasTargets && <div className="oh-grid-cell"><PacingVsTargetV2 transactions={transactions} targets={targets} depth={d.pace} /></div>}
       <div className="oh-grid-cell"><BillsV2 transactions={transactions} billExcludes={billExcludes} depth={d.bills} /></div>
@@ -6657,7 +6656,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         <>
           <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
           <TourTarget active={runTour && tourStep === 2}>
-            <div className={"oh-grid" + (v2t ? " oh-grid-tight" : (layout.big.length === 3 ? " oh-grid-3" : ""))}>
+            <div className={"oh-grid" + (!v2t && layout.big.length === 3 ? " oh-grid-3" : "")}>
               {(v2t ? ["net_worth", "goal_ring"] : layout.big).map((k) => (
                 <div className="oh-grid-cell" key={k}>{HOME_WIDGETS[k].render(widgetProps)}</div>
               ))}
@@ -10531,6 +10530,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2pt-chip { font-size:10.5px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; }
   .v2pt-ok { background:#ECFDF3; color:var(--pos); }
   .v2pt-over { background:#FEF3F2; color:var(--neg); }
+
+  /* aligned heights: cards fill the row, footer pinned to bottom */
+  .oh-grid-v2 .oh-grid-cell > .glass-card { display:flex; flex-direction:column; }
+  .oh-grid-v2 .v2wg-foot { margin-top:auto; }
+  /* outlines on all bars */
+  .v2wg-bar, .v2pt-track, .v2-mmbar { border:1px solid var(--line-strong); }
+  /* budget-hawk pacing: aligned 4-column */
+  .v2pt-full { grid-template-columns:104px 1fr auto auto; }
+  .v2pt-st { font-size:12px; text-align:right; white-space:nowrap; color:var(--ink-2); }
+  .v2pt-st strong { color:var(--ink); font-weight:600; }
+  .v2pt-dd { font-size:12px; text-align:right; white-space:nowrap; font-weight:600; }
 
   /* ===== Unified table format (Targets · Long-term plan · Monthly review) ===== */
   .bt-cat .cat-dot, .ltp-table .ltp-sticky .cat-dot, .review-cat .cat-dot { width: 9px; height: 9px; }
