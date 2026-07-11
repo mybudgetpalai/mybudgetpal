@@ -8882,7 +8882,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-net-row td { font-weight: 800 !important; background: var(--accent-soft) !important; }
   .ltp-bal-row .ltp-sticky, .ltp-net-row .ltp-sticky { background: rgba(34,44,74,0.98); color: var(--ink); font-weight: 800; }
   .ltp-close-row td { border-top: 1px solid var(--line); }
-  .ltp-actual-chip { display: block; width: fit-content; margin: 3px auto 0; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pos); background: rgba(18,161,80,0.16); border: 1px solid rgba(18,161,80,0.4); border-radius: 5px; padding: 1px 4px; }
+  .ltp-actual-chip { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pos); background: rgba(18,161,80,0.16); border: 1px solid rgba(18,161,80,0.4); border-radius: 5px; padding: 1px 4px; vertical-align: middle; }
   .ltp-table td.ltp-actual { background: rgba(18,161,80,0.045); }
 
   .targets-actions { display: flex; align-items: center; gap: 12px; }
@@ -9848,7 +9848,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
   /* ===== Unified table format (Targets · Long-term plan · Monthly review) ===== */
   .bt-cat .cat-dot, .ltp-table .ltp-sticky .cat-dot, .review-cat .cat-dot { width: 9px; height: 9px; }
-  .ltp-actual-head, .ltp-plan-head { text-align: center; vertical-align: top; }
+  .ltp-table .ltp-sticky .cat-dot { display: inline-block; vertical-align: middle; }
+  .ltp-table th.ltp-actual-head, .ltp-table th.ltp-plan-head { text-align: center; vertical-align: top; }
+  .ltp-actual-head .ltp-actual-chip { display: block; width: fit-content; margin: 3px auto 0; }
 </style>
 </body>
 </html>
