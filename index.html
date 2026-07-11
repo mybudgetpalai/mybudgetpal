@@ -6212,12 +6212,13 @@ function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
   if (s.budget <= 0) return null;
   const p = computePaceV2(s);
   const pre = p.showProj ? (
-    <p className="v2-fore v2-calc">
-      Spent so far: {formatMoney(s.spent)} <span className="v2-op">{"\u00F7"}</span> {p.day} days <span className="v2-op">=</span> <b>{formatMoney(p.paceDay)}/day</b><br />
-      If you stick at {formatMoney(p.paceDay)}/day: {formatMoney(p.paceDay)} <span className="v2-op">{"\u00D7"}</span> {p.dim} <span className="v2-op">=</span> {formatMoney(p.paceDay * p.dim)}<br />
-      {s.reserved > 0 && <>+ bills to come <span className="v2-op">=</span> {formatMoney(p.paceDay * p.dim + s.reserved)}<br /></>}
-      {formatMoney(s.pot)} <span className="v2-op">{"\u2212"}</span> {formatMoney(p.projected)} <span className="v2-op">=</span> <span className={"v2-u" + (p.under ? "" : " v2-u-neg")}>{formatMoney(p.diff)} {p.under ? "saved vs plan" : "over plan"}</span>
-    </p>
+    <div className="v2-ledger v2-calc-ledger">
+      <div className="v2-ln"><span>Your pace: {formatMoney(s.spent)} {"\u00F7"} {p.day} days</span><span className="v2-dots" /><b>{formatMoney(p.paceDay)}/day</b></div>
+      <div className="v2-ln"><span>At {formatMoney(p.paceDay)}/day for {p.dim} days</span><span className="v2-dots" /><b>{formatMoney(p.paceDay * p.dim)}</b></div>
+      {s.reserved > 0 && <div className="v2-ln"><span>+ Bills still to come</span><span className="v2-dots" /><b>{formatMoney(s.reserved)}</b></div>}
+      <div className="v2-ln"><span>= Projected {currentMonthName()} spend</span><span className="v2-dots" /><b>{formatMoney(p.projected)}</b></div>
+      <div className="v2-ln v2-total"><span>{p.under ? "Saved vs" : "Over"} your {formatMoney(s.pot)} plan</span><span className="v2-dots-blank" /><b className={p.under ? "v2-total-pos" : "v2-total-neg"}>{formatMoney(p.diff)}</b></div>
+    </div>
   ) : null;
   return (
     <div className="v2-wrap">
@@ -10155,7 +10156,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-ptile-caprow .v2-ptile-cap { margin: 0; }
   .v2-legend-tr { margin-top: 4px; justify-content: flex-end; }
   .v2-legend-below { margin-top: 12px; justify-content: flex-start; }
-  .v2-legend-above { margin: 0 0 10px; justify-content: flex-start; }
+  .v2-legend-above { margin: 18px 0 10px; justify-content: flex-start; }
   @media (max-width: 560px) { .v2-legend-tr { justify-content: flex-start; } }
   .v2-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
   .v2-hatch { background: repeating-linear-gradient(45deg, var(--line-strong) 0 3px, var(--surface-3) 3px 6px); }
@@ -10163,8 +10164,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-fore b { color: var(--ink); font-weight: 600; }
   .v2-u { color: var(--pos); font-weight: 700; }
   .v2-u-neg { color: var(--neg); }
-  .v2-calc { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 12px 0 0; }
-  .v2-calc .v2-op { color: var(--ink-3); }
+  .v2-calc-ledger { margin: 14px 0 0; }
+  .v2-total b.v2-total-pos { color: var(--pos); }
+  .v2-total b.v2-total-neg { color: var(--neg); }
   @media (max-width: 560px) {
     .v2-big { font-size: 44px; }
     .v2-pv { grid-template-columns: 1fr; }
