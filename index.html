@@ -415,7 +415,6 @@ const VIEWS = [
   { key: "longterm", label: "Long-Term Plan" },
   { key: "targets", label: "Targets" },
   { key: "transactions", label: "Transactions" },
-  { key: "trends", label: "Trends" },
   { key: "bills", label: "Bills & Subscriptions" },
   { key: "insights", label: "Insights" },
   { key: "categories", label: "Manage Categories" },
@@ -3923,7 +3922,6 @@ function TrendsCard({ transactions, compact }) {
   return (
     <div className="trends-wrap">
       {!compact && (<>
-      <h2 className="page-heading">Trends</h2>
       <div className="glass-card dash-card">
         <span className="card-label">Net inflow / outflow</span>
         <div className="trend-chart">
@@ -4186,18 +4184,23 @@ function InsightsAsk({ transactions }) {
     catch (e) { setErr((e && e.message) || "Something went wrong — please try again."); }
     setBusy(false);
   };
-  const examples = ["How much did I spend on coffee last month?", "What was my biggest expense this month?", "Am I spending more on dining than usual?"];
+  const examples = ["Where am I overspending?", "How much do subscriptions cost me?", "Am I on track this month?"];
   return (
-    <div className="insights-ask">
-      <span className="card-label">Ask about your money</span>
-      <div className="ask-row">
-        <input className="glass-input ask-input" placeholder="e.g. How much did I spend on coffee last month?" value={q}
+    <div className="ai-ask">
+      <div className="ai-ask-head">
+        <span className="ai-ask-ico"><Icon name="sparkles" size={17} /></span>
+        <span className="ai-ask-title">Ask MyBudgetPal</span>
+        <span className="ai-ask-badge">AI</span>
+      </div>
+      <p className="ai-ask-sub">Ask anything about your spending, bills, or budget — in plain English.</p>
+      <div className="ai-ask-row">
+        <input className="ai-ask-input" placeholder="Can I afford a £250 weekend away?" value={q}
           onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} />
-        <button className="glass-btn primary ask-btn" onClick={() => ask()} disabled={busy}>{busy ? <span className="btn-spinner" /> : "Ask"}</button>
+        <button className="ai-ask-btn" onClick={() => ask()} disabled={busy}>{busy ? <span className="btn-spinner" /> : "Ask"}</button>
       </div>
       {!ans && !busy && !err && (
-        <div className="ask-examples">
-          {examples.map((ex) => <button key={ex} className="ask-chip" onClick={() => ask(ex)}>{ex}</button>)}
+        <div className="ai-ask-chips">
+          {examples.map((ex) => <button key={ex} className="ai-ask-chip" onClick={() => ask(ex)}>{ex}</button>)}
         </div>
       )}
       {busy && <div className="ask-answer ask-loading">Looking through your transactions&hellip;</div>}
@@ -4206,15 +4209,12 @@ function InsightsAsk({ transactions }) {
     </div>
   );
 }
-function InsightsCard({ transactions, targets, full }) {
+function InsightsCard({ transactions, targets, full, onOpenUpload }) {
   const built = buildInsights(transactions || [], targets);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
-  return (
-    <React.Fragment>
-      {full && <h2 className="page-heading">Insights</h2>}
+  const insightList = (
     <div className="glass-card dash-card">
-      {full && <InsightsAsk transactions={transactions} />}
-      <span className="card-label">Insights</span>
+      <span className="card-label">Highlights</span>
       <div className="insight-list">
         {insights.map((ins, i) => (
           <div className={"insight-row insight-" + ins.type} key={i}>
@@ -4224,6 +4224,24 @@ function InsightsCard({ transactions, targets, full }) {
         ))}
       </div>
     </div>
+  );
+  if (!full) return insightList;
+  const dates = (transactions || []).filter((t) => t.date).map((t) => t.date).sort();
+  const latest = dates.length ? dates[dates.length - 1] : null;
+  const missingDays = latest ? Math.floor((today().getTime() - new Date(latest + "T00:00:00").getTime()) / 86400000) : null;
+  return (
+    <React.Fragment>
+      <h2 className="page-heading">Insights</h2>
+      {missingDays != null && missingDays >= 3 && (
+        <div className="data-gap">
+          <span className="data-gap-ic"><Icon name="calendar" size={16} /></span>
+          <span className="data-gap-tx">We’re missing the last <strong>{missingDays} days</strong> of data — upload your latest statement for sharper insights.</span>
+          {onOpenUpload && <button className="data-gap-btn" onClick={onOpenUpload}>Upload</button>}
+        </div>
+      )}
+      <InsightsAsk transactions={transactions} />
+      <TrendsCard transactions={transactions} />
+      {insightList}
     </React.Fragment>
   );
 }
@@ -6340,7 +6358,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
     </div>
   );
 }
-function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories }) {
+function MainContent({ view, name, onOpenUpload, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories }) {
   if (view === "overview") return (
     <OverviewHome name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} plan={plan} />
   );
@@ -6353,7 +6371,7 @@ function MainContent({ view, name, targets, banks, plan, onEditPlan, hasData, tr
   if (view === "bills") return hasData ? <BillsCard transactions={transactions} confirmed={billExcludes} onToggleConfirm={onToggleBillExclude} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
   if (view === "categories") return <CategoryManager transactions={transactions} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} onRecategorize={onRecategorize} />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
-  if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
+  if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} onOpenUpload={onOpenUpload} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
   return null;
 }
 function MappingScreen({ transactions, onRecategorize, onBack, theme }) {
@@ -6515,7 +6533,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} />)}</div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} />)}</div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -8796,6 +8814,25 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ask-chip { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 16px; cursor: pointer; }
   .ask-chip:hover { background: var(--surface-3); color: var(--ink); }
   .ask-answer { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--ink); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+  .ai-ask { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 16px; padding: 18px 18px 16px; margin: 0 4px; }
+  .ai-ask-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+  .ai-ask-ico { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-solid); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ai-ask-title { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .ai-ask-badge { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent-solid); background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 9px; letter-spacing: 0.05em; }
+  .ai-ask-sub { font-size: 13px; color: var(--ink-2); margin: 0 0 12px; }
+  .ai-ask-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .ai-ask-input { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line-strong); border-radius: 10px; padding: 11px 13px; font-size: 13px; font-family: inherit; color: var(--ink); }
+  .ai-ask-input:focus { outline: none; border-color: var(--accent-solid); }
+  .ai-ask-btn { background: var(--accent-solid); color: #fff; border: none; border-radius: 10px; padding: 0 18px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; min-width: 64px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ai-ask-btn:disabled { opacity: 0.7; cursor: default; }
+  .ai-ask-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .ai-ask-chip { font-size: 12px; color: var(--accent-solid); background: var(--card); border: 1px solid var(--accent-soft); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-family: inherit; }
+  .ai-ask-chip:hover { border-color: var(--accent); }
+  .data-gap { display: flex; align-items: center; gap: 10px; background: color-mix(in srgb, #EF9F27 15%, transparent); border: 1px solid #EF9F27; border-radius: 12px; padding: 11px 14px; margin: 0 4px; }
+  .data-gap-ic { color: #B26A00; display: flex; flex-shrink: 0; }
+  .data-gap-tx { font-size: 13px; color: var(--ink); flex: 1; }
+  .data-gap-tx strong { font-weight: 700; }
+  .data-gap-btn { background: #B26A00; color: #fff; border: none; border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .ask-loading { color: var(--ink-2); }
   .ask-error { color: #ffb4b4; border-color: rgba(217,45,32,0.4); background: rgba(217,45,32,0.1); }
 
