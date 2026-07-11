@@ -6369,14 +6369,8 @@ function MappingScreen({ transactions, onRecategorize, onBack, theme }) {
   if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
   rows.sort((a, b) => b.count - a.count);
   return (
-    <div className="app-shell stage-fade" data-theme={normalizeTheme(theme)}>
-      <div className="topbar">
-        <div className="topbar-left">
-          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
-          <div className="brand">Category Mapping</div>
-        </div>
-      </div>
-      <div className="settings-body">
+    <div className="settings-body">
+      <h2 className="page-heading">Category Mapping</h2>
         <div className="dash-card settings-section">
           <span className="card-label">Merchant categories</span>
           <p className="subtitle" style={{ margin: "8px 0 0" }}>Change a merchant’s category and it updates every transaction with that name — and applies to future uploads.</p>
@@ -6397,7 +6391,6 @@ function MappingScreen({ transactions, onRecategorize, onBack, theme }) {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 const DEMO_BANK = "Demo Bank";
@@ -6476,7 +6469,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate }) {
   const [panelOpen, setPanelOpen] = useState(!runTour);
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -6491,7 +6484,8 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
-  const effectiveView = runTour ? "overview" : (navKeys.includes(view) ? view : "overview");
+  const SPECIAL_VIEWS = ["settings", "mapping"];
+  const effectiveView = runTour ? "overview" : ((navKeys.includes(view) || SPECIAL_VIEWS.includes(view)) ? view : "overview");
   const copy = OVERVIEW_TOUR[tourStep] || { title: "", body: "" };
   const advanceTour = () => { if (tourStep >= OVERVIEW_TOUR.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
   const demoActive = runTour && !hasData;
@@ -6517,11 +6511,11 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={onOpenSettings} onOpenMapping={onOpenMapping} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}><MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} /></div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} />)}</div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -6627,15 +6621,8 @@ function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, use
   };
 
   return (
-    <div className="app-shell stage-fade" data-theme={normalizeTheme(theme)}>
-      <div className="topbar">
-        <div className="topbar-left">
-          <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>
-          <div className="brand">Settings</div>
-        </div>
-      </div>
-
-      <div className="settings-body">
+    <div className="settings-body">
+      <h2 className="page-heading">Settings</h2>
         <div className="dash-card settings-section">
           <span className="card-label">Appearance</span>
           <p className="subtitle" style={{ margin: "2px 0 12px" }}>Choose light or dark mode for your dashboard. Only you see it — it doesn't affect the public site.</p>
@@ -6792,7 +6779,6 @@ function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, use
           <button className="link-btn inline" onClick={() => onOpenLegal("terms")}>Terms of Service</button>
         </div>
       </div>
-    </div>
   );
 }
 
@@ -8350,7 +8336,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   /* settings */
   .back-btn { color: var(--ink); font-size: 18px; background: none; border: none; cursor: pointer; padding: 4px 6px; }
-  .settings-body { max-width: 560px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .settings-body { max-width: 560px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 18px; }
   .theme-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
   .theme-swatch { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; cursor: pointer; font-family: inherit; min-width: 84px; transition: all .15s ease; }
   .theme-swatch:hover { background: var(--surface-2); }
