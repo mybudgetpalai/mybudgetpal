@@ -5742,24 +5742,32 @@ function CategoryDeltaCard({ transactions }) {
 function MerchantsProCard({ transactions }) {
   const key = currentMonthKey();
   const txs = (transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key);
+  const norm = (n) => String(n || "Unknown").toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim() || "unknown";
   const by = {};
-  txs.forEach((t) => { const n = t.name || "Unknown"; by[n] = (by[n] || 0) + Math.abs(t.amount); });
-  const rows = Object.entries(by).sort((a, b) => b[1] - a[1]);
-  const total = rows.reduce((s, [, v]) => s + v, 0);
+  txs.forEach((t) => {
+    const k = norm(t.name);
+    const a = Math.abs(t.amount);
+    if (!by[k]) by[k] = { amt: 0, disp: t.name || "Unknown", dispAmt: 0, cats: {} };
+    by[k].amt += a;
+    by[k].cats[t.category] = (by[k].cats[t.category] || 0) + a;
+    if (a > by[k].dispAmt) { by[k].dispAmt = a; by[k].disp = t.name || "Unknown"; }
+  });
+  const rows = Object.values(by).map((g) => ({ disp: g.disp, amt: g.amt, cat: (Object.entries(g.cats).sort((a, b) => b[1] - a[1])[0] || ["Uncategorized"])[0] })).sort((a, b) => b.amt - a.amt);
+  const total = rows.reduce((s, r) => s + r.amt, 0);
   if (!rows.length) return <div className="glass-card dash-card"><span className="card-label">Top merchants</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>;
   const top = rows.slice(0, 3);
-  const conc = Math.round((top.reduce((s, [, v]) => s + v, 0) / Math.max(total, 1)) * 100);
+  const conc = Math.round((top.reduce((s, r) => s + r.amt, 0) / Math.max(total, 1)) * 100);
   const shades = ["var(--accent-solid)", "color-mix(in srgb, var(--accent-solid) 68%, transparent)", "color-mix(in srgb, var(--accent-solid) 42%, transparent)"];
   return (
     <div className="glass-card dash-card">
       <div className="mpc2-head"><span className="card-label" style={{ margin: 0 }}>Top merchants</span><span className="pv-mut">top 3 = {conc}%</span></div>
       <p className="pv-desc">Where most of your money went this month.</p>
       <div className="mpc2-list">
-        {top.map(([n, v], i) => {
-          const pc = Math.round((v / Math.max(total, 1)) * 100);
+        {top.map((r, i) => {
+          const pc = Math.round((r.amt / Math.max(total, 1)) * 100);
           return (
             <div key={i}>
-              <div className="mpc2-row"><span className="mpc2-nm">{n}</span><span className="mpc2-v">{formatMoney(Math.round(v))} <span className="pv-mut">{"·"} {pc}%</span></span></div>
+              <div className="mpc2-row"><span className="mpc2-nm"><span className="cat-dot" style={{ background: catColor(r.cat) }} />{r.disp}</span><span className="mpc2-v">{formatMoney(Math.round(r.amt))}</span></div>
               <div className="mpc2-track"><div style={{ width: pc + "%", background: shades[i] }} /></div>
             </div>
           );
@@ -9488,6 +9496,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .mpc2-list { display: flex; flex-direction: column; gap: 15px; }
   .mpc2-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; font-size: 13px; gap: 10px; }
   .mpc2-nm { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mpc2-nm .cat-dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
   .mpc2-v { font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .mpc2-track { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
   .mpc2-track > div { height: 100%; border-radius: 999px; }
