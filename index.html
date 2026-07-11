@@ -6370,7 +6370,7 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
     const expected = r.target * elapsed;
     const over = r.spent - expected > 0.5;
     const delta = Math.round(Math.abs(r.spent - expected));
-    const fill = Math.min(100, (r.spent / r.target) * 100);
+    const fill = r.spent > 0 ? Math.max(2, Math.min(100, (r.spent / r.target) * 100)) : 0;
     return { ...r, expected, over, delta, fill };
   });
   const overs = enrich.filter((r) => r.over);
@@ -6385,16 +6385,17 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
     return (
       <div className="glass-card dash-card">
         <span className="card-label">How each budget is doing</span>
-        <div className="fp2">
+        <div className="v2pt-rows" style={{ marginTop: 14 }}>
           {enrich.map((r) => (
-            <div className="fp2-row" key={r.c}>
-              <div className="fp2-top"><span className="fp2-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span><span className={"fp2-chip " + (r.over ? "fp2-over" : "fp2-ok")}>{r.over ? "over pace" : "on track"}</span></div>
-              <div className="fp2-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
-              <div className="fp2-nums">{formatMoney(Math.round(r.spent))} of {formatMoney(Math.round(r.target))}</div>
+            <div className="v2pt-row v2pt-chips" key={r.c}>
+              <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+              <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
+              <span className="v2pt-val">{formatMoney(Math.round(r.spent))} / {formatMoney(Math.round(r.target))}</span>
+              <span className={"v2pt-chip " + (r.over ? "v2pt-over" : "v2pt-ok")}>{r.over ? "over pace" : "on track"}</span>
             </div>
           ))}
         </div>
-        <div className="v2wg-foot"><strong>{onTrackN} of {enrich.length}</strong> budget{enrich.length !== 1 ? "s" : ""} on track{overs.length ? " — just " + overNames.join(", ") + " running a little fast." : "."}</div>
+        <div className="v2wg-foot"><strong>{onTrackN} of {enrich.length}</strong> budget{enrich.length !== 1 ? "s" : ""} on track{overs.length ? " — just " + overNames.join(", ") + " running a little fast." : " — nothing running ahead of pace."}</div>
       </div>
     );
   }
@@ -6403,13 +6404,13 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
     return (
       <div className="glass-card dash-card">
         <span className="card-label">Category vs target</span>
-        <div className="cvtv-cap">bar fills to target · <span className="cvtv-tk">tick = day-{day} pace ({tickPct}%)</span></div>
-        <div className="cvtv">
+        <div className="v2pt-cap">bar fills to target · <span className="v2pt-tk">tick = day-{day} pace ({tickPct}%)</span></div>
+        <div className="v2pt-rows">
           {enrich.map((r) => (
-            <div className="cvtv-row" key={r.c}>
-              <span className="cvtv-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-              <div className="cvtv-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /><span className="cvtv-tick" style={{ left: tickPct + "%" }} /></div>
-              <div className="cvtv-meta"><span className="cvtv-st">{formatMoney(Math.round(r.spent))} <em>/ {formatMoney(Math.round(r.target))}</em></span><span className={r.over ? "v2-bad" : "v2-good"}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span></div>
+            <div className="v2pt-row" key={r.c}>
+              <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+              <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /><span className="v2pt-tick" style={{ left: tickPct + "%" }} /></div>
+              <span className="v2pt-val"><strong>{formatMoney(Math.round(r.spent))}</strong>/{formatMoney(Math.round(r.target))}<span className={"v2pt-d " + (r.over ? "v2-bad" : "v2-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span></span>
             </div>
           ))}
         </div>
@@ -6422,12 +6423,12 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
   return (
     <div className="glass-card dash-card">
       <span className="card-label">{goal ? "Staying inside your budgets" : "Pacing vs target"}</span>
-      <div className="gpv">
+      <div className="v2pt-rows" style={{ marginTop: 14 }}>
         {enrich.map((r) => (
-          <div className="gpv-row" key={r.c}>
-            <span className="gpv-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-            <div className="gpv-bar"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
-            <span className="gpv-u">{formatMoney(Math.round(r.spent))} / {formatMoney(Math.round(r.target))}</span>
+          <div className="v2pt-row" key={r.c}>
+            <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+            <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
+            <span className="v2pt-val"><strong>{formatMoney(Math.round(r.spent))}</strong> / {formatMoney(Math.round(r.target))}</span>
           </div>
         ))}
       </div>
@@ -10512,6 +10513,23 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-mmnm { display:flex; align-items:center; gap:7px; } .v2-mmv { font-weight:600; white-space:nowrap; }
   .v2-mmbar { height:6px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
   .v2-mmbar > i { display:block; height:100%; border-radius:999px; }
+
+  /* ===== v2 . Pacing rows (single-line, aligned) ===== */
+  .v2pt-rows { display:flex; flex-direction:column; gap:11px; margin-top:2px; }
+  .v2pt-row { display:grid; grid-template-columns:104px 1fr auto; align-items:center; gap:12px; }
+  .v2pt-chips { grid-template-columns:104px 1fr auto auto; }
+  .v2pt-nm { display:flex; align-items:center; gap:7px; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .v2pt-track { position:relative; height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
+  .v2pt-track > i { display:block; height:100%; border-radius:999px; }
+  .v2pt-tick { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--ink); border-radius:2px; }
+  .v2pt-val { font-size:12px; white-space:nowrap; text-align:right; color:var(--ink-2); }
+  .v2pt-val strong { color:var(--ink); font-weight:600; }
+  .v2pt-d { margin-left:6px; font-weight:600; }
+  .v2pt-cap { font-size:10.5px; color:var(--ink-3); margin:3px 0 14px; }
+  .v2pt-tk { color:var(--ink-2); }
+  .v2pt-chip { font-size:10.5px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+  .v2pt-ok { background:#ECFDF3; color:var(--pos); }
+  .v2pt-over { background:#FEF3F2; color:var(--neg); }
 
   /* ===== Unified table format (Targets · Long-term plan · Monthly review) ===== */
   .bt-cat .cat-dot, .ltp-table .ltp-sticky .cat-dot, .review-cat .cat-dot { width: 9px; height: 9px; }
