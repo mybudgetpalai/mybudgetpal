@@ -471,7 +471,7 @@ const CATEGORY_MONTHLY = {
 const INCOME_MONTHLY = [3100, 3150, 3200];
 const CATEGORY_COLORS = {
   Groceries: "#7C9AFF", Dining: "#F2B25C", Transport: "#0EA5A0",
-  Shopping: "#B08CFF", Subscriptions: "#45C4D6", Bills: "#2E5BFF",
+  Shopping: "#B08CFF", Subscriptions: "#3B93E8", Bills: "#2E5BFF",
   Income: "#2FBE7B", Uncategorized: "#98A2B3", Other: "#98A2B3",
 };
 const DEMO_CSV = `Date,Description,Amount
@@ -874,6 +874,16 @@ function dedupeTransactions(incoming, existing) {
 function currentMonthKey() {
   const d = today();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+/* Single source of truth for the month the Overview is scoped to:
+   the real calendar month when it has any activity, otherwise the latest
+   month that has data. Every "this month" figure on the overview reads this
+   so the hero, Where-it's-gone and Spending Breakdown can never disagree. */
+function overviewMonthKey(txs) {
+  const cur = currentMonthKey();
+  const t = txs || [];
+  if (spendForMonth(t, cur) > 0 || incomeForMonth(t, cur) > 0) return cur;
+  return latestMonthKey(t);
 }
 function currentMonthName() {
   return today().toLocaleString("en-US", { month: "long" });
@@ -3944,8 +3954,8 @@ function TrendsCard({ transactions, compact }) {
           {months.map((m, i) => (
             <div className="trend-bar-col" key={"f" + m + i}>
               <div className="trend-bar-wrap dual">
-                <div className="trend-bar income-bar" style={{ height: (income[i] / flowMax) * 100 + "%" }} />
-                <div className="trend-bar spend-bar" style={{ height: (spend[i] / flowMax) * 100 + "%" }} />
+                <div className="trend-bar income-bar" style={{ height: (income[i] > 0 ? Math.max(4, (income[i] / flowMax) * 100) : 0) + "%" }} />
+                <div className="trend-bar spend-bar" style={{ height: (spend[i] > 0 ? Math.max(4, (spend[i] / flowMax) * 100) : 0) + "%" }} />
                 <span className="trend-tip">In {formatMoney(income[i])} {"\u00B7"} Out {formatMoney(spend[i])}</span>
               </div>
               <span className="trend-bar-label">{m}</span>
@@ -4125,9 +4135,15 @@ function BankAccountsCard({ banks, transactions, accountData }) {
     );
   }
 
+  const totalBal = totalEstimatedBalance(list, accountData, txs);
+  const lastUpd = statements.map((s) => s.periodEnd || "").filter(Boolean).sort().reverse()[0] || "";
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Bank accounts</span>
+      <div className="ba-head">
+        <span className="card-label" style={{ margin: 0 }}>Bank accounts</span>
+        {totalBal !== null && <span className="ba-total">{formatMoney(totalBal)}<span className="ba-total-lb">across {list.length} account{list.length !== 1 ? "s" : ""}</span></span>}
+      </div>
+      {lastUpd && <span className="ba-updated">Last statement to {lastUpd}</span>}
       <div className="tx-list">
         {list.map((b) => {
           const row = bankRows.find((r) => r.bank_name === b);
@@ -4162,6 +4178,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
           );
         })}
       </div>
+      <p className="ba-manage subtitle" style={{ margin: "12px 0 0" }}>Add or update accounts and balances in Settings.</p>
     </div>
   );
 }
@@ -4258,7 +4275,8 @@ function dataGapDays(transactions) {
 }
 
 function DataGapBanner({ transactions, onOpenUpload }) {
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => { try { return sessionStorage.getItem("mbp-datagap-dismissed") === "1"; } catch (e) { return false; } });
+  const dismiss = () => { try { sessionStorage.setItem("mbp-datagap-dismissed", "1"); } catch (e) {} setDismissed(true); };
   const missingDays = dataGapDays(transactions);
   if (dismissed || missingDays == null || missingDays < 3) return null;
   return (
@@ -4266,7 +4284,7 @@ function DataGapBanner({ transactions, onOpenUpload }) {
       <span className="data-gap-ic"><Icon name="calendar" size={16} /></span>
       <span className="data-gap-tx">We’re missing the last <strong>{missingDays} days</strong> of data — upload your latest statement for sharper insights.</span>
       {onOpenUpload && <button className="data-gap-btn" onClick={onOpenUpload}>Upload</button>}
-      <button className="data-gap-x" onClick={() => setDismissed(true)} aria-label="Dismiss" title="Dismiss">×</button>
+      <button className="data-gap-x" onClick={dismiss} aria-label="Dismiss" title="Dismiss">×</button>
     </div>
   );
 }
@@ -4579,7 +4597,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
                   <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
                   <span>{formatMoney(b)}</span>
                   <span>{formatMoney(a)}</span>
-                  <span className={over ? "rv-over" : "rv-under"}>{b === 0 ? "—" : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d))}</span>
+                  <span className={d === 0 ? "rv-flat" : (over ? "rv-over" : "rv-under")}>{b === 0 ? "—" : (d === 0 ? formatMoney(0) : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d)))}</span>
                 </div>
               );
             })}
@@ -4604,7 +4622,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
                   <span className="review-cat">Total</span>
                   <span>{formatMoney(tp)}</span>
                   <span>{formatMoney(ta)}</span>
-                  <span className={over ? "rv-over" : "rv-under"}>{tp === 0 ? "—" : (over ? "-" + formatMoney(td) : "+" + formatMoney(-td))}</span>
+                  <span className={td === 0 ? "rv-flat" : (over ? "rv-over" : "rv-under")}>{tp === 0 ? "—" : (td === 0 ? formatMoney(0) : (over ? "-" + formatMoney(td) : "+" + formatMoney(-td)))}</span>
                 </div>
               );
             })()}
@@ -4711,8 +4729,12 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
           </>
         )}
         <p className="subtitle" style={{ margin: "10px 0 0" }}>
-          Finished months show what actually happened, straight from your statements. Future months show your plan. Every column follows the same simple sum: opening balance + income − spending = closing balance. The final closing balance is your goal — so when a month changes, you can see exactly what it does to the end number.{!haveBalance ? " Add your account balances in Settings to see this as a real balance instead of total saved." : ""}
+          Finished months are real, from your statements; future months are your plan.{!haveBalance ? " Add your account balances in Settings to see this as a real balance instead of total saved." : ""}
         </p>
+        <details className="ltp-how">
+          <summary>How this works</summary>
+          <p>Every column follows the same sum: opening balance + income − spending = closing balance. The final closing balance is your goal — so when any month changes, you can see exactly what it does to the end number.</p>
+        </details>
       </div>
 
       <div className="glass-card dash-card">
@@ -4970,18 +4992,19 @@ function InsightPill({ transactions, targets }) {
 }
 
 function SpentSoFarHero({ transactions }) {
-  const key = currentMonthKey();
   const txs = transactions || [];
+  const key = overviewMonthKey(txs);
+  const isCur = key === currentMonthKey();
   const spent = spendForMonth(txs, key);
   return (
     <div className="safe-hero">
       <div className="safe-hero-row">
         <div className="safe-hero-main">
-          <span className="safe-hero-label">Spent so far {"·"} {currentMonthName()}</span>
+          <span className="safe-hero-label">{isCur ? "Spent so far" : "Spent in"} {"·"} {monthLabelFromKey(key)}</span>
           <span className="safe-hero-num"><CountUp value={spent} format={formatMoney} /></span>
         </div>
         <div className="safe-hero-side">
-          <span>day {today().getDate()} of {daysInCurrentMonth()}</span>
+          <span>{isCur ? ("day " + today().getDate() + " of " + daysInCurrentMonth()) : (monthLabelFromKey(key) + " total")}</span>
         </div>
       </div>
     </div>
@@ -4999,7 +5022,7 @@ function SetupPushBand({ onResumeSetup }) {
 }
 
 function MiniBreakdown({ transactions }) {
-  const k = latestMonthKey(transactions || []);
+  const k = overviewMonthKey(transactions || []);
   const cats = spendByCategoryForMonth(transactions || [], k);
   const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((s, e) => s + e[1], 0);
@@ -6829,9 +6852,9 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
                 <div className="tx-row" key={c}>
                   <div className="tx-info">
                     <span className="tx-name"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
-                    <span className="tx-category">{formatMoney(spent)} spent so far{v > 0 && spent > v ? " — over target" : ""}</span>
+                    <span className="tx-category">{v > 0 ? "of your " + formatMoney(v) + " target" : "no target set"}{v > 0 && spent > v ? " — over" : ""}</span>
                   </div>
-                  <span className="tx-amount" style={v > 0 && spent > v ? { color: "var(--neg)" } : null}>{formatMoney(v)}</span>
+                  <span className="tx-amount tgt-pair" style={v > 0 && spent > v ? { color: "var(--neg)" } : null}><b>{formatMoney(spent)}</b>{v > 0 ? <span className="tgt-of"> / {formatMoney(v)}</span> : null}</span>
                 </div>
               );
             })}
@@ -6899,12 +6922,12 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
         </div>
         <div className="catman-add">
           <input className="catman-input" value={newName} placeholder="Add a category (e.g. Holidays, Kids)" onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustom(); }} />
-          <button className="glass-btn primary" onClick={addCustom}>Add</button>
+          <button className="glass-btn ghost" onClick={addCustom}>Add</button>
         </div>
       </div>
 
       <div className="catman-actions">
-        <button className="glass-btn primary" disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : "Saved"}</button>
+        <button className={"glass-btn " + (dirty ? "ghost" : "confirmed")} disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : "\u2713 Saved"}</button>
         <button className="glass-btn primary" onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
       </div>
     </div>
@@ -7372,7 +7395,7 @@ function TestingBar({ personaKey, onSetPersona }) {
   const v2 = useV2Tops();
   const opts = [...Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name })), { key: "no_targets", name: "Default (no targets)" }];
   return (
-    <div className="admin-bar" style={{ background: "#C2410C", flexWrap: "wrap", gap: 8 }}>
+    <div className="admin-bar testing-bar" style={{ background: "#C2410C", flexWrap: "wrap", gap: 8 }}>
       <span className="admin-bar-dot" />
       <span className="admin-bar-label">Testing account</span>
       <span className="admin-bar-sub" style={{ marginRight: 4 }}>View:</span>
@@ -8550,6 +8573,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     --pos: #12A150; --neg: #D92D20; --warn: #B54708;
     --shadow-card: 0 1px 3px rgba(16,24,40,0.06), 0 1px 2px rgba(16,24,40,0.04);
     --shadow-pop: 0 12px 32px rgba(16,24,40,0.16);
+    /* spacing + radius scale (audit P1-1 / P1-2) */
+    --card-pad: 20px; --card-pad-sm: 16px; --grid-gap: 24px;
+    --radius-card: 16px; --radius-control: 12px; --radius-pill: 999px;
   }
   .app-shell[data-theme="dark"] .demo-reminder { background: #2A2110; border-bottom-color: #4A3A15; }
   .app-shell[data-theme="dark"] .demo-reminder-text, .app-shell[data-theme="dark"] .demo-reminder-text strong { color: #F5C97B; }
@@ -8878,7 +8904,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .overview-slot-body .tx-list,
   .overview-slot-body .category-list,
   .overview-slot-body .insight-list { flex: 1; overflow-y: auto; min-height: 0; }
-  .dash-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 22px; max-width: none; }
+  .dash-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); max-width: none; }
   .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
   .summary-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
   .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
@@ -9113,7 +9139,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .upload-statement-btn { padding: 8px 10px; font-size: 12px; }
     .brand { font-size: 14px; }
     .main-content { padding: 16px; gap: 14px; }
-    .dash-card { padding: 16px; border-radius: 16px; }
+    .dash-card { padding: var(--card-pad-sm); border-radius: var(--radius-card); }
     .summary-spent { font-size: 24px; }
     .tx-name { font-size: 13px; }
     .tx-category { font-size: 11px; }
@@ -9454,7 +9480,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .data-gap-ic { color: #B26A00; display: flex; flex-shrink: 0; }
   .data-gap-tx { font-size: 13px; color: var(--ink); flex: 1; }
   .data-gap-tx strong { font-weight: 700; }
-  .data-gap-btn { background: #B26A00; color: #fff; border: none; border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .data-gap-btn { background: #B26A00; color: #fff; border: none; border-radius: var(--radius-control); padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .data-gap-x { background: none; border: none; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; font-family: inherit; }
   .data-gap-x:hover { color: var(--ink); }
   .ai-ask-page { padding: 26px 24px 22px; }
@@ -9889,10 +9915,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-need-ic { display: flex; flex-shrink: 0; width: 20px; justify-content: center; }
   .oh-need-text { flex: 1; font-size: 14px; color: var(--ink); }
   .oh-need-cta { font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; padding: 0; }
-  .oh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .oh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--grid-gap); margin-top: 20px; }
   .oh-grid-cell { min-width: 0; display: flex; }
   .oh-grid-cell > .glass-card, .oh-grid-cell > .dash-card { flex: 1; }
-  .oh-grid .glass-card { padding: 18px 20px; min-height: 0; }
+  .oh-grid .glass-card { padding: var(--card-pad); min-height: 0; }
   .oh-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
   @media (max-width: 900px) { .oh-grid-3 { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 640px) { .oh-grid-3 { grid-template-columns: 1fr; } }
@@ -10370,6 +10396,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .tx-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .tx-filters .tx-search { grid-column: 1 / -1; min-width: 0; }
     .tx-filters .bd-month-select, .tx-filters .tx-min { width: 100%; min-width: 0; }
+    .tx-filters .tx-min { grid-column: 1 / -1; }
     .tx-filters .tx-clear { grid-column: 1 / -1; }
     /* Monthly review: tighter caps so headers align over columns */
     .review-head { font-size: 10px; letter-spacing: 0.01em; }
@@ -10547,6 +10574,76 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-table .ltp-sticky .cat-dot { display: inline-block; vertical-align: middle; }
   .ltp-table th.ltp-actual-head, .ltp-table th.ltp-plan-head { text-align: center; vertical-align: top; }
   .ltp-actual-head .ltp-actual-chip { display: block; width: fit-content; margin: 3px auto 0; }
+
+  /* ============ Audit fixes: new component + semantic styles ============ */
+  /* P3-1 semantic palette (documented, reuses :root tokens):
+     positive/money-in = var(--pos) · negative/overdue = var(--neg)
+     plan/projection = var(--accent) · neutral/zero = var(--ink-3) */
+
+  /* P1-3: one confirmed/success button state (green), distinct from primary blue */
+  .glass-btn.confirmed { color: var(--pos); background: rgba(18,161,80,0.12); border-color: rgba(18,161,80,0.4); cursor: default; }
+  .glass-btn.confirmed:disabled { opacity: 1; }
+
+  /* P1-6: neutral (zero) variance colour */
+  .rv-flat { color: var(--ink-3); font-weight: 600; }
+
+  /* P1-7: actual / target read as a pair */
+  .tgt-pair b { font-weight: 700; }
+  .tgt-of { color: var(--ink-3); font-weight: 500; }
+
+  /* P2-3: collapsible "How this works" on Long-Term Plan */
+  .ltp-how { margin-top: 8px; }
+  .ltp-how > summary { list-style: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
+  .ltp-how > summary::-webkit-details-marker { display: none; }
+  .ltp-how > summary::before { content: "\203a"; display: inline-block; transition: transform 0.18s ease; }
+  .ltp-how[open] > summary::before { transform: rotate(90deg); }
+  .ltp-how > p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+
+  /* P2-4: Bank accounts summary header + manage affordance */
+  .ba-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .ba-total { font-size: 20px; font-weight: 700; color: var(--ink); display: inline-flex; align-items: baseline; gap: 8px; }
+  .ba-total-lb { font-size: 11px; font-weight: 500; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+  .ba-updated { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-3); }
+  .ba-manage { font-size: 13px; color: var(--ink-3); }
+
+  /* P4-1: right-edge scroll hint on wide tables (first column already frozen) */
+  .ltp-wrap, .table-wrap, .budget-table-wrap {
+    background-image:
+      linear-gradient(to left, var(--card), rgba(255,255,255,0) 26px),
+      radial-gradient(farthest-side at 100% 50%, rgba(16,24,40,0.16), rgba(16,24,40,0));
+    background-position: right center, right center;
+    background-size: 26px 100%, 15px 100%;
+    background-repeat: no-repeat;
+    background-attachment: local, scroll;
+  }
+
+  /* P5-3: consistent keyboard focus rings across interactive elements */
+  .glass-btn:focus-visible, .btn:focus-visible, .link-btn:focus-visible, .edit-link:focus-visible,
+  .tx-clear:focus-visible, .data-gap-btn:focus-visible, .ev-open-btn:focus-visible,
+  .nav-item:focus-visible, .icon-btn:focus-visible, .bd-month-select:focus-visible,
+  .slot-select:focus-visible, .upload-statement-btn:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-control);
+  }
+
+  @media (max-width: 640px) {
+    /* P2-2: "How each budget is doing" rows go two-line so nothing is cramped */
+    .v2pt-row { grid-template-columns: 1fr auto; row-gap: 6px; column-gap: 10px; }
+    .v2pt-row .v2pt-bar { grid-column: 1 / -1; order: 3; }
+    .v2pt-chips { grid-template-columns: 1fr auto; }
+    .v2pt-chips .v2pt-chip { justify-self: end; }
+
+    /* P4-3: stack the pace legend instead of cramming three items on a line */
+    .v2-legend { flex-direction: column; gap: 6px; align-items: flex-start; }
+    .v2-legend-tr { align-items: flex-start; }
+
+    /* P4-4: testing-account view switcher scrolls in one row */
+    .testing-bar { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .testing-bar > button { flex: 0 0 auto; }
+
+    /* P4-5: drop the near-invisible progress bar on compare-to-target rows */
+    .bd-list .category-track { height: 5px; }
+  }
+
 </style>
 </body>
 </html>
