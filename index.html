@@ -5693,7 +5693,6 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   if (s.budget > 0) stats.push({ k: "Safe to spend / day", v: formatMoney(s.perDay), s: formatMoney(Math.abs(paceD)) + (paceD <= 0 ? " under your usual pace" : " over your usual pace"), good: paceD <= 0 });
   stats.push({ k: "Spent this month", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : Math.abs(spentVsAvg) + "% " + (spentVsAvg <= 0 ? "below" : "above") + " your 3-month average", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
   if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: "across " + acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
-  if (kept !== null) stats.push({ k: "Kept this month", v: kept + "%", s: "of your income so far", mut: true });
   if (!stats.length) return null;
   return (
     <div className="pv-kpis">
@@ -9699,7 +9698,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .nwp-legend { display: flex; flex-direction: column; margin-top: 12px; }
   .ms-row { display: flex; align-items: center; gap: 13px; }
   /* Power View KPI tiles (power-view-6b) */
-  .pv-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 4px 12px; }
+  .pv-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 0 4px 12px; }
   @media (max-width: 760px) { .pv-kpis { grid-template-columns: 1fr 1fr; } }
   .pv-kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-card); padding: 16px; min-width: 0; }
   .pv-kpi-k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 12px; }
