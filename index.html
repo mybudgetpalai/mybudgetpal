@@ -6031,15 +6031,15 @@ function BillsChecklistCard({ transactions, billExcludes }) {
 }
 
 const HOME_WIDGETS = {
-  breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => <MiniBreakdown transactions={p.transactions} /> },
-  breakdown_wide: { label: "Where it's gone (wide)", section: "month", full: true, render: (p) => <MiniBreakdown transactions={p.transactions} /> },
+  breakdown_mini: { label: "Where it's gone", section: "month", render: (p) => p.v2t ? <CompositionCardV2 transactions={p.transactions} depth={compositionDepth(p.persona)} /> : <MiniBreakdown transactions={p.transactions} /> },
+  breakdown_wide: { label: "Where it's gone (wide)", section: "month", full: true, render: (p) => p.v2t ? <CompositionCardV2 transactions={p.transactions} depth={compositionDepth(p.persona)} /> : <MiniBreakdown transactions={p.transactions} /> },
   in_out: { label: "In vs out", section: "month", render: (p) => <InOutCard transactions={p.transactions} /> },
   transactions_mini: { label: "Recent transactions", section: "month", render: (p) => <TransactionFeed limit={5} transactions={p.transactions} /> },
   merchants: { label: "Top merchants", section: "month", render: (p) => <MerchantsCard transactions={p.transactions} /> },
   bills: { label: "Bills & subscriptions", section: "month", render: (p) => <BillsCard transactions={p.transactions} confirmed={p.billExcludes} /> },
   bills_checklist: { label: "Bills checklist", section: "month", render: (p) => <BillsChecklistCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
   trend: { label: "Spending trend", section: "month", render: (p) => <TrendsCard transactions={p.transactions} compact /> },
-  category_status: { label: "Where it's gone (bars)", section: "month", render: (p) => <CategoryStatusCard transactions={p.transactions} targets={p.targets} /> },
+  category_status: { label: "Where it's gone (bars)", section: "month", render: (p) => p.v2t ? <CompositionCardV2 transactions={p.transactions} depth={compositionDepth(p.persona)} /> : <CategoryStatusCard transactions={p.transactions} targets={p.targets} /> },
   pace_gauge: { label: "Your pace", section: "month", render: (p) => <PaceGaugeCard transactions={p.transactions} targets={p.targets} /> },
   pace_full: { label: "Your pace (wide)", section: "month", full: true, render: (p) => <PaceFullCard transactions={p.transactions} targets={p.targets} rollovers={p.rollovers} billExcludes={p.billExcludes} /> },
   bills_upcoming: { label: "Bills coming up", section: "month", render: (p) => <BillsUpcomingCard transactions={p.transactions} billExcludes={p.billExcludes} /> },
@@ -6293,6 +6293,73 @@ function GoalGetterHeroV2(props) {
   );
 }
 
+function compositionDepth(persona) {
+  return (persona === "fresh_start" || persona === "goal_getter") ? "compact" : "standard";
+}
+
+function CompositionCardV2({ transactions, depth }) {
+  const k = latestMonthKey(transactions || []);
+  const cats = spendByCategoryForMonth(transactions || [], k);
+  const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((s, e) => s + e[1], 0);
+  if (!total) return (<div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>);
+  const pctOf = (v) => Math.round((v / total) * 100);
+  const topName = displayCat(entries[0][0]);
+  const topPct = pctOf(entries[0][1]);
+
+  if (depth === "compact") {
+    const top = entries.slice(0, 4);
+    const otherTotal = entries.slice(4).reduce((s, e) => s + e[1], 0);
+    const seg = top.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
+    if (otherTotal > 0) seg.push({ label: "Other", v: otherTotal, color: "#9aa4b8" });
+    let acc = 0;
+    const stops = seg.map((sg) => { const start = (acc / total) * 100; acc += sg.v; const end = (acc / total) * 100; return sg.color + " " + start + "% " + end + "%"; }).join(", ");
+    const twoSum = entries.slice(0, 2).reduce((s, e) => s + e[1], 0);
+    const foot = entries.length >= 2
+      ? displayCat(entries[0][0]) + " and " + displayCat(entries[1][0]) + " make up " + Math.round((twoSum / total) * 100) + "% of your spend."
+      : displayCat(entries[0][0]) + " is all of your spend so far.";
+    return (
+      <div className="glass-card dash-card v2wg">
+        <div className="v2wg-head"><span className="card-label" style={{ margin: 0 }}>Where it's gone</span></div>
+        <div className="v2wg-cap">% = share of total spend</div>
+        <div className="v2wg-donutwrap">
+          <div className="v2wg-donut" style={{ background: "conic-gradient(" + stops + ")" }}>
+            <div className="v2wg-hole"><span className="v2wg-amt">{formatMoney(total)}</span><span className="v2wg-lb">SPENT</span></div>
+          </div>
+        </div>
+        <div className="v2wg-leg">
+          {seg.map((sg, i) => (
+            <React.Fragment key={i}>
+              <span className="v2wg-nm"><span className="v2wg-dot" style={{ background: sg.color }} />{sg.label}</span>
+              <span className="v2wg-v">{formatMoney(sg.v)}</span>
+              <span className="v2wg-p">{pctOf(sg.v)}%</span>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="v2wg-foot">{foot}</div>
+      </div>
+    );
+  }
+
+  const maxV = entries[0][1] || 1;
+  return (
+    <div className="glass-card dash-card v2wg">
+      <div className="v2wg-head"><span className="card-label" style={{ margin: 0 }}>Where it's gone</span><span className="v2wg-ctx">{formatMoney(total)} this month</span></div>
+      <div className="v2wg-cap">% = share of total spend</div>
+      <div className="v2wg-rows">
+        {entries.map(([c, v]) => (
+          <div className="v2wg-row" key={c}>
+            <span className="v2wg-nm"><span className="v2wg-dot" style={{ background: catColor(c) }} />{displayCat(c)}</span>
+            <div className="v2wg-bar"><i style={{ width: Math.max(4, (v / maxV) * 100) + "%", background: catColor(c) }} /></div>
+            <span className="v2wg-amt">{formatMoney(Math.round(v))}<em>{pctOf(v)}%</em></span>
+          </div>
+        ))}
+      </div>
+      <div className="v2wg-foot">{topName} is your biggest at {topPct}% of spend.</div>
+    </div>
+  );
+}
+
 function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan, onOpenUpload }) {
   const key = currentMonthKey();
   const txs = transactions || [];
@@ -6300,9 +6367,9 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
-  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers };
   const [editOpen, setEditOpen] = useState(false);
   const v2t = useV2Tops();
+  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers, persona, v2t };
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
 
@@ -10171,6 +10238,29 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .v2-big, .v2-ptile-big, .v2-gg-togo { font-size: 44px; }
     .v2-pv { grid-template-columns: 1fr; }
   }
+  /* ===== v2 . Where it's gone (Composition card) ===== */
+  .v2wg-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .v2wg-ctx { font-size:11px; color:var(--ink-3); }
+  .v2wg-cap { font-size:11px; color:var(--ink-3); margin:4px 0 14px; }
+  .v2wg-donutwrap { display:flex; justify-content:center; margin:2px 0 14px; }
+  .v2wg-donut { width:120px; height:120px; border-radius:999px; display:flex; align-items:center; justify-content:center; }
+  .v2wg-hole { width:80px; height:80px; border-radius:999px; background:var(--card); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .v2wg-amt { font-size:19px; font-weight:700; color:var(--ink); }
+  .v2wg-lb { font-size:9px; letter-spacing:0.08em; color:var(--ink-3); }
+  .v2wg-leg { display:grid; grid-template-columns:1fr auto auto; gap:9px 12px; align-items:center; }
+  .v2wg-leg .v2wg-nm { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink); }
+  .v2wg-leg .v2wg-v { font-size:13px; font-weight:600; text-align:right; white-space:nowrap; color:var(--ink); }
+  .v2wg-leg .v2wg-p { font-size:12px; color:var(--ink-3); text-align:right; white-space:nowrap; }
+  .v2wg-dot { display:inline-block; width:9px; height:9px; border-radius:999px; flex-shrink:0; }
+  .v2wg-rows { display:flex; flex-direction:column; gap:9px; }
+  .v2wg-row { display:grid; grid-template-columns:104px 1fr auto; align-items:center; gap:10px; }
+  .v2wg-row .v2wg-nm { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink); white-space:nowrap; min-width:0; }
+  .v2wg-bar { height:6px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
+  .v2wg-bar > i { display:block; height:100%; border-radius:999px; }
+  .v2wg-row .v2wg-amt { font-size:13px; font-weight:600; white-space:nowrap; text-align:right; color:var(--ink); }
+  .v2wg-row .v2wg-amt em { font-style:normal; color:var(--ink-3); font-weight:500; font-size:12px; margin-left:5px; }
+  .v2wg-foot { margin-top:14px; font-size:13px; line-height:1.45; color:var(--ink-2); }
+
   /* ===== Unified table format (Targets · Long-term plan · Monthly review) ===== */
   .bt-cat .cat-dot, .ltp-table .ltp-sticky .cat-dot, .review-cat .cat-dot { width: 9px; height: 9px; }
   .ltp-table .ltp-sticky .cat-dot { display: inline-block; vertical-align: middle; }
