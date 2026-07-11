@@ -6232,7 +6232,7 @@ function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
           <div className="v2-ln v2-total"><span>Can still spend / day</span><span className="v2-dots-blank" /><b>{"\u2248"} {formatMoney(s.perDay)}/day</b></div>
         </div>
       </div>
-      <PaceTileV2 s={s} p={p} pre={pre} legendPos="below" />
+      <PaceTileV2 s={s} p={p} pre={pre} legendPos="above" />
     </div>
   );
 }
@@ -6287,7 +6287,7 @@ function GoalGetterHeroV2(props) {
         {targetDateStr && !onTrack && <div className="v2-gg-note v2-gg-note-warn">Lift your pace to reach your {formatMoney(target)} by {targetDateStr}</div>}
         {s.budget > 0 && <div className="v2-gg-second"><span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span><span className="v2-gg-safe">{formatMoney(s.perDay)}<em>/day</em></span></div>}
       </div>
-      {s.budget > 0 && <PaceTileV2 s={s} p={p} post={post} legendPos="above" />}
+      {s.budget > 0 && <PaceTileV2 s={s} p={p} post={post} />}
     </div>
   );
 }
