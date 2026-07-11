@@ -6152,9 +6152,10 @@ function computePaceV2(s) {
   return { day, dim, paceDay, projected, diff, under, showProj, spentPct, resPct, expPct, usedPct };
 }
 
-function PaceTileV2({ s, p, pre, post, legendBelow }) {
+function PaceTileV2({ s, p, pre, post, legendPos }) {
+  const pos = legendPos || "caption";
   const legend = (
-    <div className={"v2-legend " + (legendBelow ? "v2-legend-below" : "v2-legend-tr")}>
+    <div className={"v2-legend " + (pos === "caption" ? "v2-legend-tr" : pos === "above" ? "v2-legend-above" : "v2-legend-below")}>
       <span><span className="v2-dot" style={{ background: "var(--accent-solid)" }} /> {formatMoney(s.spent)} spent</span>
       <span><span className="v2-dot" style={{ background: "var(--line-strong)" }} /> {formatMoney(Math.max(0, s.free))} free</span>
       {s.reserved > 0 && <span><span className="v2-dot v2-hatch" /> {formatMoney(s.reserved)} bills to come</span>}
@@ -6166,12 +6167,13 @@ function PaceTileV2({ s, p, pre, post, legendBelow }) {
         <span className="v2-lab" style={{ margin: 0 }}>Your pace this month</span>
         <span className={"v2-pill " + (p.under ? "v2-pill-g" : "v2-pill-r")}>{p.under ? "On track" : "Over budget"}</span>
       </div>
-      <div className="v2-ptile-big">{formatMoney(s.spent)} <span className="v2-of">of {formatMoney(s.pot)}</span></div>
+      <div className="v2-ptile-big">{formatMoney(s.spent)}<span className="v2-of">of {formatMoney(s.pot)}</span></div>
       <div className="v2-ptile-caprow">
         <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {p.usedPct}% used</div>
-        {!legendBelow && legend}
+        {pos === "caption" && legend}
       </div>
       {pre}
+      {pos === "above" && legend}
       <div className="v2-pace-wrap">
         <div className="v2-pace-bar">
           <div className="v2-spent" style={{ width: p.spentPct + "%" }} />
@@ -6180,7 +6182,7 @@ function PaceTileV2({ s, p, pre, post, legendBelow }) {
         <div className="v2-mark" style={{ left: p.expPct + "%" }} />
         <div className="v2-mark-lb" style={{ left: p.expPct + "%" }}><span className="fsr-caret">{"\u25B4"}</span>expected by today</div>
       </div>
-      {legendBelow && legend}
+      {pos === "below" && legend}
       {post}
     </div>
   );
@@ -6230,7 +6232,7 @@ function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
           <div className="v2-ln v2-total"><span>Can still spend / day</span><span className="v2-dots-blank" /><b>{"\u2248"} {formatMoney(s.perDay)}/day</b></div>
         </div>
       </div>
-      <PaceTileV2 s={s} p={p} pre={pre} legendBelow />
+      <PaceTileV2 s={s} p={p} pre={pre} legendPos="below" />
     </div>
   );
 }
@@ -6285,7 +6287,7 @@ function GoalGetterHeroV2(props) {
         {targetDateStr && !onTrack && <div className="v2-gg-note v2-gg-note-warn">Lift your pace to reach your {formatMoney(target)} by {targetDateStr}</div>}
         {s.budget > 0 && <div className="v2-gg-second"><span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span><span className="v2-gg-safe">{formatMoney(s.perDay)}<em>/day</em></span></div>}
       </div>
-      {s.budget > 0 && <PaceTileV2 s={s} p={p} post={post} />}
+      {s.budget > 0 && <PaceTileV2 s={s} p={p} post={post} legendPos="above" />}
     </div>
   );
 }
@@ -10153,6 +10155,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-ptile-caprow .v2-ptile-cap { margin: 0; }
   .v2-legend-tr { margin-top: 4px; justify-content: flex-end; }
   .v2-legend-below { margin-top: 12px; justify-content: flex-start; }
+  .v2-legend-above { margin: 0 0 10px; justify-content: flex-start; }
   @media (max-width: 560px) { .v2-legend-tr { justify-content: flex-start; } }
   .v2-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
   .v2-hatch { background: repeating-linear-gradient(45deg, var(--line-strong) 0 3px, var(--surface-3) 3px 6px); }
