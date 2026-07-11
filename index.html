@@ -4557,23 +4557,23 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
         <p className="subtitle" style={{ margin: "2px 0 14px" }}>How {label} actually turned out, next to what you planned.</p>
         {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
         <div className="review-cards">
-          <div className={"review-tile " + (spendDiff <= 0 ? "rt-good" : "rt-bad")}>
+          <div className={"review-tile " + (spendDiff === 0 ? "rt-flat" : (spendDiff < 0 ? "rt-good" : "rt-bad"))}>
             <span className="rt-label">You spent</span>
             <span className="rt-actual">{formatMoney(actualSpend)}</span>
             <span className="rt-planned">planned {hasBudget ? formatMoney(plannedSpend) : "—"}</span>
-            {hasBudget && <span className="rt-verdict">{spendDiff <= 0 ? formatMoney(-spendDiff) + " under budget" : formatMoney(spendDiff) + " over budget"}</span>}
+            {hasBudget && <span className="rt-verdict">{spendDiff === 0 ? "exactly on budget" : (spendDiff < 0 ? formatMoney(-spendDiff) + " under budget" : formatMoney(spendDiff) + " over budget")}</span>}
           </div>
-          <div className={"review-tile " + (incomeDiff >= 0 ? "rt-good" : "rt-bad")}>
+          <div className={"review-tile " + (incomeDiff === 0 ? "rt-flat" : (incomeDiff > 0 ? "rt-good" : "rt-bad"))}>
             <span className="rt-label">You earned</span>
             <span className="rt-actual">{formatMoney(actualIncome)}</span>
             <span className="rt-planned">typical {formatMoney(plannedIncome)}</span>
-            <span className="rt-verdict">{incomeDiff >= 0 ? formatMoney(incomeDiff) + " more than usual" : formatMoney(-incomeDiff) + " less than usual"}</span>
+            <span className="rt-verdict">{incomeDiff === 0 ? "in line with usual" : (incomeDiff > 0 ? formatMoney(incomeDiff) + " more than usual" : formatMoney(-incomeDiff) + " less than usual")}</span>
           </div>
-          <div className={"review-tile " + (netDiff >= 0 ? "rt-good" : "rt-bad")}>
+          <div className={"review-tile " + (netDiff === 0 ? "rt-flat" : (netDiff > 0 ? "rt-good" : "rt-bad"))}>
             <span className="rt-label">Left over</span>
             <span className="rt-actual">{formatMoney(actualNet)}</span>
             <span className="rt-planned">planned {hasBudget ? formatMoney(plannedNet) : "—"}</span>
-            {hasBudget && <span className="rt-verdict">{netDiff >= 0 ? formatMoney(netDiff) + " better than plan" : formatMoney(-netDiff) + " worse than plan"}</span>}
+            {hasBudget && <span className="rt-verdict">{netDiff === 0 ? "right on plan" : (netDiff > 0 ? formatMoney(netDiff) + " better than plan" : formatMoney(-netDiff) + " worse than plan")}</span>}
           </div>
         </div>
       </div>
@@ -5001,7 +5001,7 @@ function SpentSoFarHero({ transactions }) {
       <div className="safe-hero-row">
         <div className="safe-hero-main">
           <span className="safe-hero-label">{isCur ? "Spent so far" : "Spent in"} {"·"} {monthLabelFromKey(key)}</span>
-          <span className="safe-hero-num"><CountUp value={spent} format={formatMoney} /></span>
+          <span className="safe-hero-num">{formatMoney(spent)}</span>
         </div>
         <div className="safe-hero-side">
           <span>{isCur ? ("day " + today().getDate() + " of " + daysInCurrentMonth()) : (monthLabelFromKey(key) + " total")}</span>
@@ -8648,7 +8648,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .demo-reminder { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 16px; padding: 11px 18px; background: #FFF3DC; border-bottom: 1px solid #F0DDB0; }
   .demo-reminder-text { color: #7A4D0B; font-size: 13px; }
   .demo-reminder-text strong { color: #7A4D0B; font-weight: 800; }
-  .demo-reminder-btn { background: #F0A93B; color: #3A2405; border: none; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: transform 0.15s, filter 0.15s; }
+  .demo-reminder-btn { background: var(--accent-solid); color: var(--on-accent); border: none; border-radius: 999px; padding: 7px 16px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: transform 0.15s, filter 0.15s; }
   .demo-reminder-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
   .catrev-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 16px; padding: 10px 18px; background: var(--accent-soft); border-bottom: 1px solid var(--line); }
   .catrev-banner-text { color: var(--ink); font-size: 13px; }
@@ -8834,7 +8834,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .month-table thead th { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line); font-weight: 600; }
   .row-label-head { text-align: left !important; }
   .row-label { text-align: left; color: var(--ink); font-weight: 500; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cat-dot { display: inline-block; vertical-align: middle; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .month-table tbody tr { border-bottom: 1px solid var(--line); }
   .totals-row td { font-weight: 700; border-top: 1px solid var(--line); }
   .income-row td { color: var(--pos); }
@@ -8950,7 +8950,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .category-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
   .category-name { color: var(--ink); font-size: 14px; font-weight: 500; }
   .category-amount { color: var(--ink-2); font-size: 13px; }
-  .category-track { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .category-track { height: 6px; border-radius: 3px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
   .category-fill { height: 100%; border-radius: 3px; }
 
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
@@ -9480,7 +9480,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .data-gap-ic { color: #B26A00; display: flex; flex-shrink: 0; }
   .data-gap-tx { font-size: 13px; color: var(--ink); flex: 1; }
   .data-gap-tx strong { font-weight: 700; }
-  .data-gap-btn { background: #B26A00; color: #fff; border: none; border-radius: var(--radius-control); padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .data-gap-btn { background: var(--accent-solid); color: var(--on-accent); border: none; border-radius: var(--radius-control); padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
   .data-gap-x { background: none; border: none; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; font-family: inherit; }
   .data-gap-x:hover { color: var(--ink); }
   .ai-ask-page { padding: 26px 24px 22px; }
@@ -9690,6 +9690,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .review-tile { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-2); }
   .review-tile.rt-good { border-color: rgba(18,161,80,0.4); }
   .review-tile.rt-bad { border-color: rgba(217,45,32,0.4); }
+  .review-tile.rt-flat { border-color: var(--line-strong); }
+  .rt-flat .rt-verdict { color: var(--ink-3); }
   .rt-label { color: var(--ink-2); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   .rt-actual { color: var(--ink); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
   .rt-planned { color: var(--ink-3); font-size: 12px; }
@@ -9886,6 +9888,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-goal-cell { background: rgba(18,161,80,0.12) !important; color: var(--pos) !important; font-weight: 800; }
   .rt-good .rt-verdict { color: var(--pos) !important; }
   .rt-bad .rt-verdict { color: var(--neg) !important; }
+  .rt-flat .rt-verdict { color: var(--ink-3) !important; }
   .lpd-ask { display: flex; flex-direction: column; gap: 12px; }
   .lpd-ask-q { align-self: flex-end; max-width: 88%; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 16px 16px 4px 16px; opacity: 0; transform: translateY(8px); }
   .in-view .lpd-ask-q { animation: lpdShow 0.5s ease 0.2s forwards; }
@@ -10393,11 +10396,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .bd-header { flex-direction: row; align-items: center; }
     .bd-hero-right { justify-content: flex-end; margin-top: 0; }
     /* Transactions filters: search full-width, dropdowns 2-per-row */
-    .tx-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .tx-filters .tx-search { grid-column: 1 / -1; min-width: 0; }
-    .tx-filters .bd-month-select, .tx-filters .tx-min { width: 100%; min-width: 0; }
-    .tx-filters .tx-min { grid-column: 1 / -1; }
-    .tx-filters .tx-clear { grid-column: 1 / -1; }
+    .tx-filters { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .tx-filters > * { width: 100%; min-width: 0; }
     /* Monthly review: tighter caps so headers align over columns */
     .review-head { font-size: 10px; letter-spacing: 0.01em; }
   }
@@ -10626,11 +10626,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
 
   @media (max-width: 640px) {
-    /* P2-2: "How each budget is doing" rows go two-line so nothing is cramped */
-    .v2pt-row { grid-template-columns: 1fr auto; row-gap: 6px; column-gap: 10px; }
-    .v2pt-row .v2pt-bar { grid-column: 1 / -1; order: 3; }
-    .v2pt-chips { grid-template-columns: 1fr auto; }
-    .v2pt-chips .v2pt-chip { justify-self: end; }
+    /* P2-2: budget rows go two-line so the progress bar keeps full width (not a thin tick) */
+    .v2pt-row, .v2pt-row.v2pt-chips, .v2pt-row.v2pt-full { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+    .v2pt-nm { flex: 1 1 auto; order: 1; min-width: 0; }
+    .v2pt-val, .v2pt-st { order: 2; margin-left: auto; white-space: nowrap; }
+    .v2pt-chip, .v2pt-dd { order: 3; }
+    .v2pt-track { order: 4; flex: 1 1 100%; width: 100%; height: 9px; }
 
     /* P4-3: stack the pace legend instead of cramming three items on a line */
     .v2-legend { flex-direction: column; gap: 6px; align-items: flex-start; }
