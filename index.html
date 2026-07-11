@@ -5139,7 +5139,7 @@ function PaceGaugeCard({ transactions, targets }) {
         <div className="pace-mark" style={{ left: pctExpected + "%" }} />
         <div className="pace-mark-lb" style={{ left: pctExpected + "%" }}>expected by today</div>
       </div>
-      <div className="oh-sub" style={{ marginTop: 26 }}>You've spent <strong>{formatMoney(spent)}</strong> so far. By day {day} you'd typically be around <strong>{formatMoney(Math.round(expected))}</strong> — you're <strong>{formatMoney(Math.abs(diff))} {under ? "under" : "over"}</strong> where you'd expect for a {formatMoney(Math.round(budget))} monthly budget.</div>
+      <div className="oh-sub" style={{ marginTop: 26 }}>You've spent <strong>{formatMoney(spent)}</strong> so far. By day {day} you'd typically be around <strong>{formatMoney(Math.round(expected))}</strong> — you're <strong>{formatMoney(Math.abs(diff))} {under ? "under" : "over"} your usual pace</strong> by now.</div>
     </div>
   );
 }
@@ -5376,7 +5376,7 @@ function ContributionBarsCard({ transactions }) {
     <div className="glass-card dash-card">
       <span className="card-label">Added each month</span>
       <div className="cb2-bars">
-        {vals.map((v, i) => <div key={i} title={monthLabelFromKey(keys[i]) + ": " + formatMoney(Math.round(v))} style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} />)}
+        {vals.map((v, i) => <div key={i} className="cb2-col" title={monthLabelFromKey(keys[i]) + ": " + formatMoney(Math.round(v))}><div className="cb2-bar" style={{ height: Math.max(4, (v / max) * 100) + "%", background: shade(i) }} /></div>)}
       </div>
       <div className="cb2-x">{keys.map((k, i) => <span key={k} className={i === n - 1 ? "cb2-now" : ""}>{monthLabelFromKey(k).slice(0, 3)}</span>)}</div>
       {curIsMax && <div className="oh-sub" style={{ marginTop: 12 }}>{monthLabelFromKey(keys[n - 1])} is your biggest yet.</div>}
@@ -5430,7 +5430,7 @@ function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals,
         )}
         <div className="gg2-safe">
           <span className="fsr-label">Safe to spend</span>
-          <div className="gg2-safe-v">{formatMoney(s.perDay)} <em>/day {"·"} {s.over ? "over" : "on track"}</em></div>
+          <div className="gg2-safe-v">{formatMoney(s.perDay)}<em>/day {"·"} {s.over ? "over" : "on track"}</em></div>
         </div>
       </div>
     </div>
@@ -5494,7 +5494,7 @@ function BudgetHawkHero({ targets, transactions, rollovers, billExcludes }) {
     <div className="safe-hero bh2-hero">
       <div className="bh2-left">
         <span className="fsr-label">Safe to spend · {currentMonthName()}</span>
-        <div className="bh2-num">{formatMoney(s.perDay)} <em>/day</em></div>
+        <div className="bh2-num">{formatMoney(s.perDay)}<em>/day</em></div>
         <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace · " + formatMoney(spare) + " to spare" : "Over pace · " + formatMoney(spare) + " over"}</span>
       </div>
       <div className="bh2-right">
@@ -5623,7 +5623,7 @@ function MonthEndProjectionCard({ transactions, targets }) {
   return (
     <div className="glass-card dash-card mep2-card">
       <span className="card-label">Month-end projection</span>
-      <div className="mep2-big">{formatMoney(proj)} <span>projected spend</span></div>
+      <div className="mep2-big">{formatMoney(proj)}<span>projected spend</span></div>
       {budget > 0 && <span className={"mep2-pill " + (diff >= 0 ? "mep2-ok" : "mep2-bad")}>{formatMoney(Math.abs(Math.round(diff)))} {diff >= 0 ? "under" : "over"} budget</span>}
       <div className="oh-sub" style={{ marginTop: 12 }}>Based on your current rate of <strong>{formatMoney(Math.round(rate))}/day</strong>.</div>
     </div>
@@ -5653,9 +5653,9 @@ function PaceOutlookCard({ transactions, targets, billExcludes }) {
       <div className="pace2-barwrap">
         <div className="pace2-bar"><div className="pace2-fill" style={{ width: spentPct + "%", background: under ? "var(--accent-solid)" : "var(--neg)" }} /></div>
         <div className="pace2-mark" style={{ left: expPct + "%" }} />
-        <div className="pace2-lb" style={{ left: expPct + "%" }}>▴ expected by today</div>
+        <div className="pace2-lb" style={{ left: expPct + "%" }}><span className="fsr-caret">{"▴"}</span>expected by today</div>
       </div>
-      <div className="oh-sub" style={{ marginTop: 4 }}>You've spent <strong>{formatMoney(spent)}</strong>. By day {day} you'd typically be near <strong>{formatMoney(Math.round(expected))}</strong> — so you're <strong className={under ? "pace2-good" : ""}>{formatMoney(diff)} {under ? "under" : "over"}</strong> for a {formatMoney(Math.round(budget))} budget.</div>
+      <div className="oh-sub" style={{ marginTop: 4 }}>You've spent <strong>{formatMoney(spent)}</strong>. By day {day} you'd typically be near <strong>{formatMoney(Math.round(expected))}</strong> — so you're <strong className={under ? "pace2-good" : ""}>{formatMoney(diff)} {under ? "under" : "over"} your usual pace</strong> by now.</div>
       <div className="pace2-foot"><strong>Next 7 days:</strong> {n7}</div>
     </div>
   );
@@ -9451,7 +9451,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .gg2-added-neg { color: var(--neg); }
   .gg2-safe { border-top: 1px solid var(--line-strong); padding-top: 15px; }
   .gg2-safe-v { font-size: 22px; font-weight: 800; color: var(--ink); margin-top: 8px; line-height: 1; }
-  .gg2-safe-v em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: normal; }
+  .gg2-safe-v em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: normal; margin-left: 8px; }
   .gg2-behind { display: inline-flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--warn) 13%, transparent); color: var(--warn); border-radius: 12px; padding: 9px 13px; font-size: 13px; font-weight: 600; }
   @media (max-width: 760px) { .gg2-hero { grid-template-columns: 1fr; } .gg2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 18px; } }
   /* Money flow (goal-getter-6a) */
@@ -9469,7 +9469,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .sr2-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--pos); line-height: 1; }
   /* Contribution bars (goal-getter-6a) */
   .cb2-bars { display: flex; align-items: flex-end; gap: 8px; height: 58px; margin-top: 16px; }
-  .cb2-bars > div { flex: 1; border-radius: 4px 4px 0 0; }
+  .cb2-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .cb2-bar { width: 100%; border-radius: 4px 4px 0 0; }
   .cb2-x { display: flex; gap: 8px; margin-top: 7px; }
   .cb2-x > span { flex: 1; text-align: center; font-size: 10px; font-weight: 500; color: var(--ink-3); }
   .cb2-x .cb2-now { color: var(--accent-solid); font-weight: 700; }
@@ -9573,7 +9574,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bh2-hero { display: grid; grid-template-columns: 280px 1fr; gap: 28px; align-items: center; }
   @media (max-width: 760px) { .bh2-hero { grid-template-columns: 1fr; gap: 18px; } .bh2-left { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line-strong); padding-bottom: 16px; } }
   .bh2-left { border-right: 1px solid var(--line-strong); padding-right: 28px; }
-  .bh2-num { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 14px; font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); }
+  .bh2-num { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 14px; font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); }
   .bh2-num em { font-style: normal; font-size: 16px; font-weight: 600; color: var(--ink-3); letter-spacing: normal; }
   .bh2-ledger { display: flex; flex-direction: column; gap: 11px; }
   .bh2-ln { display: flex; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
@@ -9591,7 +9592,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cvt2-h { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
   .cvt2-r { text-align: right; }
   .cvt2-nm { font-size: 13px; color: var(--ink); }
-  .cvt2-track { position: relative; height: 8px; border-radius: 999px; background: var(--surface-3); overflow: visible; }
+  .cvt2-track { position: relative; height: 8px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line-strong); overflow: visible; }
   .cvt2-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
   .cvt2-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); border-radius: 1px; }
   .cvt2-num { font-size: 13px; font-weight: 600; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -9631,15 +9632,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pace2-card { display: flex; flex-direction: column; }
   .pace2-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
   .pace2-barwrap { position: relative; margin-bottom: 22px; }
-  .pace2-bar { position: relative; height: 12px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+  .pace2-bar { position: relative; height: 12px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line-strong); overflow: hidden; }
   .pace2-fill { height: 100%; border-radius: 999px; }
   .pace2-mark { position: absolute; top: -5px; width: 2px; height: 22px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
-  .pace2-lb { position: absolute; top: 18px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .pace2-lb { position: absolute; top: 18px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; text-align: center; }
   .pace2-good { color: var(--pos); }
   .pace2-foot { border-top: 1px solid var(--line); margin-top: auto; padding-top: 13px; font-size: 13px; color: var(--ink-2); }
   .pace2-foot strong { color: var(--ink); }
   .mep2-card { display: flex; flex-direction: column; justify-content: center; }
-  .mep2-big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: 12px 0 12px; display: flex; align-items: baseline; gap: 10px; }
+  .mep2-big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); margin: 12px 0 12px; display: flex; align-items: baseline; gap: 8px; }
   .mep2-big span { font-size: 14px; font-weight: 500; color: var(--ink-3); }
   .mep2-pill { align-self: flex-start; border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
   .mep2-ok { background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); }
