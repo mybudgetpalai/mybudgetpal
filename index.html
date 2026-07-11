@@ -5724,17 +5724,17 @@ function CategoryDeltaCard({ transactions }) {
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Categories vs your average</span>
-      <p className="pv-desc">How this month’s spending compares with your typical last 3 months.</p>
+      <p className="pv-desc">Compares what you’ve spent so far with what you’d usually have spent by this point in the month, based on your last 3 months.</p>
       <div className="pvg">
         {rows.slice(0, 5).map((r) => (
           <React.Fragment key={r.c}>
-            <span className="pvg-n">{displayCat(r.c)}</span>
+            <span className="pvg-n"><span className="cat-dot" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
             <span className="pvg-v">{formatMoney(Math.round(r.s))}</span>
             <span className={"pvg-d " + (r.pct === null ? "pvg-mut" : (r.pct > 0 ? "cvt-bad" : "cvt-ok"))}>{r.pct === null ? "—" : (r.pct > 0 ? "+" : "−") + Math.abs(r.pct) + "%"}</span>
           </React.Fragment>
         ))}
       </div>
-      <div className="cvt2-foot">{hot ? displayCat(hot.c) + " running hot; everything else below your rolling 3-month average." : "Everything below your rolling 3-month average."}</div>
+      <div className="cvt2-foot">{hot ? displayCat(hot.c) + " is running ahead of its usual pace; everything else is below where you’d normally be by now." : "Everything’s below where you’d normally be by this point in the month."}</div>
     </div>
   );
 }
@@ -9708,6 +9708,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* Power View analytical grid rows (delta / movers) */
   .pvg { display: grid; grid-template-columns: 1fr auto auto; row-gap: 13px; column-gap: 14px; align-items: baseline; margin-top: 14px; }
   .pvg-n { font-size: 13px; color: var(--ink-2); }
+  .pvg-n .cat-dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
   .pvg-v { font-size: 13px; font-weight: 700; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
   .pvg-d { font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; min-width: 52px; }
   .pvg-mut { color: var(--ink-3); font-weight: 500; }
