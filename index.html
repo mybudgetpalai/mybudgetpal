@@ -6452,7 +6452,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
 
       <div className="catman-actions">
         <button className="glass-btn primary" disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : "Saved"}</button>
-        <button className="glass-btn" onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
+        <button className="glass-btn primary" onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
       </div>
     </div>
   );
@@ -9835,8 +9835,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .avatar-menu { z-index: 100; }
   @media (max-width: 400px) { .topbar-left .brand { display: none; } }
   @media (max-width: 640px) {
-    .bd-header { flex-direction: column; align-items: stretch; }
-    .bd-hero-right { justify-content: flex-start; margin-top: 8px; }
+    /* Spending breakdown: keep number left / ring right (side-by-side) */
+    .bd-header { flex-direction: row; align-items: center; }
+    .bd-hero-right { justify-content: flex-end; margin-top: 0; }
+    /* Transactions filters: search full-width, dropdowns 2-per-row */
+    .tx-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tx-filters .tx-search { grid-column: 1 / -1; min-width: 0; }
+    .tx-filters .bd-month-select, .tx-filters .tx-min { width: 100%; min-width: 0; }
+    .tx-filters .tx-clear { grid-column: 1 / -1; }
+    /* Monthly review: tighter caps so headers align over columns */
+    .review-head { font-size: 10px; letter-spacing: 0.01em; }
   }
 </style>
 </body>
