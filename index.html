@@ -6159,8 +6159,17 @@ function PaceTileV2({ s, p, pre, post }) {
         <span className="v2-lab" style={{ margin: 0 }}>Your pace this month</span>
         <span className={"v2-pill " + (p.under ? "v2-pill-g" : "v2-pill-r")}>{p.under ? "On track" : "Over budget"}</span>
       </div>
-      <div className="v2-ptile-big">{formatMoney(s.spent)} <span className="v2-of">of {formatMoney(s.pot)}</span></div>
-      <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {p.usedPct}% used</div>
+      <div className="v2-ptile-toprow">
+        <div>
+          <div className="v2-ptile-big">{formatMoney(s.spent)} <span className="v2-of">of {formatMoney(s.pot)}</span></div>
+          <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {p.usedPct}% used</div>
+        </div>
+        <div className="v2-legend v2-legend-tr">
+          <span><span className="v2-dot" style={{ background: "var(--accent-solid)" }} /> {formatMoney(s.spent)} spent</span>
+          <span><span className="v2-dot" style={{ background: "var(--line-strong)" }} /> {formatMoney(Math.max(0, s.free))} free</span>
+          {s.reserved > 0 && <span><span className="v2-dot v2-hatch" /> {formatMoney(s.reserved)} bills to come</span>}
+        </div>
+      </div>
       {pre}
       <div className="v2-pace-wrap">
         <div className="v2-pace-bar">
@@ -6169,11 +6178,6 @@ function PaceTileV2({ s, p, pre, post }) {
         </div>
         <div className="v2-mark" style={{ left: p.expPct + "%" }} />
         <div className="v2-mark-lb" style={{ left: p.expPct + "%" }}><span className="fsr-caret">{"\u25B4"}</span>expected by today</div>
-      </div>
-      <div className="v2-legend">
-        <span><span className="v2-dot" style={{ background: "var(--accent-solid)" }} /> {formatMoney(s.spent)} spent</span>
-        <span><span className="v2-dot" style={{ background: "var(--line-strong)" }} /> {formatMoney(Math.max(0, s.free))} free</span>
-        {s.reserved > 0 && <span><span className="v2-dot v2-hatch" /> {formatMoney(s.reserved)} bills to come</span>}
       </div>
       {post}
     </div>
@@ -10111,7 +10115,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-total b { color: var(--accent-solid); }
   .v2-pv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
   .v2-pvk { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-  .v2-pvk-k { font-size: 10.5px; color: var(--ink-3); font-weight: 600; }
+  .v2-pvk-k { font-size: 13px; color: var(--ink-2); font-weight: 600; }
   .v2-pvk-v { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; margin: 7px 0 4px; }
   .v2-pvk-s { font-size: 11px; font-weight: 500; color: var(--ink-3); }
   .v2-gg-head { display: flex; justify-content: space-between; align-items: baseline; }
@@ -10143,6 +10147,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-mark-lb { position: absolute; top: 22px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; text-align: center; }
   .v2-mark-lb .fsr-caret { display: block; font-size: 17px; line-height: .7; color: var(--ink); margin-bottom: 1px; }
   .v2-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 2px; font-size: 11px; color: var(--ink-2); }
+  .v2-ptile-toprow { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .v2-legend-tr { margin-top: 4px; justify-content: flex-end; }
+  @media (max-width: 560px) { .v2-legend-tr { justify-content: flex-start; } }
   .v2-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
   .v2-hatch { background: repeating-linear-gradient(45deg, var(--line-strong) 0 3px, var(--surface-3) 3px 6px); }
   .v2-fore { font-size: 12.5px; color: var(--ink-2); margin: 13px 0 0; line-height: 1.55; }
