@@ -6122,6 +6122,168 @@ function EditViewModal({ layout, onSave, onClose }) {
   );
 }
 
+/* ================= Overview V2 tops (staged redesign) ================= */
+let __V2_TOPS = false;
+function setV2Tops(val) { __V2_TOPS = !!val; window.dispatchEvent(new Event("mbp-v2tops")); }
+function useV2Tops() {
+  const [v, setV] = useState(__V2_TOPS);
+  React.useEffect(() => {
+    const handler = () => setV(__V2_TOPS);
+    window.addEventListener("mbp-v2tops", handler);
+    return () => window.removeEventListener("mbp-v2tops", handler);
+  }, []);
+  return v;
+}
+
+function computePaceV2(s) {
+  const day = today().getDate();
+  const dim = s.daysInMonth;
+  const paceDay = day > 0 ? Math.round(s.spent / day) : 0;
+  const projected = paceDay * dim + s.reserved;
+  const rawDiff = s.pot - projected;
+  const under = rawDiff >= 0;
+  const diff = Math.round(Math.abs(rawDiff));
+  const showProj = day >= 5;
+  const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(s.pot, 1)) * 100));
+  const spentPct = pw(s.spent);
+  const resPct = pw(s.reserved);
+  const expPct = Math.min(100, Math.max(0, (day / dim) * 100));
+  const usedPct = Math.round((s.spent / Math.max(s.pot, 1)) * 100);
+  return { day, dim, paceDay, projected, diff, under, showProj, spentPct, resPct, expPct, usedPct };
+}
+
+function PaceTileV2({ s, p, pre, post }) {
+  return (
+    <div className="v2-ptile">
+      <div className="v2-ptile-head">
+        <span className="v2-lab" style={{ margin: 0 }}>Your pace this month</span>
+        <span className={"v2-pill " + (p.under ? "v2-pill-g" : "v2-pill-r")}>{p.under ? "On track" : "Over budget"}</span>
+      </div>
+      <div className="v2-ptile-big">{formatMoney(s.spent)} <span className="v2-of">of {formatMoney(s.pot)}</span></div>
+      <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {p.usedPct}% used</div>
+      {pre}
+      <div className="v2-pace-wrap">
+        <div className="v2-pace-bar">
+          <div className="v2-spent" style={{ width: p.spentPct + "%" }} />
+          {s.reserved > 0 && <div className="v2-resv" style={{ width: p.resPct + "%" }} />}
+        </div>
+        <div className="v2-mark" style={{ left: p.expPct + "%" }} />
+        <div className="v2-mark-lb" style={{ left: p.expPct + "%" }}><span className="fsr-caret">{"\u25B4"}</span>expected by today</div>
+      </div>
+      <div className="v2-legend">
+        <span><span className="v2-dot" style={{ background: "var(--accent-solid)" }} /> {formatMoney(s.spent)} spent</span>
+        <span><span className="v2-dot" style={{ background: "var(--line-strong)" }} /> {formatMoney(Math.max(0, s.free))} free</span>
+        {s.reserved > 0 && <span><span className="v2-dot v2-hatch" /> {formatMoney(s.reserved)} bills to come</span>}
+      </div>
+      {post}
+    </div>
+  );
+}
+
+function FreshStartHeroV2({ targets, transactions, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const p = computePaceV2(s);
+  const post = p.showProj ? (
+    <p className="v2-fore">You{"\u2019"}ve spent about <b>{formatMoney(p.paceDay)} a day</b> so far. If you stick at {formatMoney(p.paceDay)}/day, you{"\u2019"}ll <span className={"v2-u" + (p.under ? "" : " v2-u-neg")}>{p.under ? "save about " + formatMoney(p.diff) + " more than planned" : "go about " + formatMoney(p.diff) + " over budget"}</span>.</p>
+  ) : null;
+  return (
+    <div className="v2-wrap">
+      <div className="v2-hero">
+        <span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span>
+        <div className="v2-big">{formatMoney(s.perDay)}<em>a day</em></div>
+        <p className="v2-fs-line">That{"\u2019"}s what you can still spend each day for the rest of {currentMonthName()} and finish on budget.</p>
+      </div>
+      <PaceTileV2 s={s} p={p} post={post} />
+    </div>
+  );
+}
+
+function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const p = computePaceV2(s);
+  const pre = p.showProj ? (
+    <p className="v2-fore v2-calc">
+      Spent so far: {formatMoney(s.spent)} <span className="v2-op">{"\u00F7"}</span> {p.day} days <span className="v2-op">=</span> <b>{formatMoney(p.paceDay)}/day</b><br />
+      If you stick at {formatMoney(p.paceDay)}/day: {formatMoney(p.paceDay)} <span className="v2-op">{"\u00D7"}</span> {p.dim} <span className="v2-op">=</span> {formatMoney(p.paceDay * p.dim)}<br />
+      {s.reserved > 0 && <>+ bills to come <span className="v2-op">=</span> {formatMoney(p.paceDay * p.dim + s.reserved)}<br /></>}
+      {formatMoney(s.pot)} <span className="v2-op">{"\u2212"}</span> {formatMoney(p.projected)} <span className="v2-op">=</span> <span className={"v2-u" + (p.under ? "" : " v2-u-neg")}>{formatMoney(p.diff)} {p.under ? "saved vs plan" : "over plan"}</span>
+    </p>
+  ) : null;
+  return (
+    <div className="v2-wrap">
+      <div className="v2-hero">
+        <span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span>
+        <div className="v2-big" style={{ marginBottom: 6 }}>{formatMoney(s.perDay)}<em>/day</em></div>
+        <div className="v2-ledger">
+          <div className="v2-ln"><span>Budget this month{s.roll !== 0 ? " (incl. rollover)" : ""}</span><span className="v2-dots" /><b>{formatMoney(s.pot)}</b></div>
+          <div className="v2-ln"><span>{"\u2212"} Spent so far</span><span className="v2-dots" /><b>{formatMoney(s.spent)}</b></div>
+          {s.reserved > 0 && <div className="v2-ln"><span>{"\u2212"} Bills to come</span><span className="v2-dots" /><b>{formatMoney(s.reserved)}</b></div>}
+          <div className="v2-ln"><span>= Left, {"\u00F7"} {s.daysLeft} days remaining</span><span className="v2-dots" /><b>{formatMoney(Math.max(0, s.free))}</b></div>
+          <div className="v2-ln v2-total"><span>Can still spend / day</span><span className="v2-dots-blank" /><b>{"\u2248"} {formatMoney(s.perDay)}/day</b></div>
+        </div>
+      </div>
+      <PaceTileV2 s={s} p={p} pre={pre} />
+    </div>
+  );
+}
+
+function PowerViewHeroV2({ targets, transactions, rollovers, billExcludes }) {
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  if (s.budget <= 0) return null;
+  const p = computePaceV2(s);
+  const post = p.showProj ? (
+    <p className="v2-fore">You{"\u2019"}ve spent about <b>{formatMoney(p.paceDay)}/day</b> so far. If you stick at {formatMoney(p.paceDay)}/day, you{"\u2019"}ll finish about <span className={"v2-u" + (p.under ? "" : " v2-u-neg")}>{formatMoney(p.diff)} {p.under ? "under" : "over"} your {formatMoney(s.pot)} budget</span>.</p>
+  ) : null;
+  return (
+    <div className="v2-wrap">
+      <div className="v2-hero">
+        <span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span>
+        <div className="v2-pv">
+          <div className="v2-pvk"><div className="v2-pvk-k">Can still spend / day</div><div className="v2-pvk-v">{formatMoney(s.perDay)}</div><div className="v2-pvk-s">{formatMoney(Math.max(0, s.free))} left {"\u00F7"} {s.daysLeft} days</div></div>
+          <div className="v2-pvk"><div className="v2-pvk-k">Spent / day so far</div><div className="v2-pvk-v">{formatMoney(p.paceDay)}</div><div className="v2-pvk-s">{formatMoney(s.spent)} {"\u00F7"} {p.day} days</div></div>
+        </div>
+      </div>
+      <PaceTileV2 s={s} p={p} post={post} />
+    </div>
+  );
+}
+
+function GoalGetterHeroV2(props) {
+  const { targets, transactions, rollovers, billExcludes, goals, plan, banks, accountData } = props;
+  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
+  const target = plan && plan.targetBalance > 0 ? plan.targetBalance : (goals && goals.length ? goals[0].target : 0);
+  const targetMonth = plan && plan.targetMonth ? plan.targetMonth : null;
+  if (target <= 0) return <FreshStartHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />;
+  const nw = totalEstimatedBalance(banks, accountData, transactions || []);
+  const saved = Math.max(0, nw !== null ? nw : (goals && goals.length ? goals[0].saved : 0));
+  const toGo = Math.max(0, target - saved);
+  const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+  const targetDateStr = targetMonth ? (monthLabelFromKey(targetMonth).slice(0, 3) + " " + targetMonth.slice(0, 4)) : null;
+  const proj = goalProjection({ target, saved }, transactions);
+  const targetDateObj = targetMonth ? new Date(Number(targetMonth.slice(0, 4)), Number(targetMonth.slice(5, 7)), 0) : null;
+  const onTrack = proj && proj.projected && targetDateObj ? proj.projected <= targetDateObj : true;
+  const p = computePaceV2(s);
+  const post = (s.budget > 0 && p.showProj) ? (
+    <p className="v2-fore">You{"\u2019"}ve spent about <b>{formatMoney(p.paceDay)}/day</b> so far. If you stick at {formatMoney(p.paceDay)}/day, that ~<span className={"v2-u" + (p.under ? "" : " v2-u-neg")}>{formatMoney(p.diff)} {p.under ? "underspend" : "overspend"}</span> {p.under ? "goes toward" : "comes off"} your {formatMoney(target)} goal.</p>
+  ) : null;
+  return (
+    <div className="v2-wrap">
+      <div className="v2-hero">
+        <div className="v2-gg-head"><span className="v2-lab">Your {formatMoney(target)} goal</span><span className="v2-gg-pct">{pct}% there</span></div>
+        <div className="v2-gg-togo">{formatMoney(toGo)}<em>to go</em></div>
+        <div className="v2-gg-bar"><div className="v2-gg-fill" style={{ width: pct + "%" }} /></div>
+        <div className="v2-gg-scale"><span><b>{formatMoney(saved)}</b> saved</span><span>{formatMoney(target)}</span></div>
+        {targetDateStr && onTrack && <div className="v2-gg-note">{"\uD83C\uDFAF"} On track for your {formatMoney(target)} by {targetDateStr}</div>}
+        {targetDateStr && !onTrack && <div className="v2-gg-note v2-gg-note-warn">Lift your pace to reach your {formatMoney(target)} by {targetDateStr}</div>}
+        {s.budget > 0 && <div className="v2-gg-second"><span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span><span className="v2-gg-safe">{formatMoney(s.perDay)}<em>/day</em></span></div>}
+      </div>
+      {s.budget > 0 && <PaceTileV2 s={s} p={p} post={post} />}
+    </div>
+  );
+}
+
 function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan, onOpenUpload }) {
   const key = currentMonthKey();
   const txs = transactions || [];
@@ -6131,6 +6293,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
   const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers };
   const [editOpen, setEditOpen] = useState(false);
+  const v2t = useV2Tops();
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
 
@@ -6187,13 +6350,13 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         ) : (
           <>
             {persona === "fresh_start"
-              ? <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
+              ? (v2t ? <FreshStartHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} /> : <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />)
               : persona === "goal_getter"
-              ? <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} />
+              ? (v2t ? <GoalGetterHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} /> : <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} />)
               : persona === "budget_hawk"
-              ? <BudgetHawkHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
+              ? (v2t ? <BudgetHawkHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} /> : <BudgetHawkHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />)
               : persona === "power_view"
-              ? <PowerViewHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} banks={banks} accountData={accountData} goals={goals} />
+              ? (v2t ? <PowerViewHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} /> : <PowerViewHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} banks={banks} accountData={accountData} goals={goals} />)
               : <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />}
             <InsightPill transactions={transactions} targets={targets} />
           </>
@@ -6927,6 +7090,7 @@ function AdminBar({ onOpen }) {
 }
 
 function TestingBar({ personaKey, onSetPersona }) {
+  const v2 = useV2Tops();
   const opts = [...Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name })), { key: "no_targets", name: "Default (no targets)" }];
   return (
     <div className="admin-bar" style={{ background: "#C2410C", flexWrap: "wrap", gap: 8 }}>
@@ -6946,6 +7110,17 @@ function TestingBar({ personaKey, onSetPersona }) {
           }}
         >{o.name}</button>
       ))}
+      <span style={{ width: 1, height: 16, background: "rgba(255,255,255,.4)", margin: "0 2px" }} />
+      <button
+        onClick={() => setV2Tops(!v2)}
+        style={{
+          fontSize: 12, padding: "3px 10px", borderRadius: 999, cursor: "pointer",
+          border: "1px solid rgba(255,255,255,.55)",
+          background: v2 ? "#fff" : "transparent",
+          color: v2 ? "#C2410C" : "#fff",
+          fontWeight: v2 ? 700 : 500,
+        }}
+      >V2 tops: {v2 ? "ON" : "OFF"}</button>
     </div>
   );
 }
@@ -9919,6 +10094,65 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .tx-filters .tx-clear { grid-column: 1 / -1; }
     /* Monthly review: tighter caps so headers align over columns */
     .review-head { font-size: 10px; letter-spacing: 0.01em; }
+  }
+  /* ===== Overview V2 tops (staged redesign) ===== */
+  .v2-wrap { display: flex; flex-direction: column; }
+  .v2-lab { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-3); display: block; }
+  .v2-hero { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
+  .v2-big { font-size: 40px; font-weight: 800; letter-spacing: -1px; line-height: 1; margin: 10px 0 0; }
+  .v2-big em { font-size: 15px; font-weight: 600; color: var(--ink-3); font-style: normal; margin-left: 5px; letter-spacing: 0; }
+  .v2-fs-line { font-size: 13px; color: var(--ink-2); margin: 11px 0 0; line-height: 1.5; }
+  .v2-ledger { margin-top: 12px; }
+  .v2-ln { display: flex; align-items: baseline; font-size: 12.5px; color: var(--ink-2); padding: 5px 0; gap: 6px; }
+  .v2-ln .v2-dots { flex: 1; border-bottom: 1px dotted var(--line-strong); transform: translateY(-3px); }
+  .v2-ln .v2-dots-blank { flex: 1; }
+  .v2-ln b { color: var(--ink); font-weight: 600; }
+  .v2-total { border-top: 1.5px solid var(--line-strong); margin-top: 4px; padding-top: 8px; font-size: 13px; color: var(--ink); }
+  .v2-total b { color: var(--accent-solid); }
+  .v2-pv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .v2-pvk { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .v2-pvk-k { font-size: 10.5px; color: var(--ink-3); font-weight: 600; }
+  .v2-pvk-v { font-size: 26px; font-weight: 800; letter-spacing: -.6px; margin: 6px 0 3px; }
+  .v2-pvk-s { font-size: 11px; font-weight: 500; color: var(--ink-3); }
+  .v2-gg-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .v2-gg-pct { font-size: 12px; font-weight: 700; color: var(--pos); }
+  .v2-gg-togo { font-size: 30px; font-weight: 800; letter-spacing: -.7px; margin: 8px 0 10px; }
+  .v2-gg-togo em { font-size: 13px; font-weight: 600; color: var(--ink-3); font-style: normal; margin-left: 5px; }
+  .v2-gg-bar { position: relative; height: 11px; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 99px; overflow: hidden; }
+  .v2-gg-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--pos); }
+  .v2-gg-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 7px; }
+  .v2-gg-scale b { color: var(--ink); }
+  .v2-gg-note { font-size: 12px; color: var(--pos); background: color-mix(in srgb, var(--pos) 12%, transparent); border-radius: 9px; padding: 8px 11px; margin: 12px 0 0; font-weight: 500; }
+  .v2-gg-note-warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+  .v2-gg-second { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .v2-gg-safe { font-size: 15px; font-weight: 700; }
+  .v2-gg-safe em { font-size: 11px; font-weight: 500; color: var(--ink-3); font-style: normal; margin-left: 3px; }
+  .v2-ptile { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; margin-top: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
+  .v2-ptile-head { display: flex; align-items: center; justify-content: space-between; }
+  .v2-pill { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+  .v2-pill-g { background: color-mix(in srgb, var(--pos) 12%, transparent); color: var(--pos); }
+  .v2-pill-r { background: color-mix(in srgb, var(--neg) 12%, transparent); color: var(--neg); }
+  .v2-ptile-big { font-size: 30px; font-weight: 800; letter-spacing: -.8px; margin: 10px 0 0; line-height: 1; }
+  .v2-ptile-big .v2-of { font-size: 16px; font-weight: 600; color: var(--ink-3); margin-left: 4px; letter-spacing: 0; }
+  .v2-ptile-cap { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+  .v2-pace-wrap { position: relative; margin: 12px 0 44px; }
+  .v2-pace-bar { position: relative; height: 12px; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 99px; overflow: hidden; }
+  .v2-spent { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-solid); }
+  .v2-resv { position: absolute; top: 0; bottom: 0; right: 0; background: repeating-linear-gradient(45deg, var(--line-strong) 0 4px, var(--surface-3) 4px 8px); }
+  .v2-mark { position: absolute; top: -5px; width: 2px; height: 25px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
+  .v2-mark-lb { position: absolute; top: 24px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; text-align: center; }
+  .v2-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 2px; font-size: 11px; color: var(--ink-2); }
+  .v2-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+  .v2-hatch { background: repeating-linear-gradient(45deg, var(--line-strong) 0 3px, var(--surface-3) 3px 6px); }
+  .v2-fore { font-size: 12.5px; color: var(--ink-2); margin: 13px 0 0; line-height: 1.55; }
+  .v2-fore b { color: var(--ink); font-weight: 600; }
+  .v2-u { color: var(--pos); font-weight: 700; }
+  .v2-u-neg { color: var(--neg); }
+  .v2-calc { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 12px 0 0; }
+  .v2-calc .v2-op { color: var(--ink-3); }
+  @media (max-width: 560px) {
+    .v2-big { font-size: 34px; }
+    .v2-pv { grid-template-columns: 1fr; }
   }
   /* ===== Unified table format (Targets · Long-term plan · Monthly review) ===== */
   .bt-cat .cat-dot, .ltp-table .ltp-sticky .cat-dot, .review-cat .cat-dot { width: 9px; height: 9px; }
