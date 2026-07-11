@@ -6551,7 +6551,7 @@ function ThisMonthV2({ persona, transactions, targets, billExcludes }) {
   const d = V2_DEPTHS[persona] || V2_DEPTHS.budget_hawk;
   const hasTargets = TX_CATEGORIES.some((c) => Number((targets || {})[c]) > 0);
   return (
-    <div className="oh-grid">
+    <div className="oh-grid oh-grid-tight">
       <div className="oh-grid-cell"><CompositionCardV2 transactions={transactions} depth={d.comp} /></div>
       {hasTargets && <div className="oh-grid-cell"><PacingVsTargetV2 transactions={transactions} targets={targets} depth={d.pace} /></div>}
       <div className="oh-grid-cell"><BillsV2 transactions={transactions} billExcludes={billExcludes} depth={d.bills} /></div>
@@ -6657,7 +6657,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         <>
           <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
           <TourTarget active={runTour && tourStep === 2}>
-            <div className={"oh-grid" + (!v2t && layout.big.length === 3 ? " oh-grid-3" : "")}>
+            <div className={"oh-grid" + (v2t ? " oh-grid-tight" : (layout.big.length === 3 ? " oh-grid-3" : ""))}>
               {(v2t ? ["net_worth", "goal_ring"] : layout.big).map((k) => (
                 <div className="oh-grid-cell" key={k}>{HOME_WIDGETS[k].render(widgetProps)}</div>
               ))}
@@ -10443,7 +10443,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .v2-pv { grid-template-columns: 1fr; }
   }
   /* ===== v2 . Where it's gone (Composition card) ===== */
-  .v2wg-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .v2wg-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:14px; }
+  .oh-grid-tight { align-items:start; }
   .v2wg-ctx { font-size:11px; color:var(--ink-3); }
   .v2wg-cap { font-size:11px; color:var(--ink-3); margin:4px 0 14px; }
   .v2wg-donutwrap { display:flex; justify-content:center; margin:2px 0 14px; }
