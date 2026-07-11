@@ -5422,7 +5422,7 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
         <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
       </div>
       <div className="fsr-main">
-        <div className="fsr-num">{formatMoney(s.perDay)} <em>a day</em></div>
+        <div className="fsr-num">{formatMoney(s.perDay)}<em>a day</em></div>
         <div className="fsr-say">Spend up to this each day and you'll still finish {currentMonthName()} on budget. You've spent just <strong>{formatMoney(s.spent)}</strong> so far — {paceWord} your usual <strong>{formatMoney(Math.round(expected))}</strong> by now.</div>
       </div>
       {!s.over && underBy > 0 && <div className="fsr-goal"><Icon name="checkcircle" size={14} /> On track to finish around <br className="fsr-goal-brk" /><strong>{formatMoney(projEnd)}</strong> — about <strong>{formatMoney(underBy)}</strong> under budget</div>}
@@ -5436,7 +5436,7 @@ function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
           {s.reserved > 0 && <div className="fsr-seg fsr-seg-res" style={{ width: resPct + "%" }} />}
         </div>
         <div className="fsr-mark" style={{ left: expPct + "%" }} />
-        <div className="fsr-mark-lb" style={{ left: expPct + "%" }}>{"▴"} expected by today</div>
+        <div className="fsr-mark-lb" style={{ left: expPct + "%" }}><span className="fsr-caret">{"▴"}</span>expected by today</div>
       </div>
       <div className="fsr-legend">
         <span><span className="fsr-dot fsr-dot-spent" /> {formatMoney(s.spent)} spent</span>
@@ -7068,6 +7068,7 @@ function App() {
   const [reviewMonth, setReviewMonth] = useState(null);
   const [signupMonth, setSignupMonth] = useState(null);
   const [devNow, setDevNow] = useState(null);
+  const [mobilePreview, setMobilePreview] = useState(false);
   const setDevDate = (val) => { DEV_NOW = val || null; setDevNow(val || null); };
   const [reviewManual, setReviewManual] = useState(false);
   const [sessionDismissed, setSessionDismissed] = useState([]);
@@ -7860,6 +7861,18 @@ function App() {
           <span style={{ opacity: 0.7 }}>DEV date:</span>
           <input type="date" value={devNow || ""} onChange={(e) => setDevDate(e.target.value)} style={{ fontSize: 12, padding: "2px 4px", borderRadius: 4, border: "1px solid #3a4356", background: "#0f1420", color: "#e8edf4" }} />
           {devNow && <button onClick={() => setDevDate("")} style={{ fontSize: 11, cursor: "pointer", background: "none", border: "none", color: "#8fa3bd", textDecoration: "underline" }}>reset</button>}
+          <button onClick={() => setMobilePreview((v) => !v)} style={{ fontSize: 11, cursor: "pointer", background: mobilePreview ? "#2E5BFF" : "#0f1420", border: "1px solid #3a4356", color: "#e8edf4", borderRadius: 4, padding: "3px 8px" }}>{mobilePreview ? "Exit mobile" : "📱 Mobile"}</button>
+        </div>
+      )}
+      {mobilePreview && inApp && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(15,18,24,0.72)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setMobilePreview(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "#e8edf4", fontSize: 13, fontWeight: 600 }}>Mobile preview {"·"} 390px</span>
+              <button onClick={() => setMobilePreview(false)} style={{ fontSize: 12, cursor: "pointer", background: "#2E5BFF", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px" }}>Close</button>
+            </div>
+            <iframe src={typeof window !== "undefined" ? window.location.href : ""} title="Mobile preview" style={{ width: 390, height: "84vh", border: "10px solid #1a1f2b", borderRadius: 28, background: "#fff", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }} />
+          </div>
         </div>
       )}
       {isDev && stage !== "dashboard" && (
@@ -9464,22 +9477,24 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .fsr-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
   .fsr-main { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin-bottom: 16px; }
   .fsr-num { font-size: 52px; font-weight: 800; letter-spacing: -0.03em; line-height: .9; color: var(--ink); }
-  .fsr-num em { font-style: normal; font-size: 18px; font-weight: 600; color: var(--ink-3); margin-left: 4px; }
+  .fsr-num em { font-style: normal; font-size: 18px; font-weight: 600; color: var(--ink-3); margin-left: 8px; letter-spacing: normal; }
   .fsr-say { flex: 1; min-width: 300px; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
   .fsr-say strong { color: var(--ink); font-weight: 700; }
-  .fsr-goal { display: inline-flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); border-radius: 12px; padding: 9px 13px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+  .fsr-goal { display: inline-block; background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); border-radius: 12px; padding: 9px 13px; font-size: 13px; font-weight: 600; margin-bottom: 20px; line-height: 1.5; }
+  .fsr-goal .ic { vertical-align: -2px; margin-right: 6px; }
   .fsr-goal strong { font-weight: 800; }
   .fsr-goal-brk { display: none; }
   .fsr-pace-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
   .fsr-pace-of { font-size: 13px; color: var(--ink-3); }
   .fsr-pace-of strong { color: var(--ink); font-weight: 700; }
   .fsr-bar-wrap { position: relative; margin-bottom: 28px; }
-  .fsr-bar { position: relative; display: flex; height: 15px; background: var(--surface-3); border-radius: 999px; overflow: hidden; }
+  .fsr-bar { position: relative; display: flex; height: 15px; background: var(--surface-3); border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; }
   .fsr-seg { height: 100%; }
   .fsr-seg-spent { background: var(--accent-solid); }
   .fsr-seg-res { background: color-mix(in srgb, var(--accent-solid) 42%, transparent); }
   .fsr-mark { position: absolute; top: -5px; width: 2px; height: 25px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
-  .fsr-mark-lb { position: absolute; top: 24px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+  .fsr-mark-lb { position: absolute; top: 24px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; text-align: center; }
+  .fsr-caret { display: block; line-height: 1; margin-bottom: 1px; }
   .fsr-legend { display: flex; gap: 18px; flex-wrap: wrap; }
   .fsr-legend > span { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
   .fsr-dot { width: 9px; height: 9px; border-radius: 3px; }
