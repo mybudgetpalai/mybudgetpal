@@ -8149,11 +8149,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .processing-card { max-width: 400px; align-items: center; text-align: center; }
   .breakdown-screen-card { max-width: 640px; }
   .target-card { max-width: 760px; max-height: 88vh; overflow-y: auto; }
-  .budget-table-wrap { overflow-x: auto; margin: 16px 0 6px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); }
+  .budget-table-wrap { overflow-x: auto; margin: 16px 0 6px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
   .budget-table { border-collapse: collapse; width: 100%; }
   .budget-table th, .budget-table td { padding: 5px 12px; text-align: center; }
-  .bt-corner { text-align: left !important; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; background: transparent; border-bottom: 1px solid var(--line); padding: 7px 12px; }
-  .bt-month-head { color: var(--ink-2); font-size: 12px; font-weight: 600; white-space: nowrap; min-width: 66px; border-bottom: 1px solid var(--line); }
+  .bt-corner { text-align: left !important; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; background: var(--surface-2); border-bottom: 1px solid var(--line); padding: 7px 12px; }
+  .bt-month-head { color: var(--ink-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; min-width: 66px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
   .bt-month-current { color: var(--accent); }
   .budget-table tbody tr td { border-bottom: 1px solid var(--line); }
   .bt-cat { text-align: left !important; color: var(--ink); font-size: 13px; font-weight: 500; white-space: nowrap; vertical-align: middle; background: transparent; padding: 5px 16px 5px 12px; }
@@ -8165,7 +8165,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bt-cur { color: var(--ink-3); font-size: 13px; font-weight: 500; }
   .bt-input { width: 6.5ch; background: transparent; border: none; color: var(--ink); font-size: 13px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
   .bt-input::-webkit-outer-spin-button, .bt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .bt-total-row td { border-top: 1px solid var(--line); border-bottom: none !important; padding-top: 8px; background: var(--surface-2); }
+  .bt-total-row td { border-top: 2px solid var(--line-strong); border-bottom: none !important; padding-top: 8px; background: var(--surface-3); }
   .bt-total-cell { color: var(--accent); font-size: 13px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .bt-total-row .bt-cat { color: var(--ink); font-weight: 700; background: transparent; }
 
@@ -8847,7 +8847,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .plan-opt-sub b { color: var(--ink); }
 
   /* ---- long-term plan grid ---- */
-  .ltp-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); }
+  .ltp-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
   .ltp-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
   .ltp-table th, .ltp-table td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .ltp-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
@@ -8882,7 +8882,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-net-row td { font-weight: 800 !important; background: var(--accent-soft) !important; }
   .ltp-bal-row .ltp-sticky, .ltp-net-row .ltp-sticky { background: rgba(34,44,74,0.98); color: var(--ink); font-weight: 800; }
   .ltp-close-row td { border-top: 1px solid var(--line); }
-  .ltp-actual-chip { display: inline-block; margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pos); background: rgba(18,161,80,0.16); border: 1px solid rgba(18,161,80,0.4); border-radius: 5px; padding: 1px 4px; vertical-align: middle; }
+  .ltp-actual-chip { display: block; width: fit-content; margin: 3px auto 0; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pos); background: rgba(18,161,80,0.16); border: 1px solid rgba(18,161,80,0.4); border-radius: 5px; padding: 1px 4px; }
   .ltp-table td.ltp-actual { background: rgba(18,161,80,0.045); }
 
   .targets-actions { display: flex; align-items: center; gap: 12px; }
@@ -9846,6 +9846,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     /* Monthly review: tighter caps so headers align over columns */
     .review-head { font-size: 10px; letter-spacing: 0.01em; }
   }
+  /* ===== Unified table format (Targets · Long-term plan · Monthly review) ===== */
+  .bt-cat .cat-dot, .ltp-table .ltp-sticky .cat-dot, .review-cat .cat-dot { width: 9px; height: 9px; }
+  .ltp-actual-head, .ltp-plan-head { text-align: center; vertical-align: top; }
 </style>
 </body>
 </html>
