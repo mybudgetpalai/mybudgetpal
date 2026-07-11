@@ -7843,7 +7843,7 @@ function App() {
               setBillExcludes(parseBillExcludes(profile)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
       setPlan(planFromProfile(profile));
               setShowSplash(true);
-              setTimeout(() => setShowSplash(false), 2200);
+              setTimeout(() => setShowSplash(false), 2900);
               setStage("dashboard");
             } else {
               setStage("onboarding");
@@ -8059,7 +8059,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   position: fixed; inset: 0; z-index: 12000;
   background: #F5F7FA;
   display: flex; align-items: center; justify-content: center;
-  animation: lsFadeOut 0.5s ease 1.7s forwards;
+  animation: lsFadeOut 0.5s ease 2.35s forwards;
 }
 .lsplash-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .lsplash-icon {
