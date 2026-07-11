@@ -5690,10 +5690,10 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   const expected = s.budget * (day / s.daysInMonth);
   const paceD = Math.round(s.spent - expected);
   const stats = [];
-  if (s.budget > 0) stats.push({ k: "Safe / day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "−" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
-  stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "↓" : "↑") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
-  if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
-  if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: "of income so far", mut: true });
+  if (s.budget > 0) stats.push({ k: "Safe to spend / day", v: formatMoney(s.perDay), s: formatMoney(Math.abs(paceD)) + (paceD <= 0 ? " under your usual pace" : " over your usual pace"), good: paceD <= 0 });
+  stats.push({ k: "Spent this month", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : Math.abs(spentVsAvg) + "% " + (spentVsAvg <= 0 ? "below" : "above") + " your 3-month average", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
+  if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: "across " + acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
+  if (kept !== null) stats.push({ k: "Kept this month", v: kept + "%", s: "of your income so far", mut: true });
   if (!stats.length) return null;
   return (
     <div className="pv-kpis">
@@ -5724,7 +5724,8 @@ function CategoryDeltaCard({ transactions }) {
   const hot = rows.filter((r) => r.pct !== null && r.pct > 0).sort((a, b) => b.pct - a.pct)[0];
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Category {"Δ"} vs 3-mo avg</span>
+      <span className="card-label">Categories vs your average</span>
+      <p className="pv-desc">How this month’s spending compares with your typical last 3 months.</p>
       <div className="pvg">
         {rows.slice(0, 5).map((r) => (
           <React.Fragment key={r.c}>
@@ -5753,6 +5754,7 @@ function MerchantsProCard({ transactions }) {
   return (
     <div className="glass-card dash-card">
       <div className="mpc2-head"><span className="card-label" style={{ margin: 0 }}>Top merchants</span><span className="pv-mut">top 3 = {conc}%</span></div>
+      <p className="pv-desc">Where most of your money went this month.</p>
       <div className="mpc2-list">
         {top.map(([n, v], i) => {
           const pc = Math.round((v / Math.max(total, 1)) * 100);
@@ -5783,7 +5785,8 @@ function BiggestMoversCard({ transactions }) {
   if (!movers.length) return <div className="glass-card dash-card"><span className="card-label">Biggest movers MoM</span><div className="oh-sub" style={{ marginTop: 8 }}>Needs last month's statements to compare.</div></div>;
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Biggest movers MoM <span className="pv-mut">{"·"} pace-adjusted</span></span>
+      <span className="card-label">Biggest changes vs last month</span>
+      <p className="pv-desc">The categories that moved most since last month, adjusted for how far through the month you are.</p>
       <div className="pvg">
         {movers.slice(0, 5).map((m) => (
           <React.Fragment key={m.c}>
@@ -5804,16 +5807,18 @@ function Trend12Card({ transactions }) {
   if (withData.length < 3) return <div className="glass-card dash-card"><span className="card-label">Spend {"·"} trailing 12 mo</span><div className="oh-sub" style={{ marginTop: 8 }}>Upload more history to unlock the long trend.</div></div>;
   const avg = withData.reduce((a, b) => a + b, 0) / withData.length;
   const max = Math.max(...vals, avg, 1);
-  const W = 560, H = 60;
+  const W = 560, H = 64;
   const step = W / Math.max(vals.length - 1, 1);
   const pts = vals.map((v, i) => (i * step) + "," + (H - 6 - (v / max) * (H - 14))).join(" ");
   const avgY = H - 6 - (avg / max) * (H - 14);
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Spend {"·"} trailing 12 mo <span className="pv-mut">{"·"} dashed = avg {formatMoney(Math.round(avg))}</span></span>
-      <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H} preserveAspectRatio="none" style={{ marginTop: 6 }}>
-        <line x1="0" y1={avgY} x2={W} y2={avgY} stroke="var(--line-strong)" strokeWidth="1.5" strokeDasharray="5 5" />
-        <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2.5" />
+      <span className="card-label">Spending {"—"} last 12 months</span>
+      <p className="pv-desc">Your total spend each month. The dashed line is your average ({formatMoney(Math.round(avg))}).</p>
+      <svg viewBox={"0 0 " + W + " " + H} width="100%" height={H + 10} preserveAspectRatio="none" style={{ marginTop: 2, overflow: "visible" }}>
+        <polygon points={pts + " " + W + "," + H + " 0," + H} fill="var(--accent-soft)" />
+        <line x1="0" y1={avgY} x2={W} y2={avgY} stroke="var(--ink-3)" strokeWidth="1" strokeDasharray="4 5" opacity="0.55" vectorEffect="non-scaling-stroke" />
+        <polyline points={pts} fill="none" stroke="var(--accent-solid)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
       </svg>
       <div className="tr12-x"><span>{monthLabelFromKey(keys[0]).slice(0, 3)}</span><span>{monthLabelFromKey(keys[Math.floor(keys.length / 2)]).slice(0, 3)}</span><span>{monthLabelFromKey(keys[keys.length - 1]).slice(0, 3)}</span></div>
     </div>
@@ -5839,7 +5844,8 @@ function NetWorthProCard({ banks, accountData, transactions }) {
   const palette = ["var(--accent-solid)", "#1D9E75", "#B54708", "#7A5AF8"];
   return (
     <div className="glass-card dash-card">
-      <span className="card-label">Net worth {"·"} currency split</span>
+      <span className="card-label">Net worth</span>
+      <p className="pv-desc">Your total balance across all accounts, split by currency.</p>
       <div className="oh-big">{formatMoney(Math.round(nw))}</div>
       <div className="nwp-bar">
         {homeTotals.map((x, i) => <div key={x.c} style={{ width: Math.max(2, (x.home / totalHome) * 100) + "%", background: palette[i % palette.length] }} />)}
@@ -5890,15 +5896,19 @@ function MoneyScoreCard({ transactions, targets, billExcludes }) {
   }
   score = Math.max(5, Math.min(98, Math.round(score)));
   const ringCol = score >= 70 ? "var(--pos)" : score >= 45 ? "var(--warn)" : "var(--neg)";
+  const partLabel = { pace: "Spending pace", savings: "Savings rate", bills: "Bills covered" };
   return (
-    <div className="glass-card dash-card ms2-card">
-      <span className="card-label" style={{ alignSelf: "flex-start" }}>Money score</span>
-      <div className="ms2-ring" style={{ background: "conic-gradient(" + ringCol + " 0% " + score + "%, var(--surface-3) " + score + "% 100%)" }}>
-        <div className="ms2-hole">{score}</div>
-      </div>
-      <div className="ms2-checks">
-        {parts.map((pt, i) => <span key={i}>{pt.t} {pt.ok ? "✓" : "✗"}{i < parts.length - 1 ? " · " : ""}</span>)}
-        {drag && <span> {"·"} <strong>{drag} drag</strong></span>}
+    <div className="glass-card dash-card">
+      <span className="card-label">Money score</span>
+      <p className="pv-desc">A quick 0–100 health check of your month, based on your spending pace, savings rate and bills.</p>
+      <div className="ms2-row">
+        <div className="ms2-ring" style={{ background: "conic-gradient(" + ringCol + " 0% " + score + "%, var(--surface-3) " + score + "% 100%)" }}>
+          <div className="ms2-hole">{score}</div>
+        </div>
+        <div className="ms2-legend">
+          {parts.map((pt, i) => <div className="ms2-leg" key={i}><span>{partLabel[pt.t] || pt.t}</span><span className={pt.ok ? "ms-ok" : "ms-bad"}>{pt.ok ? "✓" : "✗"}</span></div>)}
+          {drag && <div className="ms2-drag">{drag} is pulling it down</div>}
+        </div>
       </div>
     </div>
   );
@@ -9710,10 +9720,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .nwp-leg-r strong { color: var(--ink); font-weight: 700; }
   /* Money score centred ring (power-view-6b) */
   .ms2-card { display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
-  .ms2-ring { position: relative; width: 82px; height: 82px; border-radius: 50%; margin: 14px 0 12px; flex: none; }
+  .ms2-ring { position: relative; width: 82px; height: 82px; border-radius: 50%; margin: 0; flex: none; }
   .ms2-hole { position: absolute; inset: 13px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
   .ms2-checks { font-size: 12px; color: var(--ink-2); }
   .ms2-checks strong { color: var(--ink); font-weight: 700; }
+  .pv-desc { font-size: 12px; color: var(--ink-3); margin: 3px 0 12px; line-height: 1.45; }
+  .ms2-row { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
+  .ms2-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .ms2-leg { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 13px; color: var(--ink-2); }
+  .ms-ok { color: var(--pos); font-weight: 700; }
+  .ms-bad { color: var(--neg); font-weight: 700; }
+  .ms2-drag { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
   @media (max-width: 640px) {
     .bh-hero { grid-template-columns: 1fr; }
     .cvt-row { grid-template-columns: 74px 1fr 74px 60px; }
