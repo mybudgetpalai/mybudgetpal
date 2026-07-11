@@ -6652,12 +6652,12 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         )
       )}
 
-      {layout.big.length > 0 && (!runTour || tourStep >= 2) && (
+      {(v2t || layout.big.length > 0) && (!runTour || tourStep >= 2) && (
         <>
           <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
           <TourTarget active={runTour && tourStep === 2}>
-            <div className={"oh-grid" + (layout.big.length === 3 ? " oh-grid-3" : "")}>
-              {layout.big.map((k) => (
+            <div className={"oh-grid" + (!v2t && layout.big.length === 3 ? " oh-grid-3" : "")}>
+              {(v2t ? ["net_worth", "goal_ring"] : layout.big).map((k) => (
                 <div className="oh-grid-cell" key={k}>{HOME_WIDGETS[k].render(widgetProps)}</div>
               ))}
             </div>
