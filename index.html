@@ -3239,7 +3239,7 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks, isAdmin, onOpenAdmin }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks, dataGap, isAdmin, onOpenAdmin }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const menuRef = React.useRef(null);
@@ -3258,7 +3258,10 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
         <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview">{APP_NAME}</div>
       </div>
       <div className="topbar-right">
-        <button className="btn btn-ghost upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }}>Upload statement</button>
+        <div className="upload-statement-wrap">
+          <button className="btn btn-ghost upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }}>Upload statement</button>
+          {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
+        </div>
         <div className="inbox-wrap">
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="inbox" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
@@ -3609,13 +3612,18 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const monthUncat = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === activeKey).length;
   return (
     <div className="bd-page">
-      <h2 className="page-heading">Spending Breakdown</h2>
       {onOpenCatReview && <UncatBanner count={monthUncat} onSort={onOpenCatReview} label={"in " + monthLabelFromKey(activeKey) + " aren\u2019t categorised"} />}
       <div className="glass-card dash-card bd-box">
+        <div className="summary-head">
+          <span className="card-label">Spending Breakdown</span>
+          <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
+            {monthsWithData.map((k) => (<option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>))}
+          </select>
+        </div>
         <div className="bd-header">
           <div>
-            <span className="card-label">{spentTitle}</span>
             <div className="bd-headline">{formatMoney(total)}</div>
+            <div className="bd-sub">{spentTitle}</div>
             {!isCurrentMonth && totalPct !== null && totalDiff !== 0 && (
               <div className={"bd-total-delta " + (totalDiff > 0 ? "delta-up" : "delta-down")}>
                 {totalDiff > 0 ? "\u25B2" : "\u25BC"}{Math.abs(totalPct)}% &middot; {formatMoney(Math.abs(totalDiff))} {totalDiff > 0 ? "more" : "less"} than {monthLabelFromKey(prevKey)}
@@ -3625,9 +3633,6 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
           </div>
           <div className="bd-hero-right">
             {bdTarget > 0 && <div className="bd-hero-ring"><BudgetRing spent={total} target={bdTarget} /></div>}
-            <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
-              {monthsWithData.map((k) => (<option key={k} value={k}>{monthLabelFromKey(k)} {k.slice(0, 4)}</option>))}
-            </select>
           </div>
         </div>
       </div>
@@ -4237,16 +4242,23 @@ function InsightsCard({ transactions, targets, full, onOpenUpload }) {
   );
 }
 
-function DataGapBanner({ transactions, onOpenUpload }) {
+function dataGapDays(transactions) {
   const dates = (transactions || []).filter((t) => t.date).map((t) => t.date).sort();
   const latest = dates.length ? dates[dates.length - 1] : null;
-  const missingDays = latest ? Math.floor((today().getTime() - new Date(latest + "T00:00:00").getTime()) / 86400000) : null;
-  if (missingDays == null || missingDays < 3) return null;
+  if (!latest) return null;
+  return Math.floor((today().getTime() - new Date(latest + "T00:00:00").getTime()) / 86400000);
+}
+
+function DataGapBanner({ transactions, onOpenUpload }) {
+  const [dismissed, setDismissed] = useState(false);
+  const missingDays = dataGapDays(transactions);
+  if (dismissed || missingDays == null || missingDays < 3) return null;
   return (
     <div className="data-gap">
       <span className="data-gap-ic"><Icon name="calendar" size={16} /></span>
       <span className="data-gap-tx">We’re missing the last <strong>{missingDays} days</strong> of data — upload your latest statement for sharper insights.</span>
       {onOpenUpload && <button className="data-gap-btn" onClick={onOpenUpload}>Upload</button>}
+      <button className="data-gap-x" onClick={() => setDismissed(true)} aria-label="Dismiss" title="Dismiss">×</button>
     </div>
   );
 }
@@ -6606,6 +6618,8 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "sliders", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
   const reviewBaseline = signupMonth || new Date().toISOString().slice(0, 7);
   if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; if (rm >= reviewBaseline) inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
+  const dataGap = dataGapDays(viewTransactions);
+  if (dataGap != null && dataGap >= 3) inboxTasks.push({ id: "datagap", icon: "calendar", title: dataGap + " days of data missing", desc: "Upload your latest statement for sharper insights.", action: () => setUploadOpen(true) });
   if (!feedbackDone && !demoActive) inboxTasks.push({ id: "feedback", icon: "edit", title: "Share your feedback", desc: "Tell us what’s working and what could be better.", action: () => setFeedbackOpen(true) });
 
   return (
@@ -6617,7 +6631,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} dataGap={dataGap} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
@@ -8418,6 +8432,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bd-notarget { color: var(--ink-3); font-weight: 400; font-size: 12px; }
   .bd-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .bd-headline { color: var(--ink); font-size: 30px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
+  .bd-sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
   .bd-month-select { background-color: var(--accent-soft); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238fb4ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; color: var(--ink); border: 1px solid var(--accent); border-radius: 10px; padding: 8px 32px 8px 12px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; transition: background-color 0.15s, border-color 0.15s; }
   .bd-month-select:hover { background-color: var(--accent-soft); border-color: var(--accent); }
@@ -8880,6 +8895,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .targets-table tbody tr:hover td { background: var(--surface-2); }
   .bt-read-num { font-variant-numeric: tabular-nums; color: var(--ink); }
 
+  .upload-statement-wrap { position: relative; display: inline-flex; }
+  .upload-alert { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #EF9F27; color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--card); cursor: default; }
   .inbox-wrap { position: relative; }
   .inbox-btn { position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .inbox-btn:hover { background: var(--surface-3); }
@@ -8916,11 +8933,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ai-ask-chips { display: flex; flex-wrap: wrap; gap: 7px; }
   .ai-ask-chip { font-size: 12px; color: var(--accent-solid); background: var(--card); border: 1px solid var(--accent-soft); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-family: inherit; }
   .ai-ask-chip:hover { border-color: var(--accent); }
-  .data-gap { display: flex; align-items: center; gap: 10px; background: color-mix(in srgb, #EF9F27 15%, transparent); border: 1px solid #EF9F27; border-radius: 12px; padding: 11px 14px; margin: 0 4px; }
+  .data-gap { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid #EF9F27; border-radius: 16px; padding: 13px 16px; margin: 10px 4px 14px; box-shadow: var(--shadow-card); }
   .data-gap-ic { color: #B26A00; display: flex; flex-shrink: 0; }
   .data-gap-tx { font-size: 13px; color: var(--ink); flex: 1; }
   .data-gap-tx strong { font-weight: 700; }
   .data-gap-btn { background: #B26A00; color: #fff; border: none; border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .data-gap-x { background: none; border: none; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; font-family: inherit; }
+  .data-gap-x:hover { color: var(--ink); }
   .ai-ask-page { padding: 26px 24px 22px; }
   .ai-ask-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .ai-ask-page .ai-ask-ico { width: 46px; height: 46px; border-radius: 13px; }
@@ -9144,7 +9163,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .review-total .review-cat { font-weight: 700; }
   .rv-over { color: var(--neg); font-weight: 600; }
   .rv-under { color: var(--pos); font-weight: 600; }
-  .plan-headline { display: flex; flex-direction: column; margin: 12px 0 8px; }
+  .plan-headline { display: flex; flex-direction: column; margin: 0 0 8px; }
   .plan-big { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; }
   .plan-sub { color: var(--ink-2); font-size: 13px; }
   .plan-verdict { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 12px; }
