@@ -3004,7 +3004,7 @@ const PERSONA_TEMPLATES = {
   power_view: {
     name: "Power View",
     blurb: "Maximum signal — deltas vs your averages, merchant concentration, long trends and the multi-currency picture.",
-    layout: { month: ["breakdown_mini", "merchants_pro", "biggest_movers", "net_saved"], big: ["net_worth_pro", "money_score", "goal_ring"] },
+    layout: { month: ["breakdown_mini", "merchants_pro", "biggest_movers", "net_saved"], big: ["net_worth", "money_score", "goal_ring"] },
   },
 };
 
@@ -5045,6 +5045,13 @@ function NetWorthCard({ banks, accountData, transactions }) {
   const bankRows = (accountData && accountData.bankRows) || [];
   const names = Array.from(new Set([...(banks || []).filter(Boolean), ...((transactions || []).map((t) => t.bank).filter(Boolean))]));
   const acctRows = names.map((b) => ({ b, bal: computeBankBalance(b, statements, transactions || [], bankRows.find((r) => r.bank_name === b)) })).filter((r) => r.bal !== null);
+  const byCur = {};
+  acctRows.forEach((r) => { const cur = FX.bankCurrency[r.b] || "GBP"; byCur[cur] = (byCur[cur] || 0) + r.bal; });
+  const curs = Object.keys(byCur);
+  const multiCur = curs.length > 1;
+  const homeTotals = curs.map((c) => ({ c, native: byCur[c], home: c === FX.home ? byCur[c] : fxConvert(byCur[c], c, nowMonth()) }));
+  const totalHome = homeTotals.reduce((s, x) => s + x.home, 0) || 1;
+  const curPalette = ["var(--accent-solid)", "#1D9E75", "#B54708", "#7A5AF8"];
   return (
     <div className="glass-card dash-card nw-card2">
       <span className="card-label">Net worth</span>
@@ -5058,6 +5065,21 @@ function NetWorthCard({ banks, accountData, transactions }) {
             </div>
           ))}
         </div>
+      )}
+      {multiCur && (
+        <React.Fragment>
+          <div className="nwp-bar">
+            {homeTotals.map((x, i) => <div key={x.c} style={{ width: Math.max(2, (x.home / totalHome) * 100) + "%", background: curPalette[i % curPalette.length] }} />)}
+          </div>
+          <div className="nwp-legend">
+            {homeTotals.map((x, i) => (
+              <div className="nwp-leg" key={x.c}>
+                <span className="nwp-leg-l"><span className="seg-dot" style={{ background: curPalette[i % curPalette.length] }} /> {x.c}</span>
+                <span className="nwp-leg-r"><strong>{(CURRENCY_SYMBOLS[x.c] || "")}{Math.round(x.native).toLocaleString()}</strong>{x.c !== FX.home ? " ≈ " + formatMoney(Math.round(x.home)) : ""} {"·"} {Math.round((x.home / totalHome) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </React.Fragment>
       )}
     </div>
   );
