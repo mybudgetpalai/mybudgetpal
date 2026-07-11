@@ -3243,6 +3243,13 @@ function ExtraInfoBanner({ onComplete, onDismiss }) {
 function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks, isAdmin, onOpenAdmin }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const menuRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
+  }, [menuOpen]);
   const taskList = tasks || [];
   const initial = (name[0] || "?").toUpperCase();
   return (
@@ -3271,7 +3278,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
             </div>
           )}
         </div>
-        <div className="avatar-wrap">
+        <div className="avatar-wrap" ref={menuRef}>
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
         {menuOpen && (
@@ -3600,6 +3607,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const monthUncat = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === activeKey).length;
   return (
     <div className="bd-page">
+      <h2 className="page-heading">Spending Breakdown</h2>
       {onOpenCatReview && <UncatBanner count={monthUncat} onSort={onOpenCatReview} label={"in " + monthLabelFromKey(activeKey) + " aren\u2019t categorised"} />}
       <div className="glass-card dash-card bd-box">
         <div className="bd-header">
@@ -3915,6 +3923,7 @@ function TrendsCard({ transactions, compact }) {
   return (
     <div className="trends-wrap">
       {!compact && (<>
+      <h2 className="page-heading">Trends</h2>
       <div className="glass-card dash-card">
         <span className="card-label">Net inflow / outflow</span>
         <div className="trend-chart">
@@ -4201,6 +4210,8 @@ function InsightsCard({ transactions, targets, full }) {
   const built = buildInsights(transactions || [], targets);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
   return (
+    <React.Fragment>
+      {full && <h2 className="page-heading">Insights</h2>}
     <div className="glass-card dash-card">
       {full && <InsightsAsk transactions={transactions} />}
       <span className="card-label">Insights</span>
@@ -4213,6 +4224,7 @@ function InsightsCard({ transactions, targets, full }) {
         ))}
       </div>
     </div>
+    </React.Fragment>
   );
 }
 
@@ -5448,7 +5460,7 @@ function BudgetHawkHero({ targets, transactions, rollovers, billExcludes }) {
   return (
     <div className="safe-hero bh2-hero">
       <div className="bh2-left">
-        <span className="fsr-label">Safe to spend</span>
+        <span className="fsr-label">Safe to spend · {currentMonthName()}</span>
         <div className="bh2-num">{formatMoney(s.perDay)} <em>/day</em></div>
         <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace · " + formatMoney(spare) + " to spare" : "Over pace · " + formatMoney(spare) + " over"}</span>
       </div>
@@ -5648,6 +5660,7 @@ function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, 
   if (s.budget > 0) stats.push({ k: "Safe / day", v: formatMoney(s.perDay), s: (paceD <= 0 ? "−" : "+") + formatMoney(Math.abs(paceD)) + " vs pace", good: paceD <= 0 });
   stats.push({ k: "Spent MTD", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : (spentVsAvg <= 0 ? "↓" : "↑") + Math.abs(spentVsAvg) + "% vs 3-mo avg", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
   if (nw !== null) stats.push({ k: "Net worth", v: formatMoney(Math.round(nw)), s: acctCount + " account" + (acctCount !== 1 ? "s" : ""), mut: true });
+  if (kept !== null) stats.push({ k: "Kept", v: kept + "%", s: "of income so far", mut: true });
   if (!stats.length) return null;
   return (
     <div className="pv-kpis">
@@ -6188,7 +6201,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
         {!editing && (
           <div className="targets-actions">
             {onEditPlan && <button className="glass-btn ghost targets-rebuild-btn" onClick={onEditPlan}>{"\u21bb"} Rebuild from a goal</button>}
-            <button className="link-btn inline" onClick={() => setEditing(true)}>Adjust numbers</button>
+            <button className="glass-btn ghost targets-rebuild-btn" onClick={() => setEditing(true)}>Adjust numbers</button>
           </div>
         )}
       </div>
@@ -7857,7 +7870,7 @@ function App() {
       {isAdmin && inApp && <AdminBar onOpen={() => setStage("admin")} />}
       {isDev && inApp && <TestingBar personaKey={personaKey} onSetPersona={handleSetPersona} />}
       {(isDev || DEV_FLAG) && inApp && (
-        <div style={{ position: "fixed", bottom: 12, left: 12, zIndex: 9999, background: "#1a1f2b", color: "#e8edf4", padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", gap: 8, alignItems: "center", boxShadow: "0 4px 16px rgba(0,0,0,.3)" }}>
+        <div style={{ position: "fixed", bottom: 68, left: 12, zIndex: 9999, background: "#1a1f2b", color: "#e8edf4", padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", gap: 8, alignItems: "center", boxShadow: "0 4px 16px rgba(0,0,0,.3)" }}>
           <span style={{ opacity: 0.7 }}>DEV date:</span>
           <input type="date" value={devNow || ""} onChange={(e) => setDevDate(e.target.value)} style={{ fontSize: 12, padding: "2px 4px", borderRadius: 4, border: "1px solid #3a4356", background: "#0f1420", color: "#e8edf4" }} />
           {devNow && <button onClick={() => setDevDate("")} style={{ fontSize: 11, cursor: "pointer", background: "none", border: "none", color: "#8fa3bd", textDecoration: "underline" }}>reset</button>}
@@ -8279,8 +8292,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .category-fill { height: 100%; border-radius: 3px; }
 
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
+  .page-heading { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin: 0 4px 14px; }
   .bd-box { max-width: none; }
-  .bd-box-title { color: var(--ink); font-size: 14px; font-weight: 600; display: block; margin-bottom: 4px; }
+  .bd-box-title { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
   .bd-row { display: flex; gap: 16px; align-items: stretch; }
   .bd-row { flex-wrap: wrap; }
   .bd-box-where { flex: 2 1 340px; min-width: 300px; }
@@ -8717,7 +8731,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ltp-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
   .ltp-table th, .ltp-table td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .ltp-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
-  .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--ink); min-width: 140px; z-index: 3; }
+  .ltp-table .ltp-sticky { position: sticky; left: 0; background: var(--card); text-align: left; font-weight: 600; color: var(--ink); min-width: 140px; z-index: 3; border-right: 1px solid var(--line-strong); box-shadow: 6px 0 8px -4px rgba(0,0,0,0.28); }
   .ltp-table .ltp-sticky .cat-dot { margin-right: 7px; }
   .ltp-actual-head { color: var(--ink-2) !important; }
   .ltp-plan-head { color: var(--accent-solid) !important; }
@@ -8753,6 +8767,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
   .targets-actions { display: flex; align-items: center; gap: 12px; }
   .targets-rebuild-btn { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
+  @media (max-width: 640px) { .summary-head { flex-direction: column; align-items: flex-start; gap: 10px; } .targets-actions { flex-wrap: wrap; } }
   .targets-table th.bt-month-head { text-align: right; }
   .targets-table td.bt-cell { text-align: right; }
   .budget-table td.bt-cell { text-align: right; }
@@ -9083,7 +9098,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     /* Header: keep logo + buttons from colliding / wrapping */
     .topbar { gap: 10px; }
     .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
-    .topbar-left .brand { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar-left .brand { min-width: 0; white-space: nowrap; flex-shrink: 0; }
     .topbar-right { flex-shrink: 0; }
     .upload-statement-btn { white-space: nowrap; }
 
@@ -9647,8 +9662,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catman-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .catman-actions .glass-btn:disabled { opacity: 0.5; cursor: default; }
 
-  .menu-backdrop { position: fixed; inset: 0; z-index: 90; }
+  .menu-backdrop { position: fixed; inset: 0; z-index: 90; cursor: pointer; }
   .avatar-menu { z-index: 100; }
+  @media (max-width: 400px) { .topbar-left .brand { display: none; } }
   @media (max-width: 640px) {
     .bd-header { flex-direction: column; align-items: stretch; }
     .bd-hero-right { justify-content: flex-start; margin-top: 8px; }
