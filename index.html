@@ -763,7 +763,6 @@ function parseCategoryConfig(profile) {
   return { renames, custom };
 }
 function categorizeByRules(desc, amount) {
-  if (amount > 0) return "Income";
   const ck = customKeywordCategory(desc);
   if (ck) return ck;
   const d = " " + String(desc || "").toLowerCase() + " ";
@@ -774,7 +773,7 @@ function categorizeByRules(desc, amount) {
   for (const cat of TX_CATEGORIES) {
     if (CATEGORY_RULES[cat].some((k) => d.includes(k))) return cat;
   }
-  return "Uncategorized";
+  return amount > 0 ? "Income" : "Uncategorized";
 }
 
 const MONTHS_SHORT = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -819,16 +818,16 @@ function lastNMonthKeys(endKey, n) {
   for (let i = 0; i < n; i++) { keys.unshift(y + "-" + pad2(m)); m--; if (m === 0) { m = 12; y--; } }
   return keys;
 }
-function spendForMonth(txs, k) { return txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k).reduce((s, t) => s + Math.abs(t.amount), 0); }
-function incomeForMonth(txs, k) { return txs.filter((t) => t.amount > 0 && t.date.slice(0, 7) === k).reduce((s, t) => s + t.amount, 0); }
+function spendForMonth(txs, k) { return txs.filter((t) => t.date.slice(0, 7) === k && t.category !== "Income").reduce((s, t) => s - t.amount, 0); }
+function incomeForMonth(txs, k) { return txs.filter((t) => t.date.slice(0, 7) === k && t.category === "Income").reduce((s, t) => s + t.amount, 0); }
 function spendByCategoryForMonth(txs, k) {
   const o = {};
-  txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k).forEach((t) => { o[t.category] = (o[t.category] || 0) + Math.abs(t.amount); });
+  txs.filter((t) => t.date.slice(0, 7) === k && t.category !== "Income").forEach((t) => { o[t.category] = (o[t.category] || 0) - t.amount; });
   return o;
 }
 function spendByCategoryForMonthUpToDay(txs, k, day) {
   const o = {};
-  txs.filter((t) => t.amount < 0 && t.date.slice(0, 7) === k && (+t.date.slice(8, 10)) <= day).forEach((t) => { o[t.category] = (o[t.category] || 0) + Math.abs(t.amount); });
+  txs.filter((t) => t.date.slice(0, 7) === k && t.category !== "Income" && (+t.date.slice(8, 10)) <= day).forEach((t) => { o[t.category] = (o[t.category] || 0) - t.amount; });
   return o;
 }
 function catColor(c) { return customCatColor(c) || CATEGORY_COLORS[c] || "#9aa4b8"; }
@@ -8134,9 +8133,15 @@ function App() {
   const rescanCategories = async () => {
     const seen = {}; let n = 0;
     for (const t of customTransactions) {
-      if (t.amount >= 0 || (t.name in seen)) continue;
+      if (t.name in seen) continue;
       seen[t.name] = true;
-      const target = customKeywordCategory(t.name) || (t.category === "Uncategorized" ? categorizeByRules(t.name, t.amount) : null);
+      let target = null;
+      if (t.amount > 0) {
+        const guess = customKeywordCategory(t.name) || categorizeByRules(t.name, -1);
+        if (guess && guess !== "Uncategorized") target = guess;
+      } else {
+        target = customKeywordCategory(t.name) || (t.category === "Uncategorized" ? categorizeByRules(t.name, t.amount) : null);
+      }
       if (target && target !== t.category && target !== "Uncategorized") { await recategorizeDescription(t.name, target, { silent: true }); n++; }
     }
     pushToast(n ? (n + " merchant" + (n !== 1 ? "s" : "") + " re-sorted into your categories") : "Nothing new to re-sort", n ? "success" : "info");
