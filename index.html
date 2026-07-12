@@ -3935,8 +3935,9 @@ function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
 function TrendsCard({ transactions, compact }) {
   const txs = transactions || [];
   const [cat, setCat] = useState(TX_CATEGORIES[0]);
-  let keys = lastNMonthKeys(latestMonthKey(txs), 6);
+  let keys = [...new Set(txs.filter((t) => t.date).map((t) => t.date.slice(0, 7)))].sort();
   keys = keys.filter((k) => incomeForMonth(txs, k) > 0 || spendForMonth(txs, k) > 0);
+  if (keys.length > 12) keys = keys.slice(-12);
   if (!keys.length) keys = lastNMonthKeys(latestMonthKey(txs), 1);
   const months = keys.map(monthLabelFromKey);
   const income = keys.map((k) => Math.round(incomeForMonth(txs, k)));
@@ -3971,7 +3972,7 @@ function TrendsCard({ transactions, compact }) {
       </div>
 
       <div className="glass-card dash-card">
-        <span className="card-label">Net spending, last 6 months</span>
+        <span className="card-label">Net spending by month</span>
         <div className="trend-chart">
           {months.map((m, i) => (
             <div className="trend-bar-col" key={"s" + m + i}>
