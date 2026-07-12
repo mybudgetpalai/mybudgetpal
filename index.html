@@ -835,7 +835,6 @@ function spendByCategoryForMonthUpToDay(txs, k, day) {
 function catColor(c) { return customCatColor(c) || CATEGORY_COLORS[c] || "#9aa4b8"; }
 function displayCat(c) { if (c === "Uncategorized") return "Needs review"; return (CAT_CONFIG.renames && CAT_CONFIG.renames[c]) || c; }
 function addMonths(key, n) { let y = +key.slice(0, 4), m = +key.slice(5, 7) + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y + "-" + pad2(m); }
-function isMidMonth() { const d = today(); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); return d.getDate() < last; }
 function avgSpendByCategory(transactions) {
   const out = {};
   const has = transactions && transactions.length > 0;
@@ -2201,7 +2200,6 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
     setFilesByBank((prev) => ({ ...prev, [bank]: prev[bank].filter((f) => f.id !== id) }));
     pushToast("File removed", "info");
   };
-  const setBalance = (bank, field, value) => setBalanceByBank((prev) => ({ ...prev, [bank]: { ...prev[bank], [field]: value } }));
 
   const allHaveAtLeastOne = banks.every((b) => filesByBank[b].length > 0);
 
@@ -3237,17 +3235,6 @@ function ExtraQuestionsScreen({ onDone, onSkip, pushToast, userId }) {
   );
 }
 
-function ExtraInfoBanner({ onComplete, onDismiss }) {
-  return (
-    <div className="extra-banner">
-      <span>Complete a few additional questions to personalize your experience</span>
-      <div className="extra-banner-actions">
-        <button className="extra-banner-btn" onClick={onComplete}>Complete</button>
-        <button className="extra-banner-x" onClick={onDismiss} aria-label="Dismiss">×</button>
-      </div>
-    </div>
-  );
-}
 
 /* ---------------- Dashboard ---------------- */
 
@@ -3909,29 +3896,6 @@ function GoalRow({ goal, onUpdate, onDelete }) {
   );
 }
 
-function GoalsCard({ goals, onAdd, onUpdate, onDelete }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const list = goals || [];
-  return (
-    <div className="glass-card dash-card">
-      <div className="summary-head">
-        <span className="card-label">Savings goals</span>
-        <button className="extra-banner-btn" onClick={() => setModalOpen(true)}>+ New goal</button>
-      </div>
-      {list.length === 0 ? (
-        <div className="empty-state" style={{ background: "none", border: "none", boxShadow: "none", padding: "26px 0 10px" }}>
-          <div className="empty-icon">◇</div>
-          <p className="empty-text">No goals yet — add your first savings goal and track your progress toward it.</p>
-        </div>
-      ) : (
-        <div className="goal-list">
-          {list.map((g) => <GoalRow key={g.id} goal={g} onUpdate={onUpdate} onDelete={onDelete} />)}
-        </div>
-      )}
-      {modalOpen && <GoalModal onClose={() => setModalOpen(false)} onSave={async (g) => { await onAdd(g); setModalOpen(false); }} />}
-    </div>
-  );
-}
 function TrendsCard({ transactions, compact }) {
   const txs = transactions || [];
   const [cat, setCat] = useState(TX_CATEGORIES[0]);
@@ -4948,16 +4912,6 @@ function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, 
   );
 }
 
-function OverviewGrid({ slots, onChangeSlots, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers }) {
-  const updateSlot = (i, key) => onChangeSlots(slots.map((s, idx) => (idx === i ? key : s)));
-  return (
-    <div className="overview-grid">
-      {slots.map((key, i) => (
-        <OverviewSlot key={i} index={i} runTour={runTour} tourStep={tourStep} widgetKey={key} onChange={(k) => updateSlot(i, k)} targets={targets} banks={banks} hasData={hasData} transactions={transactions} goals={goals} goalsApi={goalsApi} accountData={accountData} billExcludes={billExcludes} rollovers={rollovers} />
-      ))}
-    </div>
-  );
-}
 
 const OVERVIEW_TOUR = [
   { title: "Safe to spend", body: "This is roughly what you can spend each day for the rest of the month and still stay on budget." },
@@ -6318,9 +6272,6 @@ function GoalGetterHeroV2(props) {
   );
 }
 
-function compositionDepth(persona) {
-  return (persona === "fresh_start" || persona === "goal_getter") ? "compact" : "standard";
-}
 
 function CompositionCardV2({ transactions, depth }) {
   const k = latestMonthKey(transactions || []);
@@ -6539,7 +6490,6 @@ function TopMerchantsV2({ transactions, depth }) {
   const top = all.slice(0, 3);
   const conc = Math.round((top.reduce((s, r) => s + r.amt, 0) / Math.max(total, 1)) * 100);
   const maxAmt = top[0].amt || 1;
-  const pctOfTotal = (v) => Math.round((v / Math.max(total, 1)) * 100);
 
   let foot = null;
   if (depth === "plain") foot = <span>{top[0].disp} was your biggest this month, at {formatMoney(Math.round(top[0].amt))}.</span>;
@@ -7204,7 +7154,6 @@ function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, use
     } catch (err) { pushToast("Couldn't save rate", "error"); }
   };
 
-  const startEditTargets = () => { setTargetDrafts(targets || {}); setEditingTargets(true); };
   const cancelEditTargets = () => { setTargetDrafts(targets || {}); setEditingTargets(false); };
   const saveTargets = async () => {
     setSavingTargets(true);
@@ -7429,15 +7378,6 @@ function TestingBar({ personaKey, onSetPersona }) {
   );
 }
 
-function SetupBar({ label, text }) {
-  return (
-    <div className="admin-bar" style={{ background: "#2E5BFF" }}>
-      <span className="admin-bar-dot" />
-      <span className="admin-bar-label">{label}</span>
-      <span className="admin-bar-sub">{text}</span>
-    </div>
-  );
-}
 
 function NotificationBanner({ notes, onDismiss }) {
   if (!notes || !notes.length) return null;
@@ -8584,8 +8524,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     --shadow-pop: 0 12px 32px rgba(16,24,40,0.16);
     /* spacing + radius scale (audit P1-1 / P1-2) */
     --card-pad: 20px; --card-pad-sm: 16px; --grid-gap: 24px;
-    --radius-card: 16px; --radius-control: 12px; --radius-pill: 999px;
-  }
+    --radius-card: 16px; --radius-control: 12px;  }
   .app-shell[data-theme="dark"] .demo-reminder { background: #2A2110; border-bottom-color: #4A3A15; }
   .app-shell[data-theme="dark"] .demo-reminder-text, .app-shell[data-theme="dark"] .demo-reminder-text strong { color: #F5C97B; }
   .app-shell[data-theme="dark"] {
@@ -8671,8 +8610,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .rollover-note { margin-top: 6px; }
   .rollover-note.rn-up { color: var(--pos); }
   .rollover-note.rn-down { color: #ffb84f; }
-  .uncat-pill { margin-left: 12px; vertical-align: middle; background: rgba(143,180,255,0.14); border: 1px solid rgba(143,180,255,0.35); color: var(--accent); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s; }
-  .uncat-pill:hover { background: rgba(143,180,255,0.24); }
   .catrev-card { max-width: 520px; width: 100%; max-height: 82vh; display: flex; flex-direction: column; }
   .catrev-sub { color: var(--ink-2); font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
   .catrev-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
@@ -8852,16 +8789,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .closing-row td { color: var(--ink); font-weight: 700; border-top: 1px solid var(--line); }
   .net-positive { color: var(--pos); }
   .net-negative { color: var(--neg); }
-
-  /* targets */
-  .target-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-  .target-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
-  .target-label { color: var(--ink); font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
   .target-input-wrap { display: flex; align-items: center; gap: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
   .target-currency { color: var(--ink-3); font-size: 13px; }
   .target-input { width: 70px; background: none; border: none; color: var(--ink); font-size: 14px; font-family: inherit; outline: none; text-align: right; }
-  .target-total-row { display: flex; justify-content: space-between; margin-top: 16px; padding: 12px 14px; background: var(--accent-soft); border-radius: 14px; color: var(--ink); font-size: 14px; font-weight: 600; }
-  .target-total-amount { color: var(--accent); }
 
   /* dashboard */
   .app-shell { min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
@@ -8922,14 +8852,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pace-note { margin-top: 6px; font-weight: 500; }
   .pace-note-over { color: var(--neg); }
   .pace-note-under { color: var(--pos); }
-  .category-pace { font-size: 11px; margin-top: 5px; }
   .summary-amounts { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 14px; flex-wrap: wrap; }
   .summary-spent { color: var(--ink); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
   .summary-target { color: var(--ink-3); font-size: 13px; }
   .progress-track { position: relative; height: 8px; border-radius: 4px; background: var(--surface-3); overflow: visible; margin-top: 18px; }
   .progress-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.4s ease; }
   .goal-fill { background: var(--accent); }
-  .progress-marker { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--surface-3); }
   .summary-note { color: var(--ink-3); font-size: 12px; margin: 10px 0 0; text-align: center; }
   .tx-list { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
   .tx-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px; border-bottom: 1px solid var(--line); }
@@ -9111,7 +9039,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .mapping-info { display: flex; flex-direction: column; overflow: hidden; }
   .mapping-name { color: var(--ink); font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
   .mapping-meta { color: var(--ink-3); font-size: 12px; }
-  .mapping-select { flex-shrink: 0; font-size: 13px; padding: 6px 8px; }
 
   /* ---------------- mobile responsiveness ---------------- */
   @media (max-width: 640px) {
@@ -9136,9 +9063,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .upload-card, .target-card { max-width: 100%; }
     .breakdown-screen-card { max-width: 100%; padding: 22px 14px; }
     .month-table th, .month-table td { padding: 8px 8px; font-size: 12px; }
-
-    .target-row { flex-wrap: wrap; gap: 8px; }
-    .target-total-row { font-size: 13px; }
 
     .balance-row { flex-direction: column; gap: 12px; }
 
@@ -9196,9 +9120,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .insight-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
   .insight-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; font-size: 13px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
   .insight-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-  .insight-warning .insight-icon { background: rgba(217,45,32,0.2); color: var(--neg); }
-  .insight-positive .insight-icon { background: rgba(18,161,80,0.2); color: var(--pos); }
-  .insight-info .insight-icon { background: var(--accent-soft); color: var(--accent); }
 
   /* ---------------- landing page ---------------- */
   .landing-page { background: var(--bg); color: var(--ink); position: relative; min-height: 100vh; overflow-x: hidden; }
@@ -9322,10 +9243,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
 
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  .step-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
   .step-num { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent); font-weight: 700; font-size: 13px; margin-bottom: 12px; color: var(--on-accent); }
-  .step-card h3 { font-size: 14px; margin: 0 0 6px; color: var(--ink); }
-  .step-card p { font-size: 13px; color: var(--ink-2); margin: 0; line-height: 1.5; }
 
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .feature-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
@@ -9368,10 +9286,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
-  /* button loading spinner */
-  .rollover-banner { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 18px; font-size: 14px; color: #dfe8ff; background: linear-gradient(90deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--accent); }
-  .rollover-banner strong { color: var(--ink); }
   .modal-backdrop { position: fixed; inset: 0; background: rgba(6,10,18,0.72); display: flex; align-items: center; justify-content: center; padding: 18px; z-index: 200; animation: mbFade .2s ease; }
   @keyframes mbFade { from { opacity: 0; } to { opacity: 1; } }
   .review-modal { position: relative; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; padding: 24px 22px; animation: mbPop .25s cubic-bezier(0.34,1.4,0.64,1); }
@@ -9462,17 +9376,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .inbox-item-text { display: flex; flex-direction: column; gap: 2px; }
   .inbox-item-title { color: var(--ink); font-size: 14px; font-weight: 600; }
   .inbox-item-desc { color: var(--ink-2); font-size: 12px; line-height: 1.35; }
-
-  .insights-ask { border: 1px solid rgba(143,180,255,0.28); background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; }
   .ask-row { display: flex; gap: 8px; margin-top: 10px; }
   .ask-input { flex: 1; min-width: 0; }
   .ask-btn { flex: 0 0 auto; min-width: 0; padding: 10px 20px; font-size: 14px; border-radius: 12px; }
-  .ask-examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .ask-chip { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 16px; cursor: pointer; }
   .ask-chip:hover { background: var(--surface-3); color: var(--ink); }
   .ask-answer { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--ink); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
   .ai-ask { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 16px; padding: 18px 18px 16px; margin: 0 4px; }
-  .ai-ask-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
   .ai-ask-ico { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-solid); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ai-ask-title { font-size: 24px; font-weight: 800; color: var(--ink); margin: 0 0 6px; letter-spacing: -0.02em; }
   .ai-ask-badge { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent-solid); background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 9px; letter-spacing: 0.05em; }
@@ -9601,9 +9511,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
     animation: toastIn 0.25s ease;
   }
-  .toast-success { border-color: rgba(18,161,80,0.4); }
-  .toast-error { border-color: rgba(217,45,32,0.4); }
-  .toast-info { border-color: var(--line); }
   @keyframes toastIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -9624,12 +9531,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .confirm-tx-amount { color: var(--ink-2); font-size: 14px; font-weight: 600; }
   .confirm-select { flex: 1; background: none; border: none; color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 600; outline: none; cursor: pointer; padding: 8px 6px; }
   .confirm-select option { background: var(--card); color: var(--ink); }
-
-  /* ---- month tabs (budgets) ---- */
-  .month-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-top: 4px; }
   .month-tab { flex: 0 0 auto; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
-  .month-tab-active { background: var(--accent); color: var(--on-accent); border-color: var(--line-strong); }
-  .month-active-label { color: var(--ink-3); font-size: 12px; margin: 8px 0 2px; }
   .apply-all-btn { align-self: flex-start; margin: 18px 0 6px; padding: 4px 0; text-align: left; }
 
   /* ---- empty widget slot ---- */
@@ -9676,12 +9578,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .safe-hero-overtext { color: var(--neg); font-weight: 600; }
   .safe-hero-roll { font-size: 12px; color: var(--ink-3); }
   .safe-hero-track { height: 8px; background: var(--surface-2); border-radius: 5px; margin-top: 14px; overflow: hidden; }
-  .safe-hero-fill { height: 100%; background: var(--accent); border-radius: 5px; transition: width .4s ease; }
   @media (max-width: 560px) { .safe-hero-side { align-items: flex-start; text-align: left; } .safe-hero-num { font-size: 34px; } }
   .trends-wrap { display: flex; flex-direction: column; gap: 16px; }
   .trend-cat-select { width: auto; min-width: 130px; }
-  .side-customise-btn { margin-top: 8px; width: 100%; text-align: left; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
-  .side-customise-btn:hover { background: var(--surface-3); }
   .customise-list { display: flex; flex-direction: column; gap: 8px; }
   .customise-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 14px; font-weight: 600; cursor: pointer; }
   .customise-row:disabled { opacity: 0.6; cursor: default; }
@@ -9690,8 +9589,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .bill-right { display: flex; align-items: center; gap: 10px; }
   .bill-remove { background: rgba(217,45,32,0.14); border: 1px solid rgba(217,45,32,0.4); color: var(--neg); font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
   .bill-remove:hover { background: rgba(217,45,32,0.25); }
-  .bill-excluded { margin-top: 6px; opacity: 0.85; }
-  .insights-merchants { margin-top: 4px; }
 
   /* ---- added: monthly review & long-term plan ---- */
   .review-wrap { display: flex; flex-direction: column; gap: 16px; }
@@ -9723,13 +9620,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .plan-verdict { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 12px; }
   .plan-verdict.rt-good { background: rgba(18,161,80,0.12); color: var(--pos); }
   .plan-verdict.rt-bad { background: rgba(217,45,32,0.12); color: var(--neg); }
-  .plan-grid { grid-template-columns: 1.4fr 1fr 1fr 1fr 1.1fr; }
-  .plan-month { display: flex; flex-direction: column; }
-  .plan-tag { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
-  .plan-forecast-row .plan-tag { color: var(--accent); }
   .plan-bar-actual { background: var(--pos) !important; }
   .plan-bar-forecast { background: var(--accent) !important; }
-  .plan-table { max-height: 340px; overflow-y: auto; }
   @media (max-width: 560px) { .review-cards { grid-template-columns: 1fr; } }
 
 /* ---- step 4: product-forward hero ---- */
@@ -9916,8 +9808,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-rule { flex: 1; height: 1px; background: var(--line); }
   .oh-pill { display: flex; align-items: center; gap: 12px; background: var(--accent-soft); border-radius: 999px; padding: 11px 18px; margin-top: 14px; }
   .oh-pill-icon { color: var(--accent); display: flex; flex-shrink: 0; }
-  .oh-pill-warning .oh-pill-icon { color: var(--warn); }
-  .oh-pill-positive .oh-pill-icon { color: var(--pos); }
   .oh-pill-text { font-size: 14px; color: var(--ink); line-height: 1.45; }
   .oh-needs { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-card); }
   .oh-needs-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
@@ -9946,13 +9836,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-track-cap { font-size: 12px; color: var(--ink-3); margin-top: 7px; }
   .oh-tour-active { position: relative; z-index: 2; box-shadow: 0 0 0 3px var(--accent-shadow); border-radius: 16px; transition: box-shadow 0.2s; scroll-margin-top: 120px; scroll-margin-bottom: 220px; }
   @media (max-width: 640px) { .oh-grid { grid-template-columns: 1fr; } }
-  .oh-mb { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
-  .oh-mb-ring { flex-shrink: 0; }
-  .oh-mb-legend { flex: 1; min-width: 0; }
-  .oh-mb-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; color: var(--ink-2); }
-  .oh-mb-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
-  .oh-mb-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .oh-mb-pct { color: var(--ink-3); font-weight: 600; min-width: 38px; text-align: right; }
   .oh-sec-ctx { text-transform: uppercase; letter-spacing: .06em; }
   .mb2 { display: flex; align-items: center; gap: 22px; margin-top: 12px; }
   .mb2-donut { position: relative; width: 108px; height: 108px; border-radius: 50%; flex: none; }
@@ -9983,18 +9866,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .nw2-acct-l { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-2); }
   .nw2-acct strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
   .nw2-av { width: 22px; height: 22px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-solid); font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .oh-mb-amt { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
   .oh-cell-full { grid-column: 1 / -1; }
-  .pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 14px; align-items: start; }
-  .pf-left { min-width: 0; }
-  .pf-right { min-width: 0; }
-  @media (max-width: 640px) { .pf-grid { grid-template-columns: 1fr; gap: 18px; } }
+  
   .nw-card { display: flex; flex-direction: column; }
-  .nw-big { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.02; color: var(--ink); margin: 10px 0 16px; }
-  .nw-accts { margin-top: auto; }
-  .nw-acct { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
-  .nw-acct span { color: var(--ink-3); }
-  .nw-acct strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 
   .oh-greet-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .ev-open-btn { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; cursor: pointer; transition: background 0.15s; }
@@ -10043,8 +9917,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cst-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
   .cst-ok { background: rgba(18,161,80,0.12); color: var(--pos); }
   .cst-warn { background: rgba(217,45,32,0.10); color: var(--neg); }
-  .cst-mut { background: var(--surface-2); color: var(--ink-3); }
-  .pace-row { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
   .bup-list { margin-top: 4px; }
   .bup-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 13px; border-top: 1px solid var(--line); }
   .bup-row:first-child { border-top: none; }
@@ -10059,28 +9931,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .slm-k { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; margin-top: 3px; }
 
   .grc-row { display: flex; align-items: center; gap: 18px; margin-top: 8px; flex-wrap: wrap; }
-  .grc-ring { flex-shrink: 0; }
   .grc-side { flex: 1; min-width: 180px; }
   .grc-amt { font-size: 18px; font-weight: 600; color: var(--ink); }
   .grc-amt span { font-size: 12px; color: var(--ink-3); font-weight: 500; }
-  .grc-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-3); margin-top: 6px; max-width: 230px; }
-  .grc-line strong { color: var(--ink); font-weight: 600; }
-  .grc-early { color: var(--pos) !important; }
-  .grc-late { color: var(--warn) !important; }
-  .mf-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .mf-box { flex: 1; background: var(--surface-2); border-radius: 10px; padding: 10px 8px; text-align: center; min-width: 0; }
-  .mf-goal { background: rgba(18,161,80,0.08); box-shadow: inset 0 0 0 1px rgba(18,161,80,0.25); }
-  .mf-goal .mf-v { color: var(--pos); }
-  .mf-v { font-size: 16px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mf-k { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-top: 3px; }
-  .mf-arr { color: var(--ink-3); display: flex; flex-shrink: 0; }
-  .sr-foot { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
   .sr-num { font-size: 18px; font-weight: 600; color: var(--ink); }
-  .cb-bars { display: flex; align-items: flex-end; gap: 6px; height: 58px; margin-top: 10px; }
-  .cb-bars > div { flex: 1; background: color-mix(in srgb, var(--accent-solid) 35%, transparent); border-radius: 4px 4px 0 0; }
-  .cb-bars > div.cb-hot { background: var(--accent-solid); }
-  .cb-x { display: flex; gap: 6px; font-size: 10px; color: var(--ink-3); font-weight: 600; margin-top: 5px; }
-  .cb-x span { flex: 1; text-align: center; }
   /* Goal Getter hero (goal-getter-6a) */
   .gg2-hero { display: grid; grid-template-columns: 1fr 260px; gap: 28px; align-items: center; }
   .gg2-left { padding-right: 28px; border-right: 1px solid var(--line-strong); }
@@ -10108,7 +9962,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .mf2-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--surface-3); }
   .mf2-out { background: var(--ink); height: 100%; }
   .mf2-kept { background: var(--pos); height: 100%; }
-  .mf2-keptv { color: var(--pos); font-weight: 800; }
   /* Savings rate (goal-getter-6a) */
   .sr2-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
   .sr2-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
@@ -10133,34 +9986,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .mpc2-v { font-weight: 700; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .mpc2-track { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
   .mpc2-track > div { height: 100%; border-radius: 999px; }
-  .fs-hero { display: flex; align-items: center; gap: 20px; }
-  .fs-dial { flex-shrink: 0; }
-  .fs-side { flex: 1; min-width: 0; }
-  .fs-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  @media (max-width: 640px) {
-    .gg-hero { grid-template-columns: 1fr; }
-    .gg-vr { display: none; }
-    .fs-hero { flex-direction: column; align-items: flex-start; }
-  }
-
-  .bh-hero { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
-  .bh-left { display: flex; flex-direction: column; align-items: flex-start; }
-  .bh-math { background: color-mix(in srgb, var(--card) 78%, transparent); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; }
-  .bh-ln { display: flex; justify-content: space-between; gap: 14px; font-size: 12px; color: var(--ink-2); padding: 3px 0; border-bottom: 1px dashed var(--line); }
-  .bh-ln strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .bh-ln.bh-total { border-bottom: none; border-top: 1.5px solid var(--line-strong); margin-top: 2px; padding-top: 6px; }
-  .bh-ln.bh-total span, .bh-ln.bh-total strong { color: var(--ink); font-weight: 600; }
-  .cvt-row { display: grid; grid-template-columns: 86px 1fr 82px 70px; gap: 9px; align-items: center; padding: 6px 0; font-size: 12px; }
-  .cvt-hd { font-size: 10px; color: var(--ink-3); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
-  .cvt-hd span:nth-child(3), .cvt-hd span:nth-child(4) { text-align: right; }
-  .cvt-nm { color: var(--ink-2); font-weight: 500; }
-  .cvt-bar { height: 9px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .cvt-bar > div { height: 100%; border-radius: 999px; }
-  .cvt-num { text-align: right; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
-  .cvt-d { text-align: right; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  
   .cvt-ok { color: var(--pos); }
   .cvt-bad { color: var(--neg); }
-  .cvt-mut { color: var(--ink-3); font-weight: 500; }
   .n7-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 13px; border-top: 1px solid var(--line); }
   .n7-row:first-of-type { border-top: none; }
   .n7-dt { width: 36px; color: var(--ink-3); font-weight: 600; font-size: 11px; }
@@ -10169,21 +9997,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .n7-total .n7-nm, .n7-total .n7-amt { font-weight: 700; color: var(--ink); }
   .blc-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
   .blc-row:first-of-type { border-top: none; }
-  .blc-ic { width: 20px; height: 20px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .blc-paid { background: rgba(18,161,80,0.14); color: var(--pos); }
-  .blc-due { background: var(--surface-2); color: var(--ink-3); border: 1px dashed var(--line-strong); }
   .blc-nm { flex: 1; color: var(--ink-2); }
   .blc-amt { font-weight: 600; color: var(--ink); }
   .blc-done { color: var(--ink-3); text-decoration: line-through; }
   .cst-amt { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; text-align: right; }
   .cst-amt em { font-style: normal; color: var(--ink-3); font-weight: 500; margin-left: 4px; }
-  .fs-dial-wrap { position: relative; width: 112px; height: 112px; flex-shrink: 0; }
-  .fs-dial-txt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .fs-dial-num { font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: -0.02em; }
-  .fs-dial-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
-  .fs-bignum { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin: 8px 0 2px; color: var(--ink); }
-  .fs-bignum em { font-style: normal; font-size: 14px; color: var(--ink-3); font-weight: 500; letter-spacing: normal; }
-  .blc-overdue { background: rgba(217,45,32,0.12); color: var(--neg); border: 1px solid rgba(217,45,32,0.35); }
   .blc-amt-od { color: var(--neg); }
   .blc-od-txt { color: var(--neg); }
   .fs-budget-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -10301,22 +10119,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .mep2-pill { align-self: flex-start; border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
   .mep2-ok { background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); }
   .mep2-bad { background: color-mix(in srgb, var(--neg) 13%, transparent); color: var(--neg); }
-  .fs-hero2 { display: grid; grid-template-columns: 240px 1fr; gap: 32px; align-items: center; }
-  @media (max-width: 760px) { .fs-hero2 { grid-template-columns: 1fr; gap: 20px; } }
-  .fs2-left { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
-  .fs2-left .safe-hero-label { align-self: flex-start; }
-  .fs2-spent { font-size: 18px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; margin: 4px 0 6px; align-self: flex-start; }
-  .fs2-spent span { font-size: 13px; font-weight: 500; color: var(--ink-3); }
-  .fs2-ring { position: relative; width: 128px; height: 128px; }
-  .fs2-ring-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .fs2-ring-pct { font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; line-height: 1; }
-  .fs2-ring-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
-  .fs2-right { min-width: 0; }
-  .fs2-bullets { list-style: none; margin: 12px 0 0; padding: 0; }
-  .fs2-bullets li { position: relative; padding-left: 18px; margin-bottom: 8px; font-size: 14px; color: var(--ink-2); line-height: 1.45; }
-  .fs2-bullets li:last-child { margin-bottom: 0; }
-  .fs2-bullets li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-  .fs2-bullets strong { color: var(--ink); font-weight: 700; }
+  
   .pf-bar-wrap { position: relative; margin: 16px 0 30px; }
   .pf-bar { position: relative; display: flex; height: 34px; background: var(--surface-2); border: 1.5px solid var(--line-strong); border-radius: 12px; overflow: hidden; }
   .pf-bar-seg { height: 100%; }
@@ -10325,25 +10128,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .pf-bar-mark { position: absolute; top: -5px; width: 2.5px; height: 44px; background: var(--ink); border-radius: 2px; z-index: 2; }
   .pf-bar-lb { position: absolute; top: 42px; font-size: 11px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
   .pf-legend { margin-top: 12px; font-size: 13px; }
-  .oh-mb-item { font-size: 14px; padding: 5px 0; }
-  .oh-mb-amt { font-size: 14px; }
-  .oh-mb-pct { font-size: 14px; min-width: 44px; }
-  .pv-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 0 4px; }
-  .pv-stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-card); padding: 10px 13px; }
   .pv-k { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
-  .pv-v { font-size: 16px; font-weight: 600; color: var(--ink); margin-top: 3px; font-variant-numeric: tabular-nums; }
-  .pv-s { font-size: 11px; font-weight: 600; margin-top: 2px; }
   .pv-good { color: var(--pos); }
   .pv-bad { color: var(--neg); }
-  .pv-mut { color: var(--ink-3); font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
-  .pvr { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; font-size: 12px; }
-  .pvr-n { color: var(--ink-2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pvr-v { font-weight: 600; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .pvr-v em { font-style: normal; font-weight: 700; font-size: 11px; }
   .tr12-x { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-3); font-weight: 600; margin-top: 4px; }
   .nwp-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 10px; }
   .nwp-legend { display: flex; flex-direction: column; margin-top: 12px; }
-  .ms-row { display: flex; align-items: center; gap: 13px; }
   /* Power View KPI tiles (power-view-6b) */
   .pv-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 0 4px 12px; }
   @media (max-width: 760px) { .pv-kpis { grid-template-columns: 1fr 1fr; } }
@@ -10365,12 +10155,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .nwp-leg-l { display: inline-flex; align-items: center; gap: 8px; }
   .nwp-leg-r { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .nwp-leg-r strong { color: var(--ink); font-weight: 700; }
-  /* Money score centred ring (power-view-6b) */
-  .ms2-card { display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; }
   .ms2-ring { position: relative; width: 82px; height: 82px; border-radius: 50%; margin: 0; flex: none; }
   .ms2-hole { position: absolute; inset: 13px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; }
-  .ms2-checks { font-size: 12px; color: var(--ink-2); }
-  .ms2-checks strong { color: var(--ink); font-weight: 700; }
   .pv-desc { font-size: 12px; color: var(--ink-3); margin: 3px 0 12px; line-height: 1.45; }
   .ms2-row { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
   .ms2-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -10378,10 +10164,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .ms-ok { color: var(--pos); font-weight: 700; }
   .ms-bad { color: var(--neg); font-weight: 700; }
   .ms2-drag { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
-  @media (max-width: 640px) {
-    .bh-hero { grid-template-columns: 1fr; }
-    .cvt-row { grid-template-columns: 74px 1fr 74px 60px; }
-  }
+  
   .catman { display: flex; flex-direction: column; gap: 16px; }
   .catman-list { display: flex; flex-direction: column; gap: 10px; }
   .catman-row { display: flex; align-items: center; gap: 10px; }
@@ -10479,10 +10262,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
   /* ===== v2 . Where it's gone (Composition card) ===== */
   .v2wg-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:14px; }
-  .oh-grid-tight { align-items:start; }
   .v2wg-ctx { font-size:11px; color:var(--ink-3); }
-  .v2wg-cap { font-size:11px; color:var(--ink-3); margin:4px 0 14px; }
-  .v2wg-donutwrap { display:flex; justify-content:center; margin:2px 0 14px; }
   .v2wg-donut { width:120px; height:120px; border-radius:999px; display:flex; align-items:center; justify-content:center; }
   .v2wg-hole { width:80px; height:80px; border-radius:999px; background:var(--card); display:flex; flex-direction:column; align-items:center; justify-content:center; }
   .v2wg-amt { font-size:19px; font-weight:700; color:var(--ink); }
@@ -10507,33 +10287,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2wg-compact { display:flex; align-items:center; gap:18px; }
   .v2wg-compact .v2wg-donut { flex-shrink:0; margin:0; }
   .v2wg-compact .v2wg-leg { flex:1; min-width:0; }
-  .v2-goalnote { font-size:12px; color:#0E7A3C; background:#ECFDF3; border-radius:9px; padding:9px 11px; margin-top:14px; font-weight:500; line-height:1.45; }
-  .v2-goalnote strong { color:#0E7A3C; font-weight:700; }
-  .fp2 { display:flex; flex-direction:column; gap:13px; }
-  .fp2-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
-  .fp2-nm { display:flex; align-items:center; gap:7px; font-size:13px; }
-  .fp2-chip { font-size:10.5px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; }
-  .fp2-ok { background:#ECFDF3; color:var(--pos); }
-  .fp2-over { background:#FEF3F2; color:var(--neg); }
-  .fp2-track { height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
-  .fp2-track > i { display:block; height:100%; border-radius:999px; }
-  .fp2-nums { font-size:11px; color:var(--ink-3); margin-top:4px; text-align:right; }
-  .cvtv-cap { font-size:10.5px; color:var(--ink-3); margin:-2px 0 12px; }
-  .cvtv-tk { color:var(--ink-2); }
-  .cvtv { display:flex; flex-direction:column; gap:12px; }
-  .cvtv-row { display:grid; grid-template-columns:74px 1fr; gap:4px 10px; align-items:center; }
-  .cvtv-nm { display:flex; align-items:center; gap:7px; font-size:12.5px; }
-  .cvtv-track { position:relative; height:9px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
-  .cvtv-track > i { display:block; height:100%; border-radius:999px; }
-  .cvtv-tick { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink); border-radius:2px; }
-  .cvtv-meta { grid-column:2; display:flex; justify-content:space-between; font-size:11.5px; margin-top:2px; }
-  .cvtv-st { color:var(--ink-2); } .cvtv-st em { font-style:normal; color:var(--ink-3); }
-  .gpv { display:flex; flex-direction:column; gap:10px; }
-  .gpv-row { display:grid; grid-template-columns:78px 1fr auto; gap:10px; align-items:center; }
-  .gpv-nm { display:flex; align-items:center; gap:7px; font-size:12.5px; white-space:nowrap; }
-  .gpv-bar { height:7px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
-  .gpv-bar > i { display:block; height:100%; border-radius:999px; }
-  .gpv-u { font-size:11.5px; color:var(--ink-3); white-space:nowrap; text-align:right; }
   .v2-bl { display:flex; flex-direction:column; gap:10px; }
   .v2-blrow { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; }
   .v2-bdot { width:9px; height:9px; border-radius:999px; flex-shrink:0; }
