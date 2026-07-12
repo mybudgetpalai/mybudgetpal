@@ -7796,14 +7796,16 @@ function App() {
       const unique = [...new Set(uncats.map((t) => t.name))].slice(0, 200);
       const mapping = await aiCategorize(unique);
       if (!mapping || !Object.keys(mapping).length) { notifyUncategorized(uncats.length); return; }
+      const spendSet = new Set(spendCategories());
+      const validFallback = (name) => { const c = mapping[name]; return c && spendSet.has(c) ? c : null; };
       setCustomTransactions((prev) => prev.map((t) =>
-        t.category === "Uncategorized" && mapping[t.name] ? { ...t, category: mapping[t.name] } : t
+        t.category === "Uncategorized" && validFallback(t.name) ? { ...t, category: validFallback(t.name) } : t
       ));
       const idToCat = {};
-      txs.forEach((t) => { if (t.id && t.category === "Uncategorized" && mapping[t.name]) idToCat[t.id] = mapping[t.name]; });
+      txs.forEach((t) => { if (t.id && t.category === "Uncategorized") { const c = validFallback(t.name); if (c) idToCat[t.id] = c; } });
       if (Object.keys(idToCat).length) await updateTransactionCategoriesInDb(idToCat);
       pushToast("AI categorized " + Object.keys(idToCat).length + " transactions", "success");
-      notifyUncategorized(uncats.filter((t) => !mapping[t.name]).length);
+      notifyUncategorized(uncats.filter((t) => !validFallback(t.name)).length);
     } catch (e) { notifyUncategorized(uncats.length); }
   };
 
