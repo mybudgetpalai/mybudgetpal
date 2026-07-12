@@ -7982,6 +7982,10 @@ function App() {
     const bankRows2 = await fetchBanks(userId);
     setBanks(bankRows2.map((b) => b.bank_name));
     setBankRows(bankRows2);
+    /* In demo mode the sample transactions live only in React state (never
+       persisted), so refetching from the DB would wipe them and blank out the
+       plan grid + overview. Keep the in-memory demo set intact. */
+    if (usingDemo) return;
     const txRows2 = await fetchTransactions(userId);
     setCustomTransactions(txRows2);
   };
