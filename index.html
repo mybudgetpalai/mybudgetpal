@@ -735,7 +735,7 @@ const ALL_CATEGORIES = [...TX_CATEGORIES, "Income", "Other", "Uncategorized"];
 const CATEGORY_RULES = {
   Groceries: ["waitrose", "carrefour", "spinneys", "lulu", "choithram", "union coop", "west zone", "grandiose", "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "grocery", "supermarket", "hypermarket", "ocado", "iceland food", "co-op", "coop food", "m&s food", "supermkt"],
   Dining: ["restaurant", "cafe", "caffe", "coffee", "costa", "starbucks", "mcdonald", "kfc", "burger", "pizza", "subway", "deliveroo", "talabat", "zomato", "uber eats", "grill", "bakery", "dunkin", "tim hortons", "nando", "shake shack", "five guys", "wagamama", "pret a manger"],
-  Transport: ["uber", "careem", "bolt ", "taxi", "rta ", "salik", "nol ", "metro", "parking", "petrol", "fuel", "adnoc", "enoc", "eppco", "shell ", "valet", "tfl", "trainline", "national rail", "oyster", "gwr", "lner", "avanti", "stagecoach", "national express"],
+  Transport: ["uber", "careem", "bolt ", "taxi", "rta ", "salik", "nol ", "metro", "parking", "petrol", "fuel", "adnoc", "enoc", "eppco", "shell ", "valet", " tfl", "trainline", "national rail", "oyster", "gwr", "lner", "avanti", "stagecoach", "national express"],
   Shopping: ["amazon", "noon", "namshi", "shein", "zara", "h&m", "ikea", "sharaf dg", "emax", "decathlon", "nike", "adidas", "apple store", "apple.com", "dubai mall", "city centre", "sephora", "primark", "asos"],
   Subscriptions: ["netflix", "spotify", "youtube", "disney", "apple music", "icloud", "prime video", "amazon prime", "openai", "chatgpt", "claude", "anthropic", "adobe", "microsoft 365", "office 365", "patreon", "dropbox", "canva", "subscription"],
   Bills: ["dewa", "sewa", "addc", "etisalat", " du ", "virgin mobile", "rent", "insurance", "takaful", "gym", "fitness first", "emicool", "empower", "chiller", "electricity", "internet", "broadband", "school fee", "tuition", "loan", "mortgage", "water bill", "british gas", "octopus energy", "ovo energy", "edf energy", "e.on", "eon next", "bulb energy", "scottish power", "shell energy", "thames water", "severn trent", "anglian water", "council tax", "tv licence", "tv license", "vodafone", "o2 ", " ee ", "ee limited", "giffgaff", "tesco mobile", "three.co", "hutchison 3g", "sky digital", "virgin media", "bt group", "plusnet", "talktalk"],
@@ -1174,7 +1174,8 @@ async function fetchTransactions(userId) {
   const { data, error } = await supabaseClient.from("transactions").select("*").eq("user_id", userId).order("tx_date", { ascending: false });
   if (error) return [];
   const raw = (data || []).map(rowToTx);
-  if (!FX.ready || FX.userId !== userId) {
+  const fxStale = raw.some((t) => t.bank && FX.bankCurrency[t.bank] === undefined);
+  if (!FX.ready || FX.userId !== userId || fxStale) {
     const [p, b] = await Promise.all([fetchProfile(userId), fetchBanks(userId)]);
     await initFx(userId, p, b);
   }
@@ -8314,7 +8315,7 @@ function App() {
   } else if (stage === "confirmCategory") {
     content = <ConfirmCategoryScreen transactions={customTransactions} onConfirm={recategorizeDescription} onDone={() => setStage("openingBalance")} />;
   } else if (stage === "openingBalance") {
-    content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={() => { fetchBanks(userId).then((rows) => setBankRows(rows)); setStage("breakdown"); }} />;
+    content = <OpeningBalanceScreen banks={banks} statements={statements} userId={userId} pushToast={pushToast} onBack={() => setStage("upload")} onDone={async () => { await reloadFxData(); setStage("breakdown"); }} />;
   } else if (stage === "breakdown") {
     content = <MonthlyBreakdownScreen transactions={customTransactions} bankRows={bankRows} onBack={() => setStage("openingBalance")} onDone={() => { setSetupIntroOpen(true); setStage("dashboard"); }} />;
   } else if (stage === "extraQuestions") {
