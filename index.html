@@ -6146,7 +6146,7 @@ function EditViewModal({ layout, onSave, onClose }) {
 }
 
 /* ================= Overview V2 tops (staged redesign) ================= */
-let __V2_TOPS = false;
+let __V2_TOPS = true;
 function setV2Tops(val) { __V2_TOPS = !!val; window.dispatchEvent(new Event("mbp-v2tops")); }
 function useV2Tops() {
   const [v, setV] = useState(__V2_TOPS);
@@ -7422,7 +7422,7 @@ function TestingBar({ personaKey, onSetPersona }) {
           color: v2 ? "#C2410C" : "#fff",
           fontWeight: v2 ? 700 : 500,
         }}
-      >V2 tops: {v2 ? "ON" : "OFF"}</button>
+      >Overview: {v2 ? "V2 (default)" : "V1 (test)"}</button>
     </div>
   );
 }
