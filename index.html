@@ -173,7 +173,7 @@ function renderAskAnswer(text) {
 }
 const CATEGORY_ICONS = {
   Groceries: "groceries", Dining: "dining", Transport: "transport", Shopping: "shopping",
-  Subscriptions: "subscriptions", Bills: "bills", Income: "income", Uncategorized: "tag", Other: "other",
+  Subscriptions: "subscriptions", Bills: "bills", Entertainment: "tag", Income: "income", Uncategorized: "tag", Other: "other",
 };
 function CountUp({ value, format, duration = 800 }) {
   const [display, setDisplay] = useState(() => Number(value) || 0);
@@ -472,6 +472,7 @@ const INCOME_MONTHLY = [3100, 3150, 3200];
 const CATEGORY_COLORS = {
   Groceries: "#7C9AFF", Dining: "#F2B25C", Transport: "#0EA5A0",
   Shopping: "#B08CFF", Subscriptions: "#3B93E8", Bills: "#2E5BFF",
+  Entertainment: "#E1477E",
   Income: "#2FBE7B", Uncategorized: "#98A2B3", Other: "#98A2B3",
 };
 const DEMO_CSV = `Date,Description,Amount
@@ -729,15 +730,16 @@ function parseCSVLine(line) {
 
 /* ---------------- Transaction parsing & categorization engine ---------------- */
 
-const TX_CATEGORIES = ["Groceries", "Dining", "Transport", "Shopping", "Subscriptions", "Bills"];
+const TX_CATEGORIES = ["Groceries", "Dining", "Transport", "Shopping", "Subscriptions", "Bills", "Entertainment"];
 const ALL_CATEGORIES = [...TX_CATEGORIES, "Income", "Other", "Uncategorized"];
 const CATEGORY_RULES = {
   Groceries: ["waitrose", "carrefour", "spinneys", "lulu", "choithram", "union coop", "west zone", "grandiose", "tesco", "sainsbury", "asda", "aldi", "lidl", "morrisons", "grocery", "supermarket", "hypermarket", "ocado", "iceland food", "co-op", "coop food", "m&s food", "supermkt"],
   Dining: ["restaurant", "cafe", "caffe", "coffee", "costa", "starbucks", "mcdonald", "kfc", "burger", "pizza", "subway", "deliveroo", "talabat", "zomato", "uber eats", "grill", "bakery", "dunkin", "tim hortons", "nando", "shake shack", "five guys", "wagamama", "pret a manger"],
   Transport: ["uber", "careem", "bolt ", "taxi", "rta ", "salik", "nol ", "metro", "parking", "petrol", "fuel", "adnoc", "enoc", "eppco", "shell ", "valet", "tfl", "trainline", "national rail", "oyster", "gwr", "lner", "avanti", "stagecoach", "national express"],
   Shopping: ["amazon", "noon", "namshi", "shein", "zara", "h&m", "ikea", "sharaf dg", "emax", "decathlon", "nike", "adidas", "apple store", "apple.com", "dubai mall", "city centre", "sephora", "primark", "asos"],
-  Subscriptions: ["netflix", "spotify", "youtube", "disney", "apple music", "icloud", "prime video", "amazon prime", "openai", "chatgpt", "claude", "anthropic", "adobe", "microsoft 365", "office 365", "playstation", "xbox", "nintendo", "patreon", "dropbox", "canva", "subscription"],
+  Subscriptions: ["netflix", "spotify", "youtube", "disney", "apple music", "icloud", "prime video", "amazon prime", "openai", "chatgpt", "claude", "anthropic", "adobe", "microsoft 365", "office 365", "patreon", "dropbox", "canva", "subscription"],
   Bills: ["dewa", "sewa", "addc", "etisalat", " du ", "virgin mobile", "rent", "insurance", "takaful", "gym", "fitness first", "emicool", "empower", "chiller", "electricity", "internet", "broadband", "school fee", "tuition", "loan", "mortgage", "water bill", "british gas", "octopus energy", "ovo energy", "edf energy", "e.on", "eon next", "bulb energy", "scottish power", "shell energy", "thames water", "severn trent", "anglian water", "council tax", "tv licence", "tv license", "vodafone", "o2 ", " ee ", "ee limited", "giffgaff", "tesco mobile", "three.co", "hutchison 3g", "sky digital", "virgin media", "bt group", "plusnet", "talktalk"],
+  Entertainment: ["cinema", "vue cinema", "odeon", "cineworld", "picturehouse", "everyman cinema", "showcase cinema", "ticketmaster", "eventbrite", "dice.fm", "playstation", "xbox", "nintendo", "steam games", "twitch", "concert", "theatre", "box office"],
 };
 let CAT_CONFIG = { renames: {}, custom: [] };
 const CAT_PALETTE = ["#E8813A", "#8E7BEF", "#3FA7A0", "#D9557B", "#5A8DEE", "#C2893A", "#4CAF7D", "#B0577E"];
@@ -8141,6 +8143,7 @@ function App() {
         if (guess && guess !== "Uncategorized") target = guess;
       } else {
         target = customKeywordCategory(t.name) || (t.category === "Uncategorized" ? categorizeByRules(t.name, t.amount) : null);
+        if (!target && t.category !== "Entertainment" && categorizeByRules(t.name, t.amount) === "Entertainment") target = "Entertainment";
       }
       if (target && target !== t.category && target !== "Uncategorized") { await recategorizeDescription(t.name, target, { silent: true }); n++; }
     }
