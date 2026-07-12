@@ -777,9 +777,14 @@ function parseCategoryConfig(profile) {
     .map((c) => ({ name: c.name.trim(), color: c.color || null, keywords: Array.isArray(c.keywords) ? c.keywords.filter((k) => typeof k === "string") : [] })) : [];
   return { renames, custom };
 }
+function isTransferDesc(desc) {
+  const d = " " + String(desc || "").toLowerCase() + " ";
+  return ["bank transfer", "transfer to", "transfer from", "internal transfer", "faster payment", "standing order", " trf ", " xfer ", "to savings", "from savings", "savings transfer", "own account"].some((k) => d.includes(k));
+}
 function categorizeByRules(desc, amount) {
   const ck = customKeywordCategory(desc);
   if (ck) return ck;
+  if (isTransferDesc(desc)) return "Uncategorized";
   const d = " " + String(desc || "").toLowerCase() + " ";
   /* Multi-word keywords win first (e.g. "tesco mobile" -> Bills before "tesco" -> Groceries) */
   for (const cat of TX_CATEGORIES) {
@@ -3605,8 +3610,9 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const byCatPrev = spendByCategoryForMonth(txs, prevKey);
   const avgKeys = lastNMonthKeys(addMonths(activeKey, -1), 3);
   const avgByCat = {};
-  avgKeys.forEach((k) => { const o = spendByCategoryForMonth(txs, k); Object.keys(o).forEach((c) => { avgByCat[c] = (avgByCat[c] || 0) + o[c]; }); });
-  Object.keys(avgByCat).forEach((c) => { avgByCat[c] = avgByCat[c] / avgKeys.length; });
+  const avgCntByCat = {};
+  avgKeys.forEach((k) => { const o = spendByCategoryForMonth(txs, k); Object.keys(o).forEach((c) => { if (o[c] > 0) { avgByCat[c] = (avgByCat[c] || 0) + o[c]; avgCntByCat[c] = (avgCntByCat[c] || 0) + 1; } }); });
+  Object.keys(avgByCat).forEach((c) => { avgByCat[c] = avgByCat[c] / (avgCntByCat[c] || 1); });
 
   const monthUncat0 = txs.filter((t) => t.amount < 0 && t.category === "Uncategorized" && t.date.slice(0, 7) === activeKey).length;
   const catSet = new Set([...spendCategories(), ...Object.keys(byCat).filter((c) => byCat[c] > 0)]);
@@ -7790,7 +7796,7 @@ function App() {
     if (n > 0) pushToast(n + " transaction" + (n !== 1 ? "s" : "") + " couldn't be auto-categorised — use the tag on your Overview to sort them", "info");
   };
   const runAiFallback = async (txs) => {
-    const uncats = txs.filter((t) => t.category === "Uncategorized" && !DEV_FORCED_NAMES.has(t.name));
+    const uncats = txs.filter((t) => t.category === "Uncategorized" && !DEV_FORCED_NAMES.has(t.name) && !isTransferDesc(t.name));
     if (!uncats.length) return;
     try {
       const unique = [...new Set(uncats.map((t) => t.name))].slice(0, 200);
