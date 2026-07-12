@@ -5391,7 +5391,7 @@ function SavingsRateCard({ transactions }) {
   const pts = keys.map((k) => {
     const i = incomeForMonth(transactions || [], k);
     const s = spendForMonth(transactions || [], k);
-    return i > 0 ? Math.max(0, Math.round(((i - s) / i) * 100)) : null;
+    return i > 0 ? Math.round(((i - s) / i) * 100) : null;
   });
   const valid = pts.filter((v) => v !== null);
   if (valid.length < 2) return (
@@ -5406,7 +5406,7 @@ function SavingsRateCard({ transactions }) {
   const climbing = cur !== null && cur > avg;
   const W = 150, H = 44;
   const step = W / Math.max(pts.length - 1, 1);
-  const line = pts.map((v, i) => v === null ? null : (i * step) + "," + (H - 4 - (v / 100) * (H - 10))).filter(Boolean).join(" ");
+  const line = pts.map((v, i) => v === null ? null : (i * step) + "," + (H - 4 - (Math.max(0, Math.min(100, v)) / 100) * (H - 10))).filter(Boolean).join(" ");
   return (
     <div className="glass-card dash-card">
       <div className="sr2-head">
@@ -5414,7 +5414,7 @@ function SavingsRateCard({ transactions }) {
         <div className="sr2-head-right">{isBest && <span className="cst-chip cst-ok">best month yet</span>}<button className="sr-info-btn" onClick={() => setShowInfo((v) => !v)} aria-label="What is savings rate?" title="What is savings rate?"><Icon name="info" size={15} /></button></div>
       </div>
       <div className="sr2-body">
-        <span className="sr2-num">{cur !== null ? cur + "%" : "—"}</span>
+        <span className="sr2-num" style={cur !== null && cur < 0 ? { color: "var(--neg)" } : undefined}>{cur !== null ? cur + "%" : "—"}</span>
         <svg viewBox={"0 0 " + W + " " + H} width="150" height={H} preserveAspectRatio="none"><polyline points={line} fill="none" stroke="var(--pos)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </div>
       <div className="oh-sub" style={{ marginTop: 12 }}>{climbing ? "Climbing steadily — up from a " + avg + "% average." : "Holding around your " + avg + "% average."}</div>
@@ -6586,7 +6586,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
-  const greetLine = (lk && lk !== key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
+  const greetLine = (lk && lk < key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
   const [editOpen, setEditOpen] = useState(false);
