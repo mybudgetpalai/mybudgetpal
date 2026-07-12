@@ -627,6 +627,12 @@ function today() { return DEV_NOW ? new Date(DEV_NOW + "T12:00:00") : new Date()
 function nowMonth() { return today().toISOString().slice(0, 7); }
 function txMonthKey(date) { const m = (date || "").slice(0, 7); return /^\d{4}-\d{2}$/.test(m) ? m : nowMonth(); }
 function homeSym() { return (CURRENCY_SYMBOLS[FX.home] || "£").trim(); }
+function curSym(cur) { return (CURRENCY_SYMBOLS[cur] || CURRENCY_SYMBOLS[FX.home] || "£").trim(); }
+function formatMoney2(n) {
+  const sign = n < 0 ? "-" : "";
+  const sym = CURRENCY_SYMBOLS[FX.home] || "£";
+  return sign + sym + Math.abs(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 function fxRate(month, from, to) {
   if (from === to) return 1;
   const r = FX.rates[fxKey(month, from, to)];
@@ -2526,7 +2532,7 @@ function ConfirmCategoryScreen({ transactions, onConfirm, onDone }) {
 
         <div className="confirm-tx-card">
           <span className="confirm-tx-name">{candidate.name}</span>
-          <span className="confirm-tx-amount">{formatMoney(candidate.amount)}</span>
+          <span className="confirm-tx-amount">{formatMoney2(candidate.amount)}</span>
         </div>
 
         <div className="field-group" style={{ marginTop: 16 }}>
@@ -2601,7 +2607,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
                 <div className="balance-field">
                   <label className="field-label">Opening balance</label>
                   <div className="target-input-wrap balance-input-wrap" style={{ width: "100%", padding: "10px 12px", marginTop: 4 }}>
-                    <span className="target-currency">{homeSym()}</span>
+                    <span className="target-currency">{curSym((FX.bankCurrency && FX.bankCurrency[p.bank]) || FX.home)}</span>
                     <input className="target-input" style={{ width: "100%", fontSize: 14 }} type="text" inputMode="decimal" placeholder="0"
                       value={fmtBalInput(vals[p.bank].balance)} onChange={(e) => setV(p.bank, "balance", e.target.value.replace(/[^0-9.\-]/g, ""))} />
                   </div>
