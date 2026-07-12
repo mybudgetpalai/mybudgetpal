@@ -636,6 +636,13 @@ function fxRate(month, from, to) {
   return FX_FALLBACK[from + ">" + to] || 1;
 }
 function fxConvert(amount, from, month) { return amount * fxRate(month || nowMonth(), from, FX.home); }
+function convStartingBal(r) {
+  const amt = Number(r && r.starting_balance) || 0;
+  const cur = (FX.bankCurrency && FX.bankCurrency[r.bank_name]) || (r && r.currency) || "GBP";
+  if (!amt || cur === FX.home) return amt;
+  const m = ((r && r.as_of_date) || "").slice(0, 7) || nowMonth();
+  return fxConvert(amt, cur, m);
+}
 async function initFx(userId, profile, bankRows) {
   FX.userId = userId;
   FX.home = (profile && profile.home_currency) || "GBP";
@@ -2624,7 +2631,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
 /* ---------------- Monthly breakdown table ---------------- */
 
 function MonthlyBreakdownScreen({ onDone, transactions, onBack, bankRows }) {
-  const startingBal = (bankRows || []).reduce((s, r) => s + (Number(r.starting_balance) || 0), 0);
+  const startingBal = (bankRows || []).reduce((s, r) => s + convStartingBal(r), 0);
   const hasReal = transactions && transactions.length > 0;
   let categories, monthLabels, byCatByMonth, incomeByMonth, openingByMonth, closingByMonth;
   if (hasReal) {
@@ -2730,7 +2737,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
        the opening. Using the per-bank estimate here diverged from the summary
        whenever a bank had no starting balance or a mismatched tag. */
     const bankRows = (accountData && accountData.bankRows) || [];
-    const startingBal = bankRows.reduce((s, r) => s + (Number(r.starting_balance) || 0), 0);
+    const startingBal = bankRows.reduce((s, r) => s + convStartingBal(r), 0);
     const hasTx = transactions && transactions.length > 0;
     const hasStart = bankRows.some((r) => r.starting_balance !== null && r.starting_balance !== undefined && r.starting_balance !== "");
     if (!hasTx && !hasStart) return null;
