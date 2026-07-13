@@ -2568,7 +2568,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
     return banks.map((b) => {
       const stmts = (statements || []).filter((s) => s.bank === b && s.periodStart).sort((x, y) => (x.periodStart < y.periodStart ? -1 : 1));
       const first = stmts[0];
-      return { bank: b, start: first ? first.periodStart : null, suggested: first && first.opening !== null && first.opening !== undefined ? first.opening : null };
+      return { bank: b, currency: (FX.bankCurrency && FX.bankCurrency[b]) || (UAE_BANKS.includes(b) ? "AED" : FX.home), start: first ? first.periodStart : null, suggested: first && first.opening !== null && first.opening !== undefined ? first.opening : null };
     });
   }, [banks, statements]);
 
@@ -2612,7 +2612,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
                 <div className="balance-field">
                   <label className="field-label">Opening balance</label>
                   <div className="target-input-wrap balance-input-wrap" style={{ width: "100%", padding: "10px 12px", marginTop: 4 }}>
-                    <span className="target-currency">{curSym((FX.bankCurrency && FX.bankCurrency[p.bank]) || FX.home)}</span>
+                    <span className="target-currency">{curSym(p.currency)}</span>
                     <input className="target-input" style={{ width: "100%", fontSize: 14 }} type="text" inputMode="decimal" placeholder="0"
                       value={fmtBalInput(vals[p.bank].balance)} onChange={(e) => setV(p.bank, "balance", e.target.value.replace(/[^0-9.\-]/g, ""))} />
                   </div>
