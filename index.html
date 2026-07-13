@@ -1064,7 +1064,7 @@ function parseStatementCSV(text) {
     return {
       date: normalizeDate(cols[dateIdx]) || "",
       name,
-      category: catIdx !== -1 && cols[catIdx] ? cols[catIdx].trim() : categorizeByRules(name, amount),
+      category: categorizeByRules(name, amount), /* TS2 fix: always categorise via app rules; ignore any category column in the CSV */
       amount,
       _bal: balIdx !== -1 && cols[balIdx] !== undefined && String(cols[balIdx]).trim() !== "" ? num(cols[balIdx]) : null,
     };
@@ -2248,7 +2248,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
           parsed.forEach((t) => { t.bank = bank; });
           const { kept, skipped } = dedupeTransactions(parsed, allParsed);
           totalSkipped += skipped;
-          if (!parsed.length) pushToast("No transactions found in " + f.name, "error");
+          if (!parsed.length) { pushToast("No transactions found in " + f.name, "error"); continue; } /* TS5 fix: don't insert an orphan statements row for a file with no transactions */
           let stmtRow = null;
           try {
             stmtRow = await saveStatementToDb(userId, {
