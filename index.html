@@ -734,7 +734,15 @@ function parseCSVLine(line) {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') { inQuotes = !inQuotes; continue; }
-    if (ch === "," && !inQuotes) { out.push(cur.trim()); cur = ""; continue; }
+    if (ch === "," && !inQuotes) {
+      /* B1 fix: a comma sitting between digits as a thousands separator
+         (e.g. -1,234.56) must NOT split the field. Applies only outside
+         quotes, so quoted fields and comma-in-description are untouched. */
+      const grp = line.slice(i + 1, i + 4);
+      const after = line[i + 4];
+      if (/\d$/.test(cur) && /^\d{3}$/.test(grp) && (after === undefined || !/\d/.test(after))) { continue; }
+      out.push(cur.trim()); cur = ""; continue;
+    }
     cur += ch;
   }
   out.push(cur.trim());
@@ -799,14 +807,17 @@ function categorizeByRules(desc, amount) {
 const MONTHS_SHORT = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const MONTHS_LABEL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pad2(n) { return String(n).padStart(2, "0"); }
-function normalizeDate(raw) {
+function normalizeDate(raw, order) {
   if (!raw) return null;
   const s = String(raw).trim();
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return m[1] + "-" + pad2(m[2]) + "-" + pad2(m[3]);
   m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
   if (m) {
-    let d = +m[1], mo = +m[2], y = +m[3];
+    let a = +m[1], b = +m[2], y = +m[3], d, mo;
+    /* B2 fix: honour a file-level date order inferred from unambiguous
+       rows (order='mdy' => month first). Default stays day-first (dmy). */
+    if (order === "mdy") { mo = a; d = b; } else { d = a; mo = b; }
     if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }
     if (y < 100) y += 2000;
     if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
@@ -994,7 +1005,7 @@ function detectRecurringBills(txs) {
 }
 function buildInsights(txs, targets) {
   const out = [];
-  const cur = latestMonthKey(txs);
+  const cur = overviewMonthKey(txs);
   const prev = lastNMonthKeys(cur, 2)[0];
   /* Comparisons must be like-for-like: a month still in progress is only
      compared against the SAME day-of-month last month, otherwise early in
@@ -1037,6 +1048,18 @@ function buildInsights(txs, targets) {
   return out.slice(0, 5);
 }
 
+function inferDateOrder(values) {
+  /* Decide DD/MM vs MM/DD for a whole file from any unambiguous row
+     (a part > 12 can only be the day). Returns "dmy", "mdy" or null. */
+  for (const v of (values || [])) {
+    const m = String(v || "").trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+    if (!m) continue;
+    const a = +m[1], b = +m[2];
+    if (a > 12 && b <= 12) return "dmy";
+    if (b > 12 && a <= 12) return "mdy";
+  }
+  return null;
+}
 function parseStatementCSV(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) throw new Error("empty");
@@ -1051,6 +1074,7 @@ function parseStatementCSV(text) {
   const balIdx = header.findIndex((h) => h.includes("balance"));
   const num = (v) => { const n = Number(String(v || "").replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; };
 
+  const dateOrder = inferDateOrder(lines.slice(1).map((line) => parseCSVLine(line)[dateIdx]));
   const rows = lines.slice(1).map((line) => {
     const cols = parseCSVLine(line);
     let amount = 0;
@@ -1062,7 +1086,7 @@ function parseStatementCSV(text) {
     }
     const name = (cols[descIdx] || "").trim();
     return {
-      date: normalizeDate(cols[dateIdx]) || "",
+      date: normalizeDate(cols[dateIdx], dateOrder) || "",
       name,
       category: categorizeByRules(name, amount), /* TS2 fix: always categorise via app rules; ignore any category column in the CSV */
       amount,
@@ -3598,7 +3622,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
     const set = new Set(txs.filter((t) => t.date && t.amount < 0).map((t) => t.date.slice(0, 7)));
     return [...set].sort().reverse();
   }, [txs]);
-  const [monthKey, setMonthKey] = useState(monthsWithData[0] || latestMonthKey(txs));
+  const [monthKey, setMonthKey] = useState(overviewMonthKey(txs));
   const [openCat, setOpenCat] = useState(null);
   const [compareTargets, setCompareTargets] = useState(false);
   const activeKey = monthsWithData.includes(monthKey) ? monthKey : (monthsWithData[0] || monthKey);
@@ -5080,7 +5104,7 @@ function NetWorthCard({ banks, accountData, transactions }) {
           {acctRows.map((r, i) => (
             <div className="nw2-acct" key={i}>
               <span className="nw2-acct-l"><span className="nw2-av">{String(r.b || "?").charAt(0).toUpperCase()}</span>{r.b}</span>
-              <strong>{formatMoney(r.bal)}</strong>
+              <strong>{formatMoneyNative(r.bal, FX.bankCurrency[r.b] || "GBP")}</strong>
             </div>
           ))}
         </div>
@@ -6294,7 +6318,7 @@ function GoalGetterHeroV2(props) {
 
 
 function CompositionCardV2({ transactions, depth }) {
-  const k = latestMonthKey(transactions || []);
+  const k = overviewMonthKey(transactions || []);
   const cats = spendByCategoryForMonth(transactions || [], k);
   const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((s, e) => s + e[1], 0);
@@ -7048,6 +7072,12 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
+  React.useEffect(() => {
+    if (!runTour) return;
+    const onKey = (e) => { if (e.key === "Escape") onFinishTour(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [runTour, onFinishTour]);
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [catReviewOpen, setCatReviewOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -7094,6 +7124,8 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       </div>
       {runTour && (
         <div className="tour-card">
+          <button className="tour-skip-x" onClick={onFinishTour} aria-label="Skip tour" title="Skip tour"
+            style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: "var(--muted)", fontSize: 15, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
           <div className="tour-step-count">Step {tourStep + 1} of {OVERVIEW_TOUR.length}</div>
           <h3 className="tour-title">{copy.title}</h3>
           <p className="tour-body">{copy.body}</p>
@@ -7101,6 +7133,8 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
             {OVERVIEW_TOUR.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
           </div>
           <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= OVERVIEW_TOUR.length - 1 ? "Finish" : "Next"}</button>
+          <button className="tour-skip" onClick={onFinishTour}
+            style={{ display: "block", width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Skip tour</button>
         </div>
       )}
       {customiseOpen && (
