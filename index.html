@@ -6355,10 +6355,11 @@ function CompositionCardV2({ transactions, depth }) {
 }
 
 function PacingVsTargetV2({ transactions, targets, depth }) {
-  const key = currentMonthKey();
+  const key = overviewMonthKey(transactions);
+  const isCurrentMonth = key === currentMonthKey();
   const cats = spendByCategoryForMonth(transactions || [], key);
   const day = today().getDate(), dim = daysInCurrentMonth();
-  const elapsed = day / dim;
+  const elapsed = isCurrentMonth ? day / dim : 1;
   const rows = TX_CATEGORIES.map((c) => ({ c, spent: cats[c] || 0, target: Number((targets || {})[c]) || 0 })).filter((r) => r.target > 0);
   if (!rows.length) return (<div className="glass-card dash-card"><span className="card-label">Category vs target</span><div className="oh-sub" style={{ marginTop: 8 }}>Set targets to compare against.</div></div>);
   const tickPct = Math.round(elapsed * 100);
@@ -6373,9 +6374,13 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
   const onTrackN = enrich.length - overs.length;
   const netUnder = Math.round(enrich.reduce((s, r) => s + (r.expected - r.spent), 0));
   const overNames = overs.map((r) => displayCat(r.c));
-  const aheadPhrase = overs.length === 0 ? "every category is under its day-" + day + " pace"
-    : overs.length === 1 ? "only " + overNames[0] + " is running ahead"
-    : overNames.length + " categories are running ahead";
+  const aheadPhrase = isCurrentMonth
+    ? (overs.length === 0 ? "every category is under its day-" + day + " pace"
+      : overs.length === 1 ? "only " + overNames[0] + " is running ahead"
+      : overNames.length + " categories are running ahead")
+    : (overs.length === 0 ? "every category came in under target"
+      : overs.length === 1 ? "only " + overNames[0] + " went over target"
+      : overNames.length + " categories went over target");
 
   if (depth === "chips") {
     return (
@@ -6387,11 +6392,11 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
               <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
               <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
               <span className="v2pt-val">{formatMoney(Math.round(r.spent))} / {formatMoney(Math.round(r.target))}</span>
-              <span className={"v2pt-chip " + (r.over ? "v2pt-over" : "v2pt-ok")}>{r.over ? "over pace" : "on track"}</span>
+              <span className={"v2pt-chip " + (r.over ? "v2pt-over" : "v2pt-ok")}>{r.over ? (isCurrentMonth ? "over pace" : "over") : (isCurrentMonth ? "on track" : "under")}</span>
             </div>
           ))}
         </div>
-        <div className="v2wg-foot"><strong>{onTrackN} of {enrich.length}</strong> budget{enrich.length !== 1 ? "s" : ""} on track{overs.length ? " — just " + overNames.join(", ") + " running a little fast." : " — nothing running ahead of pace."}</div>
+        <div className="v2wg-foot"><strong>{onTrackN} of {enrich.length}</strong> budget{enrich.length !== 1 ? "s" : ""} {isCurrentMonth ? "on track" : "under target"}{overs.length ? " — just " + overNames.join(", ") + (isCurrentMonth ? " running a little fast." : " over.") : (isCurrentMonth ? " — nothing running ahead of pace." : " — nothing over target.")}</div>
       </div>
     );
   }
@@ -6400,18 +6405,20 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
     return (
       <div className="glass-card dash-card">
         <span className="card-label">Category vs target</span>
-        <div className="v2pt-cap">bar fills to target · <span className="v2pt-tk">tick = day-{day} pace ({tickPct}%)</span></div>
+        <div className="v2pt-cap">{isCurrentMonth ? <>bar fills to target · <span className="v2pt-tk">tick = day-{day} pace ({tickPct}%)</span></> : <>bar fills to target · full month</>}</div>
         <div className="v2pt-rows">
           {enrich.map((r) => (
             <div className="v2pt-row v2pt-full" key={r.c}>
               <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-              <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /><span className="v2pt-tick" style={{ left: tickPct + "%" }} /></div>
+              <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} />{isCurrentMonth && <span className="v2pt-tick" style={{ left: tickPct + "%" }} />}</div>
               <span className="v2pt-st"><strong>{formatMoney(Math.round(r.spent))}</strong> / {formatMoney(Math.round(r.target))}</span>
               <span className={"v2pt-dd " + (r.over ? "v2-bad" : "v2-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
             </div>
           ))}
         </div>
-        <div className="v2wg-foot">{overs.length === 0 ? "Every category is left of the pace tick — tracking under where you'd expect by day " + day + "." : (overs.length === 1 ? "Only " + overNames[0] + " is past the pace tick" : overNames.join(", ") + " are past the pace tick") + " — everything else is tracking under."}</div>
+        <div className="v2wg-foot">{isCurrentMonth
+          ? (overs.length === 0 ? "Every category is left of the pace tick — tracking under where you'd expect by day " + day + "." : (overs.length === 1 ? "Only " + overNames[0] + " is past the pace tick" : overNames.join(", ") + " are past the pace tick") + " — everything else is tracking under.")
+          : (overs.length === 0 ? "Every category came in under target this month." : (overs.length === 1 ? "Only " + overNames[0] + " went over target" : overNames.join(", ") + " went over target") + " — everything else came in under.")}</div>
       </div>
     );
   }
@@ -6429,7 +6436,7 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
           </div>
         ))}
       </div>
-      <div className="v2wg-foot">You're <strong className={netUnder >= 0 ? "v2-good" : "v2-bad"}>{formatMoney(Math.abs(netUnder))} {netUnder >= 0 ? "under" : "over"}</strong> your day-{day} pace — {goal ? (netUnder >= 0 ? "that underspend is heading toward your goal." : "worth easing off to keep the goal on track.") : aheadPhrase}.</div>
+      <div className="v2wg-foot">You're <strong className={netUnder >= 0 ? "v2-good" : "v2-bad"}>{formatMoney(Math.abs(netUnder))} {netUnder >= 0 ? "under" : "over"}</strong> {isCurrentMonth ? "your day-" + day + " pace" : "your targets"} — {goal ? (netUnder >= 0 ? "that underspend is heading toward your goal." : "worth easing off to keep the goal on track.") : aheadPhrase}.</div>
     </div>
   );
 }
@@ -6492,7 +6499,7 @@ function BillsV2({ transactions, billExcludes, depth }) {
 }
 
 function TopMerchantsV2({ transactions, depth }) {
-  const key = currentMonthKey();
+  const key = overviewMonthKey(transactions);
   const txs = (transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key);
   const norm = (n) => String(n || "Unknown").toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim() || "unknown";
   const by = {};
@@ -6678,7 +6685,7 @@ function UncatBanner({ count, onSort, label }) {
 }
 
 function computeSafeToSpend(targets, transactions, rollovers, billExcludes) {
-  const key = currentMonthKey();
+  const key = overviewMonthKey(transactions);
   const budget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const roll = rolloverForMonth(rollovers, key);
   const spent = spendForMonth(transactions || [], key);
