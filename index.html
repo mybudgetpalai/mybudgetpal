@@ -6629,7 +6629,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const greetLine = (lk && lk < key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
-  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers, persona, v2t };
+  const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers, persona };
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
 
