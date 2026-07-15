@@ -702,9 +702,10 @@ function formatMoney(n) {
   const sign = n < 0 ? "-" : "";
   const sym = CURRENCY_SYMBOLS[FX.home] || "£";
   const v = Math.abs(Number(n) || 0);
-  /* Whole pounds stay clean (no ".00"); anything with real pence keeps them,
-     otherwise sub-£1 values collapsed to "£0" and pence vanished everywhere. */
-  const dp = Math.abs(v - Math.round(v)) < 0.005 ? 0 : 2;
+  /* Whole pounds — pence are noise at a glance. One exception: a real but
+     sub-£1 amount must not flatten to "£0" (that's what made phantom "£0 bills"
+     look legitimate), so those keep their pence. */
+  const dp = (v > 0 && v < 1) ? 2 : 0;
   return sign + sym + v.toLocaleString("en-GB", { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 function formatNum(n) {
@@ -725,7 +726,7 @@ function formatMoneyNative(n, cur) {
   const sign = n < 0 ? "-" : "";
   const sym = CURRENCY_SYMBOLS[cur] || "£";
   const v = Math.abs(Number(n) || 0);
-  const dp = Math.abs(v - Math.round(v)) < 0.005 ? 0 : 2;
+  const dp = (v > 0 && v < 1) ? 2 : 0;
   return sign + sym + v.toLocaleString("en-GB", { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 function formatSize(bytes) {
