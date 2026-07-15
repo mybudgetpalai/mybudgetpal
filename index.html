@@ -6338,6 +6338,46 @@ const HOME_WIDGETS = {
    through every intermediate component. DashboardScreen listens. */
 function goToView(v) { window.dispatchEvent(new CustomEvent("mbp-goto", { detail: v })); }
 
+/* ---- Hash routing -------------------------------------------------------
+   Keeps the dashboard page in the URL (#/overview, #/transactions, ...) so the
+   browser's back/forward buttons work and a refresh lands on the same page.
+   Drop-in replacement for useState: every existing setView(...) call now also
+   pushes a history entry. */
+const ROUTE_KEYS = VIEWS.map((v) => v.key).concat(["settings", "mapping", "ask"]);
+function readHashView(fallback) {
+  if (typeof window === "undefined") return fallback;
+  const raw = (window.location.hash || "").replace(/^#\/?/, "").split("?")[0];
+  return ROUTE_KEYS.includes(raw) ? raw : fallback;
+}
+function writeHashView(v, replace) {
+  if (typeof window === "undefined") return;
+  const next = "#/" + v;
+  if (window.location.hash === next) return;
+  const url = window.location.pathname + window.location.search + next;
+  if (replace) window.history.replaceState({ mbpView: v }, "", url);
+  else window.history.pushState({ mbpView: v }, "", url);
+}
+function useHashView(initial) {
+  const [view, setViewRaw] = React.useState(() => readHashView(initial));
+  /* Stamp the starting page into the URL so the first Back press has a target. */
+  React.useEffect(() => { writeHashView(readHashView(initial), true); }, []);
+  /* Back / forward, and any manual hash edit. */
+  React.useEffect(() => {
+    const onPop = () => setViewRaw(readHashView(initial));
+    window.addEventListener("popstate", onPop);
+    window.addEventListener("hashchange", onPop);
+    return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("hashchange", onPop); };
+  }, [initial]);
+  const setView = React.useCallback((v) => {
+    setViewRaw((prev) => {
+      const next = typeof v === "function" ? v(prev) : v;
+      if (next !== prev) writeHashView(next, false);
+      return next;
+    });
+  }, []);
+  return [view, setView];
+}
+
 function computePaceV2(s) {
   const day = today().getDate();
   const dim = s.daysInMonth;
@@ -7287,7 +7327,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
 
 function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billRejects, onRejectBill, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
   const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
-  const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
+  const [view, setView] = useHashView(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
   /* Item 16: how many recurring payments we could offer to track. Only meaningful
      once there's data and the Cx hasn't been through the flow yet. */
@@ -8526,6 +8566,10 @@ function App() {
     setUserId(null); setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setStatements([]); setPlan(null);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
+    /* Drop any #/page route so the landing page doesn't carry a stale hash. */
+    if (typeof window !== "undefined" && window.location.hash) {
+      window.history.replaceState({}, "", window.location.pathname + window.location.search);
+    }
     setStage("landing");
   };
 
