@@ -238,6 +238,7 @@ const ICON_PATHS = {
   alert: "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z|M12 9v4|M12 17h.01",
   edit: "M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z",
   inbox: "M22 12h-6l-2 3h-4l-2-3H2|M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z",
+  bell: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9|M13.7 21a2 2 0 0 1-3.4 0",
   upload: "M22 12h-6l-2 3h-4l-2-3H2|M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z|M12 15V3|M8.5 6.5 12 3l3.5 3.5",
   file: "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z|M14 2v6h6",
   chart: "M3 3v18h18|M8 17V9|M13 17V5|M18 17v-3",
@@ -3694,12 +3695,12 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
       </div>
       <div className="topbar-right">
         <div className="upload-statement-wrap">
-          <button className="btn btn-ghost upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="upload" size={17} className="upload-btn-icon" /><span className="upload-btn-label">Upload statement</span></button>
+          <button className="btn btn-primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={15} className="upload-btn-icon" /><span className="upload-btn-label">Upload statement</span><span className="upload-btn-label-short">Upload</span></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
         <div className="inbox-wrap" ref={inboxRef}>
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
-            <Icon name="inbox" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
+            <Icon name="bell" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
           </button>
           {inboxOpen && (
             <div className="inbox-menu">
@@ -9432,8 +9433,9 @@ function App() {
   .brand-word { font-weight: 700; letter-spacing: -0.4px; color: var(--ink); }
   .brand-word-2 { color: var(--grad-3); }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
-  .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
-  .upload-btn-icon { display: none; }
+  .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .upload-btn-icon { display: block; flex-shrink: 0; }
+  .upload-btn-label-short { display: none; }
   .avatar-wrap { position: relative; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .avatar-menu { position: absolute; top: 44px; right: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-pop); padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
@@ -9705,7 +9707,7 @@ function App() {
     /* dashboard */
     .topbar { padding: 12px 14px; }
     .topbar-right { gap: 8px; }
-    .upload-statement-btn { padding: 8px 10px; font-size: 12px; }
+    .upload-statement-btn { padding: 8px 13px; font-size: 12px; }
     .brand { font-size: 14px; }
     .main-content { padding: 16px; gap: 14px; }
     .dash-card { padding: var(--card-pad-sm); border-radius: var(--radius-card); }
@@ -10413,8 +10415,9 @@ function App() {
     .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
     .topbar-left .brand { min-width: 0; white-space: nowrap; flex-shrink: 0; }
     .topbar-right { flex-shrink: 0; }
-    .upload-statement-btn { white-space: nowrap; padding: 8px; }
+    .upload-statement-btn { white-space: nowrap; padding: 8px 13px; gap: 5px; }
     .upload-btn-label { display: none; }
+    .upload-btn-label-short { display: inline; }
     .upload-btn-icon { display: block; }
 
     /* Sidebar drawer: show close control, allow it to scroll */
