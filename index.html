@@ -4060,7 +4060,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   return (
     <div className="bd-page">
       {onOpenCatReview && <UncatBanner count={monthUncat} onSort={onOpenCatReview} label={"in " + monthLabelFromKey(activeKey) + " aren\u2019t categorised"} />}
-      <div className="glass-card dash-card bd-box">
+      <div className="glass-card dash-card bd-box bd-box-hero">
         <div className="summary-head">
           <span className="card-label">Spending Breakdown</span>
           <select className="bd-month-select" value={activeKey} onChange={(e) => { setMonthKey(e.target.value); setOpenCat(null); }}>
@@ -4087,7 +4087,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
       <div className="bd-row">
         <div className="glass-card dash-card bd-box bd-box-where">
           <div className="bd-box-head">
-            <span className="bd-box-title">{whereTitle}</span>
+            <span className="bd-box-title">{whereTitle}<span className="bd-box-hint">Tap a category to see its transactions</span></span>
             <label className="bd-check">
               <input type="checkbox" checked={compareTargets} onChange={(e) => setCompareTargets(e.target.checked)} />
               <span>Compare to targets</span>
@@ -9523,7 +9523,13 @@ function App() {
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
   .page-heading { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin: 0 4px 14px; }
   .bd-box { max-width: none; }
+  /* Hero tile holds one line of figures + a ring, so the stock card padding
+     left a big empty band underneath. Tighten it to hug its content. */
+  .bd-box-hero { padding-top: 18px; padding-bottom: 18px; }
+  .bd-box-hero .summary-head { margin-bottom: 2px; }
   .bd-box-title { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+  /* Sits under the section title: the rows are clickable but nothing said so. */
+  .bd-box-hint { display: block; margin-top: 3px; font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ink-3); opacity: 0.85; }
   .bd-row { display: flex; gap: 16px; align-items: stretch; }
   .bd-row { flex-wrap: wrap; }
   .bd-box-where { flex: 2 1 340px; min-width: 300px; }
@@ -9540,8 +9546,8 @@ function App() {
   .bd-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); cursor: pointer; user-select: none; }
   .bd-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
   .bd-notarget { color: var(--ink-3); font-weight: 400; font-size: 12px; }
-  .bd-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-  .bd-headline { color: var(--ink); font-size: 30px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
+  .bd-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 2px; }
+  .bd-headline { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .bd-sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
   .bd-month-select { background-color: var(--accent-soft); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238fb4ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; color: var(--ink); border: 1px solid var(--accent); border-radius: 10px; padding: 8px 32px 8px 12px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; transition: background-color 0.15s, border-color 0.15s; }
@@ -9986,9 +9992,9 @@ function App() {
   .balance-input-wrap { align-items: center; }
   .balance-input-wrap .target-input { text-align: right; }
 
-  .bd-hero-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+  .bd-hero-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; flex: 0 0 auto; }
   .bd-hero-ring .budget-ring-wrap { margin: 0; }
-  .bd-hero-ring .budget-ring { width: 104px; height: 104px; }
+  .bd-hero-ring .budget-ring { width: 92px; height: 92px; }
   .bd-hero-ring .budget-ring-pct { font-size: 22px; }
   .bd-hero-ring .budget-ring-sub { font-size: 10px; }
 
@@ -10295,7 +10301,7 @@ function App() {
   .review-tile.rt-flat { border-color: var(--line-strong); }
   .rt-flat .rt-verdict { color: var(--ink-3); }
   .rt-label { color: var(--ink-2); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-  .rt-actual { color: var(--ink); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .rt-actual { color: var(--ink); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .rt-planned { color: var(--ink-3); font-size: 12px; }
   .rt-verdict { font-size: 12px; font-weight: 600; margin-top: 4px; }
   .rt-good .rt-verdict { color: var(--pos); }
@@ -10311,7 +10317,7 @@ function App() {
   .rv-over { color: var(--neg); font-weight: 600; }
   .rv-under { color: var(--pos); font-weight: 600; }
   .plan-headline { display: flex; flex-direction: column; margin: 0 0 8px; }
-  .plan-big { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; }
+  .plan-big { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .plan-sub { color: var(--ink-2); font-size: 13px; }
   .plan-verdict { font-size: 13px; font-weight: 600; padding: 10px 12px; border-radius: 12px; }
   .plan-verdict.rt-good { background: rgba(18,161,80,0.12); color: var(--pos); }
