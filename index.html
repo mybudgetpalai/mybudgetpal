@@ -6565,8 +6565,10 @@ function BillsV2({ transactions, billExcludes, depth }) {
           const od = !b.paid && !b.upcoming;
           return (
             <div className={"v2-blrow" + (b.paid ? " v2-bl-paid" : "")} key={i}>
-              <span className={"v2-bdot " + (b.paid ? "v2-bd-paid" : od ? "v2-bd-od" : "v2-bd-up")} />
-              <span className="v2-bnm">{titleCaseBill(b.name)}{b.paid ? "" : od ? <span className="v2-bmeta-od"> · overdue</span> : <span className="v2-bmeta"> · due {b.due}</span>}</span>
+              {b.paid
+                ? <span className="v2-bdot v2-bd-tick"><Icon name="check" size={8} strokeWidth={4} /></span>
+                : <span className={"v2-bdot " + (od ? "v2-bd-od" : "v2-bd-up")} />}
+              <span className="v2-bnm">{titleCaseBill(b.name)}{b.paid ? <span className="v2-bpaid">Paid</span> : od ? <span className="v2-bmeta-od"> · overdue</span> : <span className="v2-bmeta"> · due {b.due}</span>}</span>
               <span className={"v2-bamt" + (od ? " v2-bamt-od" : "")}>{formatMoney(b.amount)}</span>
             </div>
           );
@@ -10579,7 +10581,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-bd-od { background:var(--neg); } .v2-bd-up { background:var(--accent); } .v2-bd-paid { background:var(--pos); }
   .v2-bnm { font-size:12.5px; } .v2-bmeta { color:var(--ink-3); } .v2-bmeta-od { color:var(--neg); font-weight:600; }
   .v2-bamt { font-size:12.5px; font-weight:600; white-space:nowrap; text-align:right; }
-  .v2-bl-paid .v2-bnm, .v2-bl-paid .v2-bamt { color:var(--ink-3); text-decoration:line-through; }
+  /* Struck-through name + amount read as "cancelled/removed" rather than "paid".
+     A filled tick in the existing dot slot and a PAID badge say done instead. */
+  .v2-bl-paid .v2-bnm, .v2-bl-paid .v2-bamt { color:var(--ink-3); }
+  .v2-bd-tick { background:var(--pos); color:#fff; display:flex; align-items:center; justify-content:center; width:13px; height:13px; margin-left:-2px; }
+  .v2-bpaid { display:inline-block; margin-left:7px; padding:1.5px 6px; border-radius:999px; background:color-mix(in srgb, var(--pos) 14%, transparent); color:var(--pos); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; vertical-align:1px; }
   .v2-bamt-od { color:var(--neg); }
   .v2-blnext { margin-top:12px; padding-top:11px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-2); }
   .v2-blnext strong { color:var(--ink); }
