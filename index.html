@@ -1190,7 +1190,26 @@ async function aiCategorize(descriptions) {
 function buildTxDigest(transactions) {
   const txs = (transactions || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 1200);
   const lines = txs.map((t) => (t.date || "") + "|" + (t.name || "") + "|" + (t.amount < 0 ? "-" : "+") + Math.abs(Number(t.amount) || 0).toFixed(2) + "|" + (t.category || "Uncategorized"));
-  return { home: FX.home, count: txs.length, transactions: lines };
+  /* Ground the model in the app's OWN totals. Previously we shipped raw lines and asked the
+     model to "do the arithmetic carefully" over up to 1200 rows — its sums drifted from what
+     the dashboard showed, so Ask and the rest of the app disagreed. These are the same helpers
+     the UI renders from, so a quoted figure always ties out. */
+  const dated = txs.filter((t) => t.date);
+  const monthKeys = [...new Set(dated.map((t) => t.date.slice(0, 7)))].sort().reverse().slice(0, 24);
+  const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+  const months = monthKeys.map((k) => {
+    const cats = spendByCategoryForMonth(dated, k);
+    const byCat = {};
+    Object.keys(cats).forEach((c) => { if (cats[c] > 0) byCat[c] = r2(cats[c]); });
+    return { month: k, income: r2(incomeForMonth(dated, k)), spend: r2(spendForMonth(dated, k)), net: r2(incomeForMonth(dated, k) - spendForMonth(dated, k)), by_category: byCat };
+  });
+  const merchants = {};
+  dated.filter((t) => t.category !== "Income" && t.amount < 0).forEach((t) => {
+    const n = t.name || "(unknown)";
+    merchants[n] = r2((merchants[n] || 0) + Math.abs(Number(t.amount) || 0));
+  });
+  const topMerchants = Object.entries(merchants).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([name, total]) => ({ name, total }));
+  return { home: FX.home, count: txs.length, today: today().toISOString().slice(0, 10), current_month: currentMonthKey(), totals: { months, top_merchants: topMerchants }, transactions: lines };
 }
 async function aiAskInsights(question, transactions) {
   const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
