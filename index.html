@@ -148,6 +148,16 @@ const ICON_PATHS = {
   info: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M12 11v5|M12 8h.01",
   checkcircle: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M8.5 12.2l2.4 2.4 4.6-4.8",
 };
+/* The 3-column mark from the app icon, so the header matches the installed PWA. */
+function BrandMark({ size = 20 }) {
+  return (
+    <svg className="brand-mark" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="14" width="4.6" height="7" rx="2.3" fill="currentColor" />
+      <rect x="9.7" y="9" width="4.6" height="12" rx="2.3" fill="currentColor" />
+      <rect x="16.4" y="4" width="4.6" height="17" rx="2.3" fill="currentColor" />
+    </svg>
+  );
+}
 function Icon({ name, size = 16, strokeWidth = 2, className = "", style }) {
   const d = ICON_PATHS[name] || ICON_PATHS.tag;
   return (
@@ -398,6 +408,11 @@ function parseNavLayout(profile) {
   const wanted = wantedT.includes("categories") ? wantedT : [...wantedT, "categories"];
   const out = valid.filter((k) => wanted.includes(k));
   return out.includes("overview") ? out : valid;
+}
+function parseBillRejects(profile) {
+  const raw = profile?.bill_rejects;
+  let arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch (e) { return null; } })() : null);
+  return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
 }
 function parseBillExcludes(profile) {
   const raw = profile?.bill_excludes;
@@ -3385,7 +3400,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     <div className="topbar">
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview">{APP_NAME}</div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><BrandMark size={19} /><span className="brand-word">{APP_NAME}</span></div>
       </div>
       <div className="topbar-right">
         <div className="upload-statement-wrap">
@@ -4243,8 +4258,10 @@ function BillsSetupModal({ transactions, confirmed, onSave, onClose }) {
   );
 }
 
-function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
-  const [dismissed, setDismissed] = useState([]);
+function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejected, onReject }) {
+  /* Rejections must persist — local state meant "No" was forgotten on reload and
+     the same payment was asked about forever. */
+  const dismissed = rejected || [];
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
   const conf = confirmed || [];
@@ -4311,7 +4328,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
               <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} {"\u00B7"} ~{formatMoney(b.amount)}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
               <div className="bill-right">
                 <button className="glass-btn primary" style={{ padding: "5px 12px", fontSize: 13 }} onClick={() => onToggleConfirm(b.name)}>Yes</button>
-                <button className="bill-remove" onClick={() => setDismissed((d) => [...d, b.name])}>No</button>
+                <button className="bill-remove" onClick={() => onReject && onReject(b.name)}>No</button>
               </div>
             </div>
           ))}
@@ -4982,8 +4999,8 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
               <span className="plan-big">{formatMoney(endBal)}</span>
               <span className="plan-sub">projected {word} by {monthLabelFromKey(lastKey)} {lastKey.slice(0, 4)}, if you keep to your current budgets</span>
             </div>
-            <div className="plan-verdict rt-good">Set a plan to turn this projection into a real goal — with monthly targets that all tie back to one number.</div>
-            <button className="glass-btn primary" style={{ marginTop: 12 }} onClick={onEditPlan}>Set up your plan</button>
+            <div className="plan-verdict rt-good">This is a projection from your targets — not a saved plan. Set a goal balance and date to turn it into one, with monthly targets that all tie back to one number.</div>
+            <button className="glass-btn primary" style={{ marginTop: 12 }} onClick={onEditPlan}>Set a goal for this plan</button>
           </>
         )}
         <p className="subtitle" style={{ margin: "10px 0 0" }}>
@@ -6194,8 +6211,12 @@ function goToView(v) { window.dispatchEvent(new CustomEvent("mbp-goto", { detail
 function computePaceV2(s) {
   const day = today().getDate();
   const dim = s.daysInMonth;
-  const paceDay = day > 0 ? Math.round(s.spent / day) : 0;
-  const projected = paceDay * dim + s.reserved;
+  /* Round for display only. Projecting from the ROUNDED £/day multiplied the
+     rounding error by the whole month and disagreed with the Insights figure
+     (£907 vs £911 on the same data). */
+  const paceDayRaw = day > 0 ? s.spent / day : 0;
+  const paceDay = Math.round(paceDayRaw);
+  const projected = paceDayRaw * dim + s.reserved;
   const rawDiff = s.pot - projected;
   const under = rawDiff >= 0;
   const diff = Math.round(Math.abs(rawDiff));
@@ -8954,7 +8975,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .hamburger, .hamburger::before, .hamburger::after { display: block; width: 18px; height: 2px; background: var(--ink); border-radius: 2px; position: relative; }
   .hamburger::before, .hamburger::after { content: ""; position: absolute; }
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
-  .brand { color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  /* Mark + wordmark, matching the boot screen and the installed icon. */
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand-mark { color: var(--grad-3); flex-shrink: 0; }
+  .brand-word { font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
   .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
   .upload-btn-icon { display: none; }
