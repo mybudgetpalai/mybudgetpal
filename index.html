@@ -3691,11 +3691,11 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     <div className="topbar">
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><BrandMark size={19} /><span className="brand-word">My<span className="brand-word-2">BudgetPal</span></span></div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-word">My<span className="brand-word-2">BudgetPal</span></span></div>
       </div>
       <div className="topbar-right">
         <div className="upload-statement-wrap">
-          <button className="btn btn-primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={15} className="upload-btn-icon" /><span className="upload-btn-label">Upload statement</span><span className="upload-btn-label-short">Upload</span></button>
+          <button className="btn btn-primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
         <div className="inbox-wrap" ref={inboxRef}>
@@ -9427,15 +9427,14 @@ function App() {
   .hamburger::before, .hamburger::after { content: ""; position: absolute; }
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
   /* Mark + wordmark, matching the boot screen and the installed icon. */
-  .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand { display: inline-flex; align-items: center; color: var(--ink); font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
   .brand-mark { color: var(--grad-3); flex-shrink: 0; }
   /* Two-tone, same as the splash: dark "My", accent "BudgetPal". */
-  .brand-word { font-weight: 700; letter-spacing: -0.4px; color: var(--ink); }
+  .brand-word { font-weight: 800; letter-spacing: -0.7px; color: var(--ink); line-height: 1; }
   .brand-word-2 { color: var(--grad-3); }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
-  .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .upload-statement-btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .upload-btn-icon { display: block; flex-shrink: 0; }
-  .upload-btn-label-short { display: none; }
   .avatar-wrap { position: relative; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .avatar-menu { position: absolute; top: 44px; right: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-pop); padding: 6px; display: flex; flex-direction: column; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
@@ -9707,8 +9706,8 @@ function App() {
     /* dashboard */
     .topbar { padding: 12px 14px; }
     .topbar-right { gap: 8px; }
-    .upload-statement-btn { padding: 8px 13px; font-size: 12px; }
-    .brand { font-size: 14px; }
+    .upload-statement-btn { width: 36px; height: 36px; padding: 0; }
+    .brand { font-size: 20px; }
     .main-content { padding: 16px; gap: 14px; }
     .dash-card { padding: var(--card-pad-sm); border-radius: var(--radius-card); }
     .oh-needs { padding: var(--card-pad-sm); }
@@ -10415,9 +10414,7 @@ function App() {
     .topbar-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
     .topbar-left .brand { min-width: 0; white-space: nowrap; flex-shrink: 0; }
     .topbar-right { flex-shrink: 0; }
-    .upload-statement-btn { white-space: nowrap; padding: 8px 13px; gap: 5px; }
-    .upload-btn-label { display: none; }
-    .upload-btn-label-short { display: inline; }
+    .upload-statement-btn { flex-shrink: 0; }
     .upload-btn-icon { display: block; }
 
     /* Sidebar drawer: show close control, allow it to scroll */
@@ -10933,7 +10930,7 @@ function App() {
 
   .menu-backdrop { position: fixed; inset: 0; z-index: 90; cursor: pointer; }
   .avatar-menu { z-index: 100; }
-  @media (max-width: 400px) { .topbar-left .brand { display: none; } }
+  @media (max-width: 400px) { .topbar-left .brand { font-size: 18px; } }
   @media (max-width: 640px) {
     /* Spending breakdown: keep number left / ring right (side-by-side) */
     .bd-header { flex-direction: row; align-items: center; }
