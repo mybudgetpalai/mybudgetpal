@@ -4,6 +4,71 @@
 <!-- build: 2026-07-10T1300 redeploy -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<script>
+/* Mobile-preview emulation shim. Runs FIRST, before any app code, when the page
+   is loaded inside the desktop testing "Mobile preview" frame (?mp=1). It makes
+   the framed instance behave like a real phone rather than a narrow desktop
+   window: coarse pointer, touch support, mobile UA hints and PWA standalone
+   display. Everything below is a no-op on a normal (non-?mp=1) load. */
+(function () {
+  try {
+    if (!/[?&]mp=1(&|$)/.test(window.location.search)) return;
+    window.__MP_PREVIEW = true;
+
+    /* Touch capability — code that feature-detects touch should see a phone. */
+    if (!("ontouchstart" in window)) {
+      try { window.ontouchstart = null; } catch (e) {}
+    }
+    try {
+      Object.defineProperty(navigator, "maxTouchPoints", { get: function () { return 5; }, configurable: true });
+    } catch (e) {}
+
+    /* Mobile user-agent + platform hints. */
+    var UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+    try { Object.defineProperty(navigator, "userAgent", { get: function () { return UA; }, configurable: true }); } catch (e) {}
+    try { Object.defineProperty(navigator, "platform", { get: function () { return "iPhone"; }, configurable: true }); } catch (e) {}
+    try {
+      Object.defineProperty(navigator, "userAgentData", {
+        get: function () { return { mobile: true, platform: "iOS", brands: [] }; },
+        configurable: true,
+      });
+    } catch (e) {}
+
+    /* pointer:coarse / hover:none — hover-only affordances should disappear. */
+    var origMM = window.matchMedia.bind(window);
+    window.matchMedia = function (q) {
+      var res = origMM(q);
+      if (/pointer\s*:\s*coarse|hover\s*:\s*none|any-pointer\s*:\s*coarse/i.test(q)) {
+        return { matches: true, media: q, onchange: null, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return false; } };
+      }
+      if (/pointer\s*:\s*fine|hover\s*:\s*hover/i.test(q)) {
+        return { matches: false, media: q, onchange: null, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return false; } };
+      }
+      return res;
+    };
+
+    /* PWA standalone display — matches the installed-app experience. */
+    var mmStandalone = window.matchMedia;
+    window.matchMedia = function (q) {
+      if (/display-mode\s*:\s*standalone/i.test(q)) {
+        return { matches: true, media: q, onchange: null, addListener: function () {}, removeListener: function () {}, addEventListener: function () {}, removeEventListener: function () {}, dispatchEvent: function () { return false; } };
+      }
+      return mmStandalone(q);
+    };
+    try { Object.defineProperty(navigator, "standalone", { get: function () { return true; }, configurable: true }); } catch (e) {}
+
+    /* Hide the testing/admin/DEV chrome inside the frame — the host desktop
+       window owns those controls, and they'd otherwise cover the phone screen. */
+    var st = document.createElement("style");
+    st.textContent = ".admin-bar, .testing-bar { display: none !important; }";
+    document.addEventListener("DOMContentLoaded", function () { document.head.appendChild(st); });
+
+    /* Carry the DEV date through into the framed instance. */
+    var dm = /[?&]devdate=([0-9-]+)/.exec(window.location.search);
+    if (dm) window.__MP_DEVDATE = dm[1];
+  } catch (e) { /* never let the shim break a normal load */ }
+})();
+</script>
 <meta name="description" content="MyBudgetPal — upload your bank statements, track spending by category, and hit your savings goals." />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="MyBudgetPal" />
@@ -699,7 +764,10 @@ const FX_FALLBACK = { "GBP>AED": 4.65, "AED>GBP": 0.215, "GBP>USD": 1.27, "USD>G
 /* Module-level FX state: home currency, per-bank currency, locked monthly rates */
 const FX = { ready: false, userId: null, home: "GBP", bankCurrency: {}, rates: {} };
 function fxKey(m, f, t) { return m + "|" + f + "|" + t; }
-let DEV_NOW = null; // dev-only: override for "today" to test month-end triggers
+let DEV_NOW = (typeof window !== "undefined" && window.__MP_DEVDATE) || null; // dev-only: override for "today" to test month-end triggers
+/* True only inside the desktop "Mobile preview" frame. The host window owns the
+   testing chrome, so the framed copy renders as the plain customer experience. */
+const MP_PREVIEW = (typeof window !== "undefined") && !!window.__MP_PREVIEW;
 const DEV_FLAG = (typeof window !== "undefined") && new URLSearchParams(window.location.search).get("dev") === "1";
 function today() { return DEV_NOW ? new Date(DEV_NOW + "T12:00:00") : new Date(); }
 function nowMonth() { return today().toISOString().slice(0, 7); }
@@ -7790,6 +7858,15 @@ function AdminBar({ onOpen }) {
   );
 }
 
+const DEVICE_PRESETS = {
+  iphonese:  { name: "iPhone SE",     w: 375, h: 667,  dpr: 2 },
+  iphone15:  { name: "iPhone 15",     w: 393, h: 852,  dpr: 3 },
+  iphonemax: { name: "iPhone 15 Max", w: 430, h: 932,  dpr: 3 },
+  pixel8:    { name: "Pixel 8",       w: 412, h: 915,  dpr: 2.6 },
+  galaxys23: { name: "Galaxy S23",    w: 360, h: 780,  dpr: 3 },
+  ipadmini:  { name: "iPad mini",     w: 744, h: 1133, dpr: 2 },
+};
+
 function TestingBar({ personaKey, onSetPersona }) {
   const opts = [...Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name })), { key: "no_targets", name: "Default (no targets)" }];
   return (
@@ -8077,6 +8154,9 @@ function App() {
   const [signupMonth, setSignupMonth] = useState(null);
   const [devNow, setDevNow] = useState(null);
   const [mobilePreview, setMobilePreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState("iphone15");
+  const [previewLandscape, setPreviewLandscape] = useState(false);
+  const [mpNonce, setMpNonce] = useState(0);
   const setDevDate = (val) => { DEV_NOW = val || null; setDevNow(val || null); };
   const [reviewManual, setReviewManual] = useState(false);
   const [sessionDismissed, setSessionDismissed] = useState([]);
@@ -8918,9 +8998,9 @@ function App() {
 
   return (
     <>
-      {isAdmin && inApp && <AdminBar onOpen={() => setStage("admin")} />}
-      {isDev && inApp && <TestingBar personaKey={personaKey} onSetPersona={handleSetPersona} />}
-      {(isDev || DEV_FLAG) && inApp && (
+      {isAdmin && inApp && !MP_PREVIEW && <AdminBar onOpen={() => setStage("admin")} />}
+      {isDev && inApp && !MP_PREVIEW && <TestingBar personaKey={personaKey} onSetPersona={handleSetPersona} />}
+      {(isDev || DEV_FLAG) && inApp && !MP_PREVIEW && (
         <div style={{ position: "fixed", bottom: 68, left: 12, zIndex: 9999, background: "#1a1f2b", color: "#e8edf4", padding: "6px 10px", borderRadius: 8, fontSize: 12, display: "flex", gap: 8, alignItems: "center", boxShadow: "0 4px 16px rgba(0,0,0,.3)" }}>
           <span style={{ opacity: 0.7 }}>DEV date:</span>
           <input type="date" value={devNow || ""} onChange={(e) => setDevDate(e.target.value)} style={{ fontSize: 12, padding: "2px 4px", borderRadius: 4, border: "1px solid #3a4356", background: "#0f1420", color: "#e8edf4" }} />
@@ -8928,18 +9008,49 @@ function App() {
           <button onClick={() => setMobilePreview((v) => !v)} style={{ fontSize: 11, cursor: "pointer", background: mobilePreview ? "#2E5BFF" : "#0f1420", border: "1px solid #3a4356", color: "#e8edf4", borderRadius: 4, padding: "3px 8px" }}>{mobilePreview ? "Exit mobile" : "📱 Mobile"}</button>
         </div>
       )}
-      {mobilePreview && inApp && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(15,18,24,0.72)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setMobilePreview(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "#e8edf4", fontSize: 13, fontWeight: 600 }}>Mobile preview {"·"} 390px</span>
-              <button onClick={() => setMobilePreview(false)} style={{ fontSize: 12, cursor: "pointer", background: "#2E5BFF", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px" }}>Close</button>
-            </div>
-            <iframe src={typeof window !== "undefined" ? window.location.href : ""} title="Mobile preview" style={{ width: 390, height: "84vh", border: "10px solid #1a1f2b", borderRadius: 28, background: "#fff", boxShadow: "0 20px 60px rgba(0,0,0,.5)" }} />
+      {mobilePreview && inApp && !MP_PREVIEW && (() => {
+        const dev = DEVICE_PRESETS[previewDevice] || DEVICE_PRESETS.iphone15;
+        const vw = previewLandscape ? dev.h : dev.w;
+        const vh = previewLandscape ? dev.w : dev.h;
+        const maxH = typeof window !== "undefined" ? window.innerHeight - 170 : 800;
+        const scale = Math.min(1, maxH / vh);
+        const personaOpts = [...Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name })), { key: "no_targets", name: "Default (no targets)" }];
+        const src = (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "") + "?mp=1" + (devNow ? "&devdate=" + devNow : "");
+        return (
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(10,13,20,0.9)", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px", overflow: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 8 }}>
+            <span style={{ color: "#e8edf4", fontSize: 13, fontWeight: 700, marginRight: 2 }}>Mobile preview</span>
+            <select value={previewDevice} onChange={(e) => setPreviewDevice(e.target.value)} style={{ fontSize: 12, padding: "4px 6px", borderRadius: 6, background: "#0f1420", color: "#e8edf4", border: "1px solid #3a4356" }}>
+              {Object.keys(DEVICE_PRESETS).map((k) => (
+                <option key={k} value={k}>{DEVICE_PRESETS[k].name + " · " + DEVICE_PRESETS[k].w + "×" + DEVICE_PRESETS[k].h}</option>
+              ))}
+            </select>
+            <button onClick={() => setPreviewLandscape((v) => !v)} style={{ fontSize: 12, cursor: "pointer", background: previewLandscape ? "#2E5BFF" : "#0f1420", color: "#e8edf4", border: "1px solid #3a4356", borderRadius: 6, padding: "4px 10px" }}>{previewLandscape ? "Landscape" : "Portrait"}</button>
+            <button onClick={() => setMpNonce((n) => n + 1)} style={{ fontSize: 12, cursor: "pointer", background: "#0f1420", color: "#e8edf4", border: "1px solid #3a4356", borderRadius: 6, padding: "4px 10px" }}>Reload</button>
+            <span style={{ color: "#8fa3bd", fontSize: 11 }}>{vw + "×" + vh + " · @" + dev.dpr + "x" + (scale < 1 ? " · " + Math.round(scale * 100) + "%" : "")}</span>
+            <button onClick={() => setMobilePreview(false)} style={{ fontSize: 12, cursor: "pointer", background: "#2E5BFF", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontWeight: 600 }}>Close</button>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center", marginBottom: 10 }}>
+            <span style={{ color: "#8fa3bd", fontSize: 11, marginRight: 2 }}>Persona:</span>
+            {personaOpts.map((o) => (
+              <button key={o.key} onClick={() => { handleSetPersona(o.key); setTimeout(() => setMpNonce((n) => n + 1), 350); }} style={{ fontSize: 11, padding: "3px 9px", borderRadius: 999, cursor: "pointer", border: "1px solid rgba(255,255,255,.4)", background: personaKey === o.key ? "#C2410C" : "transparent", color: "#fff", fontWeight: personaKey === o.key ? 700 : 500 }}>{o.name}</button>
+            ))}
+          </div>
+          <div style={{ width: (vw + 24) * scale, height: (vh + 24) * scale, flex: "0 0 auto" }}>
+            <div style={{ width: vw, height: vh, transform: "scale(" + scale + ")", transformOrigin: "top left", border: "12px solid #1a1f2b", borderRadius: previewLandscape ? 34 : 42, boxSizing: "content-box", background: "#fff", boxShadow: "0 24px 70px rgba(0,0,0,.6)", overflow: "hidden" }}>
+              <iframe
+                key={previewDevice + (previewLandscape ? "-l" : "-p") + "-" + mpNonce}
+                src={src}
+                title="Mobile preview"
+                style={{ width: vw, height: vh, border: "none", background: "#fff", display: "block" }}
+              />
+            </div>
+          </div>
+          <div style={{ color: "#5f7291", fontSize: 10, marginTop: 16, textAlign: "center", maxWidth: 480, lineHeight: 1.5 }}>Runs the real mobile code path inside the frame: touch input, pointer:coarse, mobile viewport and PWA standalone display are emulated. Not a desktop resize.</div>
         </div>
-      )}
-      {isDev && stage !== "dashboard" && (
+        );
+      })()}
+      {isDev && !MP_PREVIEW && stage !== "dashboard" && (
         <button onClick={doSkipToDashboard} title="Load the dummy statement data + Dec £15,000 goal and jump straight to the dashboard" style={{ position: "fixed", bottom: 12, right: 12, zIndex: 9999, background: "#2E5BFF", color: "#fff", padding: "11px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 6px 20px rgba(46,91,255,.4)" }}>⚡ Skip to dashboard</button>
       )}
       {stage === "dashboard" && <NotificationBanner notes={notifications} onDismiss={dismissNote} />}
