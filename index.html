@@ -1969,7 +1969,7 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
               <div className="balance-field">
                 <label className="field-label">Opening balance</label>
                 <div className="target-input-wrap" style={{ width: "100%" }}>
-                  <span className="target-currency">{homeSym()}</span>
+                  <span className="target-currency">{curSym(FX.bankCurrency[bank] || "GBP")}</span>
                   <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
                     value={openingInput} onChange={(e) => setOpeningInput(e.target.value)} />
                 </div>
@@ -1977,7 +1977,7 @@ function UploadStatementModal({ onClose, onImport, pushToast, banks }) {
               <div className="balance-field">
                 <label className="field-label">Closing balance</label>
                 <div className="target-input-wrap" style={{ width: "100%" }}>
-                  <span className="target-currency">{homeSym()}</span>
+                  <span className="target-currency">{curSym(FX.bankCurrency[bank] || "GBP")}</span>
                   <input className="target-input" style={{ width: "100%" }} type="number" placeholder="0"
                     value={closingInput} onChange={(e) => setClosingInput(e.target.value)} />
                 </div>
