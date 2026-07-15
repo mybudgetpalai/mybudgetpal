@@ -44,10 +44,13 @@
      which #root was empty and the screen was simply blank. This paints instantly
      from plain CSS and is torn out the moment React mounts. */
   .boot-shell { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #F5F7FA; font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; z-index: 1; }
-  /* Matches the login splash: gradient tile + two-tone wordmark. */
-  .boot-tile { width: 84px; height: 84px; border-radius: 22px; background: linear-gradient(150deg, #3B6BFF 0%, #7C4DFF 60%, #9B5CF0 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 44px rgba(90, 90, 255, .28); }
-  .boot-logo { font-size: 27px; font-weight: 700; letter-spacing: -0.03em; }
-  .boot-my { color: #0B1220; }
+  /* Identical to .lsplash-icon / .lsplash-word — same tile, gradient, bar sizes
+     and wordmark, so the login splash and this boot screen can't drift apart. */
+  .boot-tile { width: 96px; height: 96px; border-radius: 24px; background: linear-gradient(150deg, #2E5BFF 0%, #6A4DFF 60%, #8B5CF6 100%); box-shadow: 0 12px 30px rgba(92, 80, 255, 0.35); display: flex; align-items: flex-end; justify-content: center; gap: 8px; padding: 24px 22px; box-sizing: border-box; }
+  .boot-bar-i { width: 12px; border-radius: 6px; background: #fff; display: block; }
+  .boot-bar-i.b1 { height: 22px; } .boot-bar-i.b2 { height: 36px; } .boot-bar-i.b3 { height: 50px; }
+  .boot-logo { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; }
+  .boot-my { color: #101828; }
   .boot-bp { color: #2E5BFF; }
   .boot-bar { width: 148px; height: 4px; border-radius: 999px; background: #E2E7F0; overflow: hidden; }
   .boot-bar > i { display: block; width: 40%; height: 100%; border-radius: 999px; background: #2E5BFF; animation: bootSlide 1.1s ease-in-out infinite; }
@@ -55,6 +58,7 @@
   @keyframes bootSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
   @media (prefers-color-scheme: dark) {
     .boot-shell { background: #0F1218; } .boot-my { color: #F2F5FA; } .boot-bp { color: #6C8CFF; } .boot-bar { background: #232B38; } .boot-sub { color: #8A96AC; }
+    .boot-tile { box-shadow: 0 12px 30px rgba(92, 80, 255, 0.22); }
   }
   @media (prefers-reduced-motion: reduce) { .boot-bar > i { animation: none; width: 100%; } }
 
@@ -111,11 +115,7 @@ if ('serviceWorker' in navigator) {
 <body>
 <div id="root"><div class="boot-shell" id="boot-shell">
   <div class="boot-tile">
-    <svg width="46" height="46" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="14" width="4.6" height="7" rx="2.3" fill="#fff" />
-      <rect x="9.7" y="9" width="4.6" height="12" rx="2.3" fill="#fff" />
-      <rect x="16.4" y="4" width="4.6" height="17" rx="2.3" fill="#fff" />
-    </svg>
+    <span class="boot-bar-i b1"></span><span class="boot-bar-i b2"></span><span class="boot-bar-i b3"></span>
   </div>
   <div class="boot-logo"><span class="boot-my">My</span><span class="boot-bp">BudgetPal</span></div>
   <div class="boot-bar"><i></i></div>
@@ -159,13 +159,14 @@ const ICON_PATHS = {
   info: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M12 11v5|M12 8h.01",
   checkcircle: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M8.5 12.2l2.4 2.4 4.6-4.8",
 };
-/* The 3-column mark from the app icon, so the header matches the installed PWA. */
+/* Same mark as the login splash and boot screen. Bar heights keep the splash's
+   1 : 1.64 : 2.27 ratio (22/36/50) so the logo reads identically at any size. */
 function BrandMark({ size = 20 }) {
   return (
     <svg className="brand-mark" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="3" y="14" width="4.6" height="7" rx="2.3" fill="currentColor" />
-      <rect x="9.7" y="9" width="4.6" height="12" rx="2.3" fill="currentColor" />
-      <rect x="16.4" y="4" width="4.6" height="17" rx="2.3" fill="currentColor" />
+      <rect x="2.5" y="13.4" width="5" height="8.1" rx="2.5" fill="currentColor" />
+      <rect x="9.5" y="8.2" width="5" height="13.3" rx="2.5" fill="currentColor" />
+      <rect x="16.5" y="3" width="5" height="18.5" rx="2.5" fill="currentColor" />
     </svg>
   );
 }
@@ -3498,7 +3499,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     <div className="topbar">
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><BrandMark size={19} /><span className="brand-word">{APP_NAME}</span></div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><BrandMark size={19} /><span className="brand-word">My<span className="brand-word-2">BudgetPal</span></span></div>
       </div>
       <div className="topbar-right">
         <div className="upload-statement-wrap">
@@ -9127,7 +9128,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* Mark + wordmark, matching the boot screen and the installed icon. */
   .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
   .brand-mark { color: var(--grad-3); flex-shrink: 0; }
-  .brand-word { font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+  /* Two-tone, same as the splash: dark "My", accent "BudgetPal". */
+  .brand-word { font-weight: 700; letter-spacing: -0.4px; color: var(--ink); }
+  .brand-word-2 { color: var(--grad-3); }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
   .upload-statement-btn { padding: 9px 16px; font-size: 13px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; }
   .upload-btn-icon { display: none; }
