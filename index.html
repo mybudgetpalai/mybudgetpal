@@ -6650,7 +6650,9 @@ function LockedCard({ children, onUnlock }) {
 }
 function ThisMonthV2({ persona, transactions, targets, billExcludes, onResumeSetup }) {
   const d = V2_DEPTHS[persona] || V2_DEPTHS.budget_hawk;
-  const hasTargets = TX_CATEGORIES.some((c) => Number((targets || {})[c]) > 0);
+  /* The "Default (no targets)" persona is a view switch and doesn't wipe saved
+     targets, so checking the data alone meant the locked state was unreachable. */
+  const hasTargets = persona !== "no_targets" && TX_CATEGORIES.some((c) => Number((targets || {})[c]) > 0);
   const unlock = () => (onResumeSetup ? onResumeSetup() : goToView("targets"));
   return (
     <div className="oh-grid oh-grid-v2">
@@ -10338,6 +10340,19 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .cvt2-bad { color: var(--neg); }
   .cvt2-mut { color: var(--ink-3); font-weight: 600; font-size: 12px; }
   .cvt2-foot { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; font-size: 12px; line-height: 1.4; color: var(--ink-3); }
+  /* Phones report ~600-640 CSS px, so the old 560px rule never reached them and
+     `display: contents` left every row sizing its own columns. Rebuild each row
+     as a real grid with pinned figure tracks below 760px. */
+  @media (max-width: 760px) {
+    .cvt2-grid { display: block; }
+    .cvt2-h { display: none; }
+    .cvt2-row { display: grid; grid-template-columns: minmax(0,1fr) 104px 84px; align-items: baseline; column-gap: 8px; row-gap: 8px; padding: 13px 0; border-top: 1px solid var(--line); }
+    .cvt2-row:first-of-type { border-top: none; padding-top: 2px; }
+    .cvt2-nm { grid-column: 1; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cvt2-num { grid-column: 2; grid-row: 1; text-align: right; }
+    .cvt2-d { grid-column: 3; grid-row: 1; text-align: right; }
+    .cvt2-track { grid-column: 1 / -1; grid-row: 2; height: 10px; }
+  }
   .sbw2-plot { display: flex; align-items: flex-end; gap: 14px; height: 96px; border-bottom: 1px solid var(--line-strong); margin-top: 18px; }
   .sbw2-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
   .sbw2-val { font-size: 11px; font-weight: 700; color: var(--accent-solid); margin-bottom: 6px; }
@@ -10360,15 +10375,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     /* 2 · Category vs target — stacked rows */
     .cvt2-grid { display: block; }
     .cvt2-grid > span { display: none; }
-    /* Three fixed columns so the spend/target and the delta line up down the card.
-       Previously .cvt2-num was left-aligned on its own row and .cvt2-d right-aligned
-       on another, so no two figures shared a column. */
-    .cvt2-row { display: grid; grid-template-columns: minmax(0,1fr) 104px 84px; align-items: baseline; column-gap: 8px; row-gap: 8px; padding: 13px 0; border-top: 1px solid var(--line); }
-    .cvt2-row:first-of-type { border-top: none; padding-top: 2px; }
-    .cvt2-nm { grid-column: 1; grid-row: 1; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cvt2-num { grid-column: 2; grid-row: 1; text-align: right; font-size: 13px; }
-    .cvt2-d { grid-column: 3; grid-row: 1; font-size: 13px; text-align: right; }
-    .cvt2-track { grid-column: 1 / -1; grid-row: 2; height: 10px; }
+    /* Row layout is handled in the 760px block above (phones report ~600px, so a
+       560px rule never reached them). Only size tweaks belong here. */
+    .cvt2-nm { font-size: 14px; }
+    .cvt2-num, .cvt2-d { font-size: 13px; }
     /* 3 · Spend by week — headroom for value labels */
     .sbw2-plot { height: 128px; padding-top: 24px; }
     /* 12 nowrap labels centred on ~20px columns collided into an unreadable
@@ -10569,10 +10579,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2-bd-od { background:var(--neg); } .v2-bd-up { background:var(--accent); } .v2-bd-paid { background:var(--pos); }
   .v2-bnm { font-size:12.5px; } .v2-bmeta { color:var(--ink-3); } .v2-bmeta-od { color:var(--neg); font-weight:600; }
   .v2-bamt { font-size:12.5px; font-weight:600; white-space:nowrap; text-align:right; }
-  /* Line-through on the name AND amount read as "cancelled/removed" rather than
-     "paid". A green tick plus muted text says done without saying deleted. */
-  .v2-bl-paid .v2-bnm, .v2-bl-paid .v2-bamt { color:var(--ink-3); }
-  .v2-bl-paid .v2-bnm::after { content:" \2713"; color:var(--pos); font-weight:700; }
+  .v2-bl-paid .v2-bnm, .v2-bl-paid .v2-bamt { color:var(--ink-3); text-decoration:line-through; }
   .v2-bamt-od { color:var(--neg); }
   .v2-blnext { margin-top:12px; padding-top:11px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-2); }
   .v2-blnext strong { color:var(--ink); }
