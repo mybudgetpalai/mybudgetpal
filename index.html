@@ -928,10 +928,15 @@ function currentMonthName() {
 }
 function completedMonthsWithData(txs) {
   const set = new Set((txs || []).filter((t) => t.date).map((t) => t.date.slice(0, 7)));
-  const keys = [...set].filter((k) => k < currentMonthKey()).sort();
-  if (keys.length < 2) return keys;
-  /* Fill gap months so the plan grid never skips a column (e.g. Jan, Mar, Apr -> Jan, Feb, Mar, Apr). */
-  return monthKeysBetween(keys[0], keys[keys.length - 1]);
+  return [...set].filter((k) => k < currentMonthKey()).sort();
+}
+/* A continuous run of completed months from the first with data to the month before the
+   current one. Only for timelines that must not skip columns (the long-term plan grid);
+   keep using completedMonthsWithData where "months that actually have data" is meant. */
+function completedMonthsContinuous(txs) {
+  const keys = completedMonthsWithData(txs);
+  if (!keys.length) return keys;
+  return monthKeysBetween(keys[0], addMonths(currentMonthKey(), -1));
 }
 function typicalIncome(txs, uptoKey) {
   const keys = [...new Set((txs || []).filter((t) => t.date).map((t) => t.date.slice(0, 7)))].filter((k) => !uptoKey || k <= uptoKey).sort();
@@ -4672,7 +4677,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
 
 function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, onEditPlan }) {
   const txs = transactions || [];
-  const past = completedMonthsWithData(txs);
+  const past = completedMonthsContinuous(txs);
   const [horizon, setHorizon] = useState(6);
   const curKey = currentMonthKey();
   const avg = React.useMemo(() => avgSpendByCategory(txs), [txs]);
@@ -10377,7 +10382,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .v2wg-rows { display:flex; flex-direction:column; gap:9px; }
   /* £ and % get their own fixed columns so figures line up down the card
      (previously one auto cell holding both, which right-aligned as a ragged block). */
-  .v2wg-row { display:grid; grid-template-columns:104px 1fr 54px 38px; align-items:center; gap:10px; }
+  .v2wg-row { display:grid; grid-template-columns:104px 1fr 46px 34px; align-items:center; gap:10px; }
   .v2wg-row .v2wg-nm { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink); white-space:nowrap; min-width:0; }
   .v2wg-bar { height:6px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
   .v2wg-bar > i { display:block; height:100%; border-radius:999px; }
@@ -10410,7 +10415,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* ===== v2 . Pacing rows (single-line, aligned) ===== */
   .v2pt-rows { display:flex; flex-direction:column; gap:11px; margin-top:2px; }
   .v2pt-row { display:grid; grid-template-columns:104px 1fr auto; align-items:center; gap:12px; }
-  .v2pt-chips { grid-template-columns:104px 1fr 104px 78px; }
+  .v2pt-chips { grid-template-columns:104px 1fr 88px 70px; }
   .v2pt-nm { display:flex; align-items:center; gap:7px; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   .v2pt-track { position:relative; height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
   .v2pt-track > i { display:block; height:100%; border-radius:999px; }
@@ -10432,7 +10437,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* budget-hawk pacing: aligned 4-column */
   /* Fixed (not auto) trailing columns: auto sizes per-row, which made each 1fr track a
      different width and scattered the day-N pace tick. Pinned = ticks align vertically. */
-  .v2pt-full { grid-template-columns:104px 1fr 104px 82px; }
+  .v2pt-full { grid-template-columns:104px 1fr 88px 72px; }
   .v2pt-st { font-size:12px; text-align:right; white-space:nowrap; color:var(--ink-2); font-variant-numeric:tabular-nums; }
   .v2pt-st strong { color:var(--ink); font-weight:600; }
   .v2pt-dd { font-size:12px; text-align:right; white-space:nowrap; font-weight:600; font-variant-numeric:tabular-nums; }
