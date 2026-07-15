@@ -1049,7 +1049,9 @@ function buildInsights(txs, targets) {
       else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " spend is down " + Math.abs(chg) + cmpSuffix });
     }
   });
-  const totalTarget = Object.values(targets || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  /* Spend categories only — Income is stored in targets too, and including it inflated the
+     budget (e.g. 1620 -> 4120) so projections and % used were both wrong. */
+  const totalTarget = spendCategories().reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const spent = spendForMonth(txs, cur);
   if (totalTarget > 0 && cur === currentMonthKey()) {
     const projected = projectMonthEnd(spent);
