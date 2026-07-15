@@ -1640,14 +1640,41 @@ function LpCategoriseDemo() {
 }
 
 function LpAskDemo() {
+  const [stage, setStage] = useState(0); // 0 idle, 1 question, 2 typing, 3 answer
+  useEffect(() => {
+    const seq = [
+      setTimeout(() => setStage(1), 500),
+      setTimeout(() => setStage(2), 1100),
+      setTimeout(() => setStage(3), 2100),
+    ];
+    return () => seq.forEach(clearTimeout);
+  }, []);
   return (
     <div className="lp-demo-card lpd-ask">
-      <div className="lpd-ask-q">How much did I spend on coffee last month?</div>
-      <div className="lpd-ask-a">
-        <span className="lpd-ask-spark"><Icon name="ask" size={15} /></span>
-        <p>You spent <strong>&pound;68.40</strong> on coffee across <strong>19 visits</strong> in June &mdash; mostly <strong>Starbucks</strong> and <strong>&#37; Arabica</strong>. That&rsquo;s &pound;12 more than May.</p>
+      <div className="lpd-ask-thread">
+        {stage >= 1 && (
+          <div className="lpd-ask-q">How much did I spend on coffee last month?</div>
+        )}
+        {stage === 2 && (
+          <div className="lpd-ask-row">
+            <span className="lpd-ask-av"><Icon name="sparkles" size={13} /></span>
+            <div className="lpd-ask-typing"><span /><span /><span /></div>
+          </div>
+        )}
+        {stage >= 3 && (
+          <div className="lpd-ask-row">
+            <span className="lpd-ask-av"><Icon name="sparkles" size={13} /></span>
+            <div className="lpd-ask-a">
+              <p>You spent <strong>&pound;68.40</strong> on coffee across <strong>19 visits</strong> in June &mdash; mostly <strong>Starbucks</strong> and <strong>&#37; Arabica</strong>.</p>
+              <div className="lpd-ask-chips">
+                <span className="lpd-ask-chip up">&uarr; &pound;12 vs May</span>
+                <span className="lpd-ask-chip">19 visits</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="lpd-ask-bar"><span>Ask about your money&hellip;</span><span className="lpd-ask-send">&rarr;</span></div>
+      <div className="lpd-ask-bar"><span>Ask about your money&hellip;</span><span className="lpd-ask-send">&uarr;</span></div>
     </div>
   );
 }
@@ -1778,6 +1805,29 @@ function LpCurrencyDemo() {
   );
 }
 
+function LpInsightsDemo() {
+  const items = [
+    { tone: "warn", ico: "↑", text: (<span><strong>Dining</strong> is up <strong>34%</strong> vs the same point last month.</span>) },
+    { tone: "pos",  ico: "✓", text: (<span>At this rate you&rsquo;ll finish <strong>~&pound;90 under</strong> your target.</span>) },
+    { tone: "info", ico: "★", text: (<span>Biggest merchant this month: <strong>Waitrose</strong> (&pound;312).</span>) },
+  ];
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setIdx((i) => (i + 1) % items.length), 3200);
+    return () => clearInterval(t);
+  }, []);
+  const it = items[idx];
+  return (
+    <div className="lp-demo-card lpd-insights">
+      <div className="lpd-ins-head"><span className="lpd-ins-spark"><Icon name="sparkles" size={15} /></span><span>MyBudgetPal noticed&hellip;</span></div>
+      <div className={"lpd-ins-row lpd-ins-" + it.tone} key={idx}>
+        <span className="lpd-ins-ico">{it.ico}</span>{it.text}
+      </div>
+      <div className="lpd-ins-dots">{items.map((_, i) => <span key={i} className={"lpd-ins-dot" + (i === idx ? " on" : "")} />)}</div>
+    </div>
+  );
+}
+
 /* ---------------- Landing (marketing) ---------------- */
 
 function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
@@ -1818,38 +1868,23 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
           </div>
-          <span className="hero-trust">No bank login, ever · works with PDF &amp; CSV statements · GBP + AED</span>
-        </div>
-        <div className="lp-hero-mock" aria-hidden="true">
-          <div className="hm-card hm-safe">
-            <span className="hm-label">Safe to spend today</span>
-            <span className="hm-big">&pound;42.10</span>
-            <div className="hm-track"><div className="hm-fill" style={{ width: "62%" }} /></div>
-            <span className="hm-sub">&pound;1,284 spent &middot; &pound;2,324 budget &middot; 23 days to go</span>
-          </div>
-          <div className="hm-card hm-budgets">
-            <span className="hm-label">Budgets &middot; July</span>
-            <div className="hm-row">
-              <span className="hm-ico" style={{ color: "#7C9AFF" }}><Icon name="groceries" size={14} /></span>
-              <div className="hm-cat"><div className="hm-cat-top"><span>Groceries</span><span>&pound;312 / &pound;400</span></div>
-                <div className="hm-track sm"><div className="hm-fill" style={{ width: "78%" }} /></div></div>
-            </div>
-            <div className="hm-row">
-              <span className="hm-ico" style={{ color: "#F2B25C" }}><Icon name="dining" size={14} /></span>
-              <div className="hm-cat"><div className="hm-cat-top"><span>Dining</span><span>&pound;238 / &pound;200</span></div>
-                <div className="hm-track sm"><div className="hm-fill warn" style={{ width: "100%" }} /></div></div>
-            </div>
-            <div className="hm-row">
-              <span className="hm-ico" style={{ color: "#57C6A0" }}><Icon name="transport" size={14} /></span>
-              <div className="hm-cat"><div className="hm-cat-top"><span>Transport</span><span>&pound;96 / &pound;180</span></div>
-                <div className="hm-track sm"><div className="hm-fill" style={{ width: "53%" }} /></div></div>
-            </div>
-          </div>
+          <span className="hero-trust">No bank login, ever &mdash; your statements, your control.</span>
         </div>
       </div>
 
+      <div className="lp-trust-strip reveal">
+        <div className="lp-trust-facts">
+          <span className="lp-trust-fact"><Icon name="file" size={16} /> Works with PDF &amp; CSV</span>
+          <span className="lp-trust-dot" />
+          <span className="lp-trust-fact"><Icon name="income" size={16} /> GBP + AED</span>
+          <span className="lp-trust-dot" />
+          <span className="lp-trust-fact"><Icon name="sparkles" size={16} /> AI-categorised in seconds</span>
+        </div>
+        <p className="lp-trust-note">Built by one person, in early access &mdash; shaped by the people testing it.</p>
+      </div>
+
       <div className="lp-section lp-wrap" id="lp-how">
-        <div className="section-head reveal"><h2>How it works</h2><p>Scroll through — this is the real flow, not marketing fluff.</p></div>
+        <div className="section-head reveal"><h2>How it works</h2><p>From statement to clarity in three steps. No syncing, no permissions.</p></div>
 
         <div className="lp-step reveal">
           <div className="lp-step-copy">
@@ -1872,47 +1907,106 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
         <div className="lp-step reveal">
           <div className="lp-step-copy">
             <div className="step-num">3</div>
-            <h3>Explore your money from every angle</h3>
-            <p>Spending breakdown, monthly review against your budgets, trends over time, savings goals — all live from your real data. Try the tabs.</p>
+            <h3>Your dashboard fills in</h3>
+            <p>Spending, budgets, goals and trends populate instantly &mdash; your whole picture, live from your real data.</p>
           </div>
           <LpViewsDemo />
         </div>
 
+      </div>
+
+      <div className="lp-section lp-wrap">
+        <div className="section-head reveal"><h2>The parts people love</h2><p>A taste of what makes MyBudgetPal feel less like a spreadsheet.</p></div>
+
         <div className="lp-step lp-step-flip reveal">
           <div className="lp-step-copy">
-            <div className="step-num">4</div>
+            <div className="step-num lpd-cur-num"><Icon name="sparkles" size={18} /></div>
             <h3>Just ask, in plain English</h3>
             <p>&ldquo;How much did I spend on coffee last month?&rdquo; Ask a question and get a straight answer worked out from your own transactions &mdash; no filters, no formulas.</p>
           </div>
           <LpAskDemo />
         </div>
-      </div>
 
-      <div className="lp-section lp-wrap">
-        <div className="section-head reveal"><h2>Two countries, one clear picture</h2><p>Bank in pounds and dirhams? Keep both. Each account stays in its own currency &mdash; your totals convert into whichever home currency you choose.</p></div>
+        <div className="lp-step reveal">
+          <div className="lp-step-copy">
+            <div className="step-num lpd-cur-num"><Icon name="sparkles" size={18} /></div>
+            <h3>It notices things for you</h3>
+            <p>MyBudgetPal surfaces what changed before you go looking &mdash; overspends, savings on track, your biggest merchant this month.</p>
+          </div>
+          <LpInsightsDemo />
+        </div>
+
         <div className="lp-step lp-step-flip reveal">
           <div className="lp-step-copy">
             <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
-            <h3>Multi-currency, done properly</h3>
-            <p>Pick your currencies at sign-up and group your banks under each. Every transaction keeps its real amount, with the converted value alongside &mdash; so nothing gets distorted and your history stays honest.</p>
+            <h3>Two countries, one clear picture</h3>
+            <p>Bank in pounds and dirhams? Keep both. Each account stays in its own currency &mdash; your totals convert into whichever home currency you choose, at a rate locked per month.</p>
           </div>
           <LpCurrencyDemo />
         </div>
       </div>
 
       <div className="lp-section lp-wrap">
-        <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
+        <div className="section-head reveal"><h2>Everything you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
         <div className="features">
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="ask" size={17} /></div><h4>Ask about your money</h4><p>Ask a plain-English question and get an answer from your own transactions.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="calendar" size={17} /></div><h4>Month-end review</h4><p>Close out each month, then catch up or roll over what you didn&rsquo;t spend.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h4>Long-term plan</h4><p>Plan months ahead and reconcile your actual spending against the plan.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="income" size={17} /></div><h4>Multi-currency</h4><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="chart" size={17} /></div><h4>Spending breakdown</h4><p>See exactly what you spend by category, every month.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="target" size={17} /></div><h4>Monthly targets</h4><p>Set a budget per category and track how you're pacing.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h4>Savings goals</h4><p>Plan toward a goal and see your progress over time.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="bills" size={17} /></div><h4>Bills & subscriptions</h4><p>Keep track of recurring payments and due dates in one place.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="linechart" size={17} /></div><h4>Trends over time</h4><p>See how your spending and income shift month to month.</p></div>
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="sliders" size={17} /></div><h4>Customizable views</h4><p>Switch between different dashboard views to see the data your way.</p></div>
+          <div className="feature-card reveal">
+            <div className="feature-icon"><Icon name="sparkles" size={18} /></div>
+            <h4>Ask about your money</h4>
+            <p>Ask a plain-English question and get an answer from your own transactions.</p>
+            <div className="fc-viz fc-viz-ask">
+              <span className="fc-q">How much on coffee?</span>
+              <span className="fc-a">&pound;68 &middot; 19 visits</span>
+            </div>
+          </div>
+          <div className="feature-card reveal">
+            <div className="feature-icon"><Icon name="calendar" size={18} /></div>
+            <h4>Month-end review</h4>
+            <p>Close out each month, then catch up or roll over what you didn&rsquo;t spend.</p>
+            <div className="fc-viz fc-viz-roll">
+              <span className="fc-roll-from">June &middot; &pound;63 left</span>
+              <span className="fc-roll-arrow">&rarr;</span>
+              <span className="fc-roll-to">July +&pound;63</span>
+            </div>
+          </div>
+          <div className="feature-card reveal">
+            <div className="feature-icon"><Icon name="trending" size={18} /></div>
+            <h4>Long-term plan</h4>
+            <p>Plan months ahead and reconcile your actual spending against the plan.</p>
+            <div className="fc-viz fc-viz-trend">
+              <svg viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
+                <polyline points="0,26 24,20 48,22 72,12 96,14 120,4" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
+          <div className="feature-card reveal">
+            <div className="feature-icon"><Icon name="income" size={18} /></div>
+            <h4>Multi-currency</h4>
+            <p>Track GBP and AED accounts together, converted into your home currency.</p>
+            <div className="fc-viz fc-viz-cur">
+              <span className="fc-chip">&pound; GBP</span>
+              <span className="fc-chip">AED</span>
+              <span className="fc-chip fc-chip-soft">1 view</span>
+            </div>
+          </div>
+          <div className="feature-card reveal">
+            <div className="feature-icon"><Icon name="target" size={18} /></div>
+            <h4>Goals &amp; targets</h4>
+            <p>Set budgets and savings goals, and track how you&rsquo;re pacing toward them.</p>
+            <div className="fc-viz fc-viz-goal">
+              <div className="fc-bar"><span style={{ width: "68%" }} /></div>
+              <span className="fc-bar-label">68%</span>
+            </div>
+          </div>
+          <div className="feature-card reveal">
+            <div className="feature-icon"><Icon name="bills" size={18} /></div>
+            <h4>Bills &amp; subscriptions</h4>
+            <p>Keep track of recurring payments and due dates in one place.</p>
+            <div className="fc-viz fc-viz-bills">
+              <span className="fc-bill">Netflix</span>
+              <span className="fc-bill">Spotify</span>
+              <span className="fc-bill fc-bill-due">DEWA &middot; due</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1924,12 +2018,12 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <div className="price-amount">£0</div>
             <div className="price-period">for 28 days</div>
             <ul className="price-features"><li>3 statement uploads</li><li>10 &ldquo;Ask about your money&rdquo; questions</li><li>Full dashboard access</li></ul>
-            <button className="btn btn-ghost" style={{ width: "100%" }} onClick={onSignup}>Start free</button>
+            <button className="btn btn-ghost" style={{ width: "100%" }} onClick={onSignup}>Start free trial</button>
           </div>
           <div className="price-card highlight reveal">
             <div className="price-tag">Pro</div>
             <div className="price-amount">£4.99</div>
-            <div className="price-period">per month</div>
+            <div className="price-period">per month &middot; approx AED 23</div>
             <ul className="price-features"><li>Unlimited uploads</li><li>Unlimited &ldquo;Ask about your money&rdquo; questions</li><li>Full dashboard access</li><li>Priority support</li></ul>
             <button className="btn btn-primary" style={{ width: "100%" }} onClick={onSignup}>Start free trial</button>
           </div>
@@ -9674,10 +9768,28 @@ function App() {
   .step-num { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent); font-weight: 700; font-size: 13px; margin-bottom: 12px; color: var(--on-accent); }
 
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .feature-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
-  .feature-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); font-size: 16px; margin-bottom: 10px; }
-  .feature-card h4 { font-size: 14px; margin: 0 0 5px; color: var(--ink); }
-  .feature-card p { font-size: 12px; color: var(--ink-3); margin: 0; line-height: 1.5; }
+  .feature-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px 20px; box-shadow: var(--shadow-card); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .feature-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-pop); }
+  .feature-icon { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 14px; }
+  .feature-card h4 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--ink); }
+  .feature-card p { font-size: 13px; color: var(--ink-2); margin: 0; line-height: 1.55; }
+  .fc-viz { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; }
+  .fc-q { font-size: 11px; font-weight: 600; color: var(--on-accent); background: var(--accent); padding: 4px 9px; border-radius: 12px 12px 12px 3px; }
+  .fc-a { font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); padding: 4px 9px; border-radius: 12px; }
+  .fc-roll-from, .fc-roll-to { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 20px; }
+  .fc-roll-from { color: var(--ink-2); background: var(--surface-2); }
+  .fc-roll-to { color: var(--accent); background: var(--accent-soft); }
+  .fc-roll-arrow { color: var(--ink-3); font-weight: 700; }
+  .fc-viz-trend { display: block; padding-top: 12px; }
+  .fc-viz-trend svg { width: 100%; height: 30px; display: block; }
+  .fc-chip { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 20px; }
+  .fc-chip-soft { color: var(--ink-3); background: var(--surface-2); }
+  .fc-viz-goal { gap: 10px; }
+  .fc-bar { flex: 1; height: 7px; background: var(--surface-3); border-radius: 5px; overflow: hidden; }
+  .fc-bar span { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+  .fc-bar-label { font-size: 11px; font-weight: 700; color: var(--ink-2); }
+  .fc-bill { font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); padding: 4px 9px; border-radius: 20px; }
+  .fc-bill-due { color: var(--accent); background: var(--accent-soft); }
 
   .pricing { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 620px; margin: 0 auto; align-items: stretch; }
   .price-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 28px; text-align: center; display: flex; flex-direction: column; }
@@ -10098,10 +10210,18 @@ function App() {
   @media (max-width: 560px) { .review-cards { grid-template-columns: 1fr; } }
 
 /* ---- step 4: product-forward hero ---- */
-  .lp-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; text-align: left; padding: 72px 24px 64px; }
+  .lp-hero { display: block; text-align: center; padding: 90px 24px 64px; }
+  .lp-hero-copy { max-width: 640px; margin: 0 auto; }
   .lp-hero-copy h1 { font-size: 52px; }
-  .lp-hero-copy p { max-width: 46ch; }
+  .lp-hero-copy p { max-width: 520px; margin-left: auto; margin-right: auto; }
   .hero-trust { display: block; margin-top: 18px; font-size: 13px; color: var(--ink-3); }
+  .lp-trust-strip { max-width: 760px; margin: 0 auto; padding: 0 24px 8px; text-align: center; }
+  .lp-trust-facts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
+  .lp-trust-fact { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+  .lp-trust-fact .ic { color: var(--accent); }
+  .lp-trust-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--line-strong); }
+  .lp-trust-note { margin: 14px 0 0; font-size: 13px; color: var(--ink-3); }
+  @media (max-width: 560px) { .lp-trust-dot { display: none; } .lp-trust-facts { gap: 10px 18px; } }
   .lp-hero-mock { display: flex; flex-direction: column; gap: 14px; animation: heroMockIn 0.7s cubic-bezier(0.22, 0.8, 0.3, 1) both 0.15s; }
   @keyframes heroMockIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
   .hm-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow-card); }
@@ -10134,7 +10254,7 @@ function App() {
   }
 
   .lp-hero-copy p { margin: 0 0 28px; }
-  .lp-hero-copy .hero-actions { justify-content: flex-start; }
+  .lp-hero-copy .hero-actions { justify-content: center; }
   @media (max-width: 900px) { .lp-hero-copy h1 { font-size: 36px; } }
 
   /* ================= mobile usability fixes (2026-07-09_) ================= */
@@ -10263,17 +10383,36 @@ function App() {
   .rt-good .rt-verdict { color: var(--pos) !important; }
   .rt-bad .rt-verdict { color: var(--neg) !important; }
   .rt-flat .rt-verdict { color: var(--ink-3) !important; }
-  .lpd-ask { display: flex; flex-direction: column; gap: 12px; }
-  .lpd-ask-q { align-self: flex-end; max-width: 88%; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 16px 16px 4px 16px; opacity: 0; transform: translateY(8px); }
-  .in-view .lpd-ask-q { animation: lpdShow 0.5s ease 0.2s forwards; }
-  .lpd-ask-a { display: flex; gap: 10px; align-items: flex-start; max-width: 94%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px 16px 16px 4px; padding: 12px 14px; opacity: 0; transform: translateY(8px); }
-  .in-view .lpd-ask-a { animation: lpdShow 0.5s ease 0.95s forwards; }
-  .lpd-ask-a p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+  .lpd-ask { display: flex; flex-direction: column; gap: 14px; }
+  .lpd-ask-thread { display: flex; flex-direction: column; gap: 12px; min-height: 150px; justify-content: flex-start; padding-bottom: 4px; }
+  .lpd-ask-q { align-self: flex-end; max-width: 82%; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; line-height: 1.4; padding: 11px 15px; border-radius: 18px 18px 5px 18px; box-shadow: 0 4px 14px rgba(46,91,255,0.28); animation: lpdAskPop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .lpd-ask-row { display: flex; gap: 9px; align-items: flex-end; max-width: 92%; animation: lpdShow 0.4s ease; }
+  .lpd-ask-av { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lpd-ask-a { background: var(--surface); border: 1px solid var(--line); border-radius: 18px 18px 18px 5px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(16,24,40,0.05); }
+  .lpd-ask-a p { margin: 0; color: var(--ink); font-size: 14px; line-height: 1.5; }
   .lpd-ask-a strong { color: var(--ink); font-weight: 700; }
-  .lpd-ask-spark { color: var(--accent); flex-shrink: 0; display: inline-flex; margin-top: 1px; }
-  .lpd-ask-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 7px 7px 16px; color: var(--ink-3); font-size: 13px; margin-top: auto; opacity: 0; }
-  .in-view .lpd-ask-bar { animation: lpdShow 0.5s ease 1.5s forwards; }
-  .lpd-ask-send { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; flex-shrink: 0; }
+  .lpd-ask-chips { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .lpd-ask-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; background: var(--surface-2); color: var(--ink-2); }
+  .lpd-ask-chip.up { background: #FEF3F2; color: #B42318; }
+  .lpd-ask-typing { display: flex; gap: 4px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 18px 18px 18px 5px; padding: 13px 15px; }
+  .lpd-ask-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); opacity: 0.4; animation: lpdTyping 1.2s infinite ease-in-out; }
+  .lpd-ask-typing span:nth-child(2) { animation-delay: 0.18s; }
+  .lpd-ask-typing span:nth-child(3) { animation-delay: 0.36s; }
+  .lpd-ask-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 7px 7px 16px; color: var(--ink-3); font-size: 14px; }
+  .lpd-ask-send { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; flex-shrink: 0; box-shadow: 0 2px 8px rgba(46,91,255,0.3); }
+  @keyframes lpdAskPop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes lpdTyping { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+  .lpd-ins-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--ink); margin-bottom: 12px; }
+  .lpd-ins-spark { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+  .lpd-ins-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4; animation: lpdInsIn 0.45s ease; }
+  .lpd-ins-ico { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+  .lpd-ins-warn { background: #FEF3F2; color: #912018; } .lpd-ins-warn .lpd-ins-ico { background: #FEE4E2; color: #D92D20; }
+  .lpd-ins-pos { background: #ECFDF3; color: #087443; } .lpd-ins-pos .lpd-ins-ico { background: #D1FADF; color: #12A150; }
+  .lpd-ins-info { background: var(--surface-2); color: var(--ink-2); } .lpd-ins-info .lpd-ins-ico { background: var(--surface-3); color: var(--ink-3); }
+  .lpd-ins-dots { display: flex; gap: 5px; justify-content: center; margin-top: 14px; }
+  .lpd-ins-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); transition: all 0.3s; }
+  .lpd-ins-dot.on { background: var(--accent); width: 16px; border-radius: 3px; }
+  @keyframes lpdInsIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
   .oh-sec { display: flex; align-items: center; gap: 12px; margin: 22px 2px 14px; }
   .oh-sec > span:first-child { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); white-space: nowrap; }
