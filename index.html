@@ -142,6 +142,8 @@ const ICON_PATHS = {
   calendar: "M8 2v4|M16 2v4|M3 6h18v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z|M3 10h18",
   sliders: "M4 21v-7|M4 10V3|M12 21v-9|M12 8V3|M20 21v-5|M20 12V3|M1 14h6|M9 8h6|M17 16h6",
   sparkles: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z|M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z",
+  /* "ask" is a conversation, not magic — the sparkle read as a generic AI badge */
+  ask: "M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z",
   trending: "M22 7 13.5 15.5l-5-5L2 17|M16 7h6v6",
   info: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M12 11v5|M12 8h.01",
   checkcircle: "M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18Z|M8.5 12.2l2.4 2.4 4.6-4.8",
@@ -1489,7 +1491,7 @@ function LpCategoriseDemo() {
           </span>
         </div>
       ))}
-      <div className="lpd-ai-note" style={{ animationDelay: (0.7 + LP_DEMO_TXS.length * 0.55) + "s" }}>&#10024; Sorted automatically &mdash; fix any of them once, and it remembers.</div>
+      <div className="lpd-ai-note" style={{ animationDelay: (0.7 + LP_DEMO_TXS.length * 0.55) + "s" }}><Icon name="tag" size={13} /> Sorted automatically {"\u2014"} fix any of them once, and it remembers.</div>
     </div>
   );
 }
@@ -1499,7 +1501,7 @@ function LpAskDemo() {
     <div className="lp-demo-card lpd-ask">
       <div className="lpd-ask-q">How much did I spend on coffee last month?</div>
       <div className="lpd-ask-a">
-        <span className="lpd-ask-spark"><Icon name="sparkles" size={15} /></span>
+        <span className="lpd-ask-spark"><Icon name="ask" size={15} /></span>
         <p>You spent <strong>&pound;68.40</strong> on coffee across <strong>19 visits</strong> in June &mdash; mostly <strong>Starbucks</strong> and <strong>&#37; Arabica</strong>. That&rsquo;s &pound;12 more than May.</p>
       </div>
       <div className="lpd-ask-bar"><span>Ask about your money&hellip;</span><span className="lpd-ask-send">&rarr;</span></div>
@@ -1758,7 +1760,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       <div className="lp-section lp-wrap">
         <div className="section-head reveal"><h2>What you get</h2><p>A clean dashboard built around how you actually think about money.</p></div>
         <div className="features">
-          <div className="feature-card reveal"><div className="feature-icon"><Icon name="sparkles" size={17} /></div><h4>Ask about your money</h4><p>Ask a plain-English question and get an answer from your own transactions.</p></div>
+          <div className="feature-card reveal"><div className="feature-icon"><Icon name="ask" size={17} /></div><h4>Ask about your money</h4><p>Ask a plain-English question and get an answer from your own transactions.</p></div>
           <div className="feature-card reveal"><div className="feature-icon"><Icon name="calendar" size={17} /></div><h4>Month-end review</h4><p>Close out each month, then catch up or roll over what you didn&rsquo;t spend.</p></div>
           <div className="feature-card reveal"><div className="feature-icon"><Icon name="trending" size={17} /></div><h4>Long-term plan</h4><p>Plan months ahead and reconcile your actual spending against the plan.</p></div>
           <div className="feature-card reveal"><div className="feature-icon"><Icon name="income" size={17} /></div><h4>Multi-currency</h4><p>Track GBP and AED accounts together, converted into your home currency.</p></div>
@@ -3160,7 +3162,7 @@ function BuildingDashboardScreen({ personaKey, onDone, overlay }) {
           </>
         ) : (
           <>
-            <div className="bdg-badge"><Icon name="sparkles" size={15} /> {t.name}</div>
+            <div className="bdg-badge"><Icon name="sliders" size={15} /> {t.name}</div>
             <h1 className="title" style={{ marginTop: 14 }}>We've set you up with the {t.name} view</h1>
             <p className="subtitle">{t.blurb}</p>
             <p className="subtitle" style={{ fontSize: 13, opacity: 0.85 }}>Don't worry {"—"} you can change any widget later with "Edit view" on your overview.</p>
@@ -3447,7 +3449,7 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
         </div>
       )}
       <button className={"side-ask-btn " + (active === "ask" ? "side-ask-active" : "")} onClick={() => setActive("ask")}>
-        <span className="side-ask-ic"><Icon name="sparkles" size={16} /></span>Ask MyBudgetPal
+        <span className="side-ask-ic"><Icon name="ask" size={16} /></span>Ask MyBudgetPal
       </button>
       {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
     </div>
@@ -4336,7 +4338,7 @@ function InsightsAsk({ transactions }) {
   return (
     <div className="ai-ask ai-ask-page">
       <div className="ai-ask-top">
-        <span className="ai-ask-ico"><Icon name="sparkles" size={26} /></span>
+        <span className="ai-ask-ico"><Icon name="ask" size={26} /></span>
         <span className="ai-ask-badge">AI</span>
       </div>
       <h2 className="ai-ask-title">Ask MyBudgetPal</h2>
@@ -4487,7 +4489,7 @@ function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onC
               <span className="review-bignum"><CountUp value={actualSpend} format={formatMoney} /></span>
               <span className="review-biglabel">spent of {formatMoney(plannedSpend)} budgeted</span>
             </div>
-            {winCat && winCat.diff > 0 && <div className="review-win"><Icon name="sparkles" size={13} /> Top category win — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
+            {winCat && winCat.diff > 0 && <div className="review-win"><Icon name="checkcircle" size={13} /> Top category win — you came in {formatMoney(winCat.diff)} under on {winCat.c}</div>}
             <div className="review-minibars">
               {TX_CATEGORIES.map((c) => {
                 const b = Number(budgets[c]) || 0, a = Math.round(byCat[c] || 0), o = a > b;
@@ -4999,7 +5001,7 @@ function CategoriseReviewModal({ transactions, onRecategorize, onClose }) {
 function EmptyState({ text, title }) {
   return (
     <div className="glass-card dash-card empty-state">
-      <div className="empty-icon-wrap"><span className="empty-icon"><Icon name="sparkles" size={22} /></span></div>
+      <div className="empty-icon-wrap"><span className="empty-icon"><Icon name="inbox" size={22} /></span></div>
       <p className="empty-title">{title || "Nothing here just yet"}</p>
       <p className="empty-text">{text || "Upload a statement and this will fill with your own data."}</p>
     </div>
@@ -5134,7 +5136,7 @@ function SpentSoFarHero({ transactions }) {
 function SetupPushBand({ onResumeSetup }) {
   return (
     <div className="oh-setup-band">
-      <span className="oh-setup-ic"><Icon name="sparkles" size={17} /></span>
+      <span className="oh-setup-ic"><Icon name="sliders" size={17} /></span>
       <span className="oh-setup-text"><strong>Want sharper insights?</strong> You're only seeing part of what {APP_NAME} can do {"—"} set your targets to unlock safe-to-spend, pacing alerts and tailored tips. It takes 3 minutes.</span>
       <button className="oh-setup-cta" onClick={onResumeSetup}>Set up {"›"}</button>
     </div>
