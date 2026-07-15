@@ -27,16 +27,32 @@
 <meta name="apple-mobile-web-app-title" content="MyBudgetPal" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <title>MyBudgetPal</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   html, body { margin: 0; padding: 0; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; scroll-behavior: smooth; }
   #root { min-height: 100vh; }
+
+  /* Boot shell: in-browser Babel takes several seconds to compile the app, during
+     which #root was empty and the screen was simply blank. This paints instantly
+     from plain CSS and is torn out the moment React mounts. */
+  .boot-shell { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #F5F7FA; font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; z-index: 1; }
+  .boot-logo { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: #0B1220; }
+  .boot-bar { width: 148px; height: 4px; border-radius: 999px; background: #E2E7F0; overflow: hidden; }
+  .boot-bar > i { display: block; width: 40%; height: 100%; border-radius: 999px; background: #2E5BFF; animation: bootSlide 1.1s ease-in-out infinite; }
+  .boot-sub { font-size: 13px; color: #63708B; }
+  @keyframes bootSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+  @media (prefers-color-scheme: dark) {
+    .boot-shell { background: #0F1218; } .boot-logo { color: #F2F5FA; } .boot-bar { background: #232B38; } .boot-sub { color: #8A96AC; }
+  }
+  @media (prefers-reduced-motion: reduce) { .boot-bar > i { animation: none; width: 100%; } }
 
   /* ---- icon system + motion (steps 2-3) ---- */
   .ic { vertical-align: -2px; flex-shrink: 0; }
@@ -89,7 +105,11 @@ if ('serviceWorker' in navigator) {
 </script>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div class="boot-shell" id="boot-shell">
+  <div class="boot-logo">MyBudgetPal</div>
+  <div class="boot-bar"><i></i></div>
+  <div class="boot-sub">Getting things ready…</div>
+</div></div>
 
 <script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect } = React;
@@ -3532,11 +3552,16 @@ function DAYS_INTO_MONTH() { return today().getDate(); }
 function CategoryEditor({ value, onChange }) {
   const [open, setOpen] = useState(false);
   if (!open) return (<span className="cat-view"><span className="cat-dot" style={{ background: catColor(value) }} />{displayCat(value)} <button className="edit-link" onClick={() => setOpen(true)}>Edit</button></span>);
+  /* Keep the dot while editing — swapping the whole span for a bare <select> made
+     it disappear, so the row lost its colour cue mid-edit. */
   return (
-    <select className="cat-select" autoFocus value={value} onBlur={() => setOpen(false)}
-      onChange={(e) => { onChange(e.target.value); setOpen(false); }}>
-      {allSpendCategories().map((c) => <option key={c} value={c}>{displayCat(c)}</option>)}
-    </select>
+    <span className="cat-view">
+      <span className="cat-dot" style={{ background: catColor(value) }} />
+      <select className="cat-select" autoFocus value={value} onBlur={() => setOpen(false)}
+        onChange={(e) => { onChange(e.target.value); setOpen(false); }}>
+        {allSpendCategories().map((c) => <option key={c} value={c}>{displayCat(c)}</option>)}
+      </select>
+    </span>
   );
 }
 function TransactionFeed({ limit, transactions, onRecategorize }) {
@@ -4749,17 +4774,19 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
   const futureKeys = monthKeysBetween(curKey, lastKey);
   const monthsAll = [...past, ...futureKeys];
   const isActual = (k) => k < curKey;
-  const incM = (k) => Math.round(incomeForMonth(txs, k));
-  const spM = (k) => Math.round(spendForMonth(txs, k));
+  /* Raw (unrounded) — rounding these before arithmetic pushed the residual into
+     `other` and drifted every downstream balance by a pound or two per month. */
+  const incM = (k) => incomeForMonth(txs, k);
+  const spM = (k) => spendForMonth(txs, k);
 
   const balNowRaw = totalEstimatedBalance(banks, accountData, txs);
   const sumPastNet = past.reduce((s, k) => s + (incM(k) - spM(k)), 0);
   const curNetSoFar = incM(curKey) - spM(curKey);
   /* plan.openingBalance = balance at the start of the current month when the plan was made.
      Used only as a fallback anchor when statements can't give us a balance. */
-  const planAnchor = planActive && plan && plan.openingBalance != null ? Math.round(plan.openingBalance) + curNetSoFar : null;
+  const planAnchor = planActive && plan && plan.openingBalance != null ? Number(plan.openingBalance) + curNetSoFar : null;
   const haveBalance = balNowRaw !== null || planAnchor !== null;
-  const balNow = balNowRaw !== null ? Math.round(balNowRaw) : (planAnchor !== null ? planAnchor : 0);
+  const balNow = balNowRaw !== null ? Number(balNowRaw) : (planAnchor !== null ? planAnchor : 0);
   const startBal = balNow - sumPastNet - curNetSoFar;
 
   let run = startBal;
@@ -4769,14 +4796,16 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
     const cats = {};
     TX_CATEGORIES.forEach((c) => { cats[c] = isActual(k) ? (spendByCategoryForMonth(txs, k)[c] || 0) : plannedCatFor(allTargets, k, c, avg); });
     const catSum = TX_CATEGORIES.reduce((s, c) => s + cats[c], 0);
-    const other = isActual(k) ? spM(k) - catSum : 0;
+    /* Raw minus raw. Previously a rounded spM(k) less an unrounded catSum, so the
+       rounding residual landed in `other` and skewed net + every later balance. */
+    const other = isActual(k) ? Math.max(0, spM(k) - catSum) : 0;
     const net = inc - catSum - other;
     run += net;
     return { k, open, inc, cats, other, net, close: run, actual: isActual(k) };
   });
   const hasOther = cols.some((c) => Math.round(c.other) > 0);
   const endBal = cols.length ? cols[cols.length - 1].close : startBal;
-  const gap = planActive ? Math.round(plan.targetBalance) - endBal : 0;
+  const gap = planActive ? Math.round(Math.round(plan.targetBalance) - endBal) : 0;
   const word = haveBalance ? "balance" : "total saved";
 
   const bals = cols.map((c) => c.close);
@@ -4885,13 +4914,13 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
               {TX_CATEGORIES.map((c) => (
                 <tr key={c}>
                   <td className="ltp-sticky"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</td>
-                  {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " ltp-neg"}>{r.cats[c] ? "−" + formatMoney(r.cats[c]) : formatMoney(0)}</td>)}
+                  {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " ltp-neg"}>{Math.round(r.cats[c]) ? "−" + formatMoney(r.cats[c]) : formatMoney(0)}</td>)}
                 </tr>
               ))}
               {hasOther && (
                 <tr>
                   <td className="ltp-sticky"><span className="cat-dot" style={{ background: "#8b93a7" }} />Other spending</td>
-                  {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " ltp-neg"}>{r.other ? "−" + formatMoney(r.other) : formatMoney(0)}</td>)}
+                  {cols.map((r) => <td key={r.k} className={(r.actual ? "ltp-actual" : "ltp-plan") + " ltp-neg"}>{Math.round(r.other) ? "−" + formatMoney(r.other) : formatMoney(0)}</td>)}
                 </tr>
               )}
               <tr className="ltp-bal-row ltp-close-row">
@@ -6114,7 +6143,7 @@ function BillsChecklistCard({ transactions, billExcludes }) {
   const bills = remainingBillsThisMonth(transactions, billExcludes)
     .slice().sort((a, b) => (a.paid ? 1 : 0) - (b.paid ? 1 : 0) || (a.dueDay || 31) - (b.dueDay || 31));
   if (!bills.length) return (
-    <div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>No bills confirmed yet — mark a recurring payment as a bill to track it here.</div></div>
+    <div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>Nothing's a bill until you say so {"\u2014"} pick your regular payments and they'll show up here.</div><button className="link-btn inline" style={{ marginTop: 10 }} onClick={() => goToView("bills")}>Choose your bills {"\u203A"}</button></div>
   );
   const overdueTotal = bills.filter((b) => !b.paid && !b.upcoming).reduce((s, b) => s + b.amount, 0);
   const upcomingTotal = bills.filter((b) => !b.paid && b.upcoming).reduce((s, b) => s + b.amount, 0);
@@ -6239,6 +6268,9 @@ function EditViewModal({ layout, onSave, onClose }) {
 /* ================= Overview V2 tops (staged redesign) ================= */
 let __V2_TOPS = true;
 function setV2Tops(val) { __V2_TOPS = !!val; window.dispatchEvent(new Event("mbp-v2tops")); }
+/* Lets a deeply-nested card ask for a page change without threading setView down
+   through every intermediate component. DashboardScreen listens. */
+function goToView(v) { window.dispatchEvent(new CustomEvent("mbp-goto", { detail: v })); }
 function useV2Tops() {
   const [v, setV] = useState(__V2_TOPS);
   React.useEffect(() => {
@@ -6569,7 +6601,7 @@ function BillsV2({ transactions, billExcludes, depth }) {
   const bills = remainingBillsThisMonth(transactions, billExcludes).slice();
   const rank = (b) => b.paid ? 2 : (!b.upcoming ? 0 : 1);
   bills.sort((a, b) => rank(a) - rank(b) || (a.dueDay || 31) - (b.dueDay || 31));
-  if (!bills.length) return (<div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>No bills confirmed yet — mark a recurring payment as a bill to track it here.</div></div>);
+  if (!bills.length) return (<div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>Nothing's a bill until you say so {"\u2014"} pick your regular payments and they'll show up here.</div><button className="link-btn inline" style={{ marginTop: 10 }} onClick={() => goToView("bills")}>Choose your bills {"\u203A"}</button></div>);
   const monthly = bills.reduce((s, b) => s + b.amount, 0);
   const overdue = bills.filter((b) => !b.paid && !b.upcoming).reduce((s, b) => s + b.amount, 0);
   const upcoming = bills.filter((b) => !b.paid && b.upcoming).reduce((s, b) => s + b.amount, 0);
@@ -7171,6 +7203,12 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
+  /* Cards nested well below this can request a page via goToView(). */
+  React.useEffect(() => {
+    const handler = (e) => { if (e && e.detail) { setView(e.detail); setTInitEdit(false); } };
+    window.addEventListener("mbp-goto", handler);
+    return () => window.removeEventListener("mbp-goto", handler);
+  }, []);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   React.useEffect(() => {
@@ -8645,6 +8683,8 @@ function App() {
   );
 }
 
+/* Remove the pre-React boot shell now that we're about to paint the real UI. */
+(function () { const s = document.getElementById("boot-shell"); if (s && s.parentNode) s.parentNode.removeChild(s); })();
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 
