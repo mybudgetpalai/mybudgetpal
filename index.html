@@ -6184,78 +6184,12 @@ const HOME_WIDGETS = {
   accounts: { label: "Bank accounts", section: "big", render: (p) => <BankAccountsCard banks={p.banks} transactions={p.transactions} accountData={p.accountData} /> },
 };
 
-function EditViewModal({ layout, onSave, onClose }) {
-  const [draft, setDraft] = useState({ month: [...(layout.month || [])], big: [...(layout.big || [])] });
-  const move = (sec, i, dir) => setDraft((d) => {
-    const arr = [...d[sec]]; const j = i + dir;
-    if (j < 0 || j >= arr.length) return d;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    return { ...d, [sec]: arr };
-  });
-  const remove = (sec, i) => setDraft((d) => ({ ...d, [sec]: d[sec].filter((_, idx) => idx !== i) }));
-  const add = (sec, k) => setDraft((d) => (d[sec].includes(k) ? d : { ...d, [sec]: [...d[sec], k] }));
-  const reset = () => setDraft({ month: [...DEFAULT_HOME_LAYOUT.month], big: [...DEFAULT_HOME_LAYOUT.big] });
-  const sections = [{ key: "month", title: "This month" }, { key: "big", title: "The big picture" }];
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="glass-card modal-card ev-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="brand-row" style={{ marginBottom: 4, justifyContent: "space-between" }}>
-          <span className="brand-name">Edit your overview</span>
-          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>{"×"}</button>
-        </div>
-        <p style={{ fontSize: 13, color: "var(--ink-3)", margin: "0 0 12px" }}>Choose what shows in each section. Reorder or remove anything {"—"} you can always reset.</p>
-        {sections.map((s) => {
-          const available = HOME_WIDGET_KEYS[s.key].filter((k) => !draft[s.key].includes(k));
-          return (
-            <div className="ev-section" key={s.key}>
-              <span className="card-label">{s.title}</span>
-              <div className="ev-list">
-                {draft[s.key].length === 0 && <div className="ev-empty">Nothing here yet {"—"} add a widget below.</div>}
-                {draft[s.key].map((k, i) => (
-                  <div className="ev-row" key={k}>
-                    <span className="ev-row-name">{HOME_WIDGETS[k].label}</span>
-                    <div className="ev-row-actions">
-                      <button className="ev-ctl" disabled={i === 0} onClick={() => move(s.key, i, -1)} aria-label="Move up">{"\u2191"}</button>
-                      <button className="ev-ctl" disabled={i === draft[s.key].length - 1} onClick={() => move(s.key, i, 1)} aria-label="Move down">{"\u2193"}</button>
-                      <button className="ev-ctl ev-remove" onClick={() => remove(s.key, i)} aria-label="Remove">{"×"}</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {available.length > 0 && (
-                <div className="ev-add-row">
-                  {available.map((k) => (
-                    <button className="ev-add-chip" key={k} onClick={() => add(s.key, k)}>+ {HOME_WIDGETS[k].label}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <div className="nav-row">
-          <button className="glass-btn ghost" onClick={reset}>Reset to default</button>
-          <button className="glass-btn primary" onClick={() => { onSave(draft); onClose(); }}>Save view</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ================= Overview V2 tops (staged redesign) ================= */
-let __V2_TOPS = true;
-function setV2Tops(val) { __V2_TOPS = !!val; window.dispatchEvent(new Event("mbp-v2tops")); }
+
 /* Lets a deeply-nested card ask for a page change without threading setView down
    through every intermediate component. DashboardScreen listens. */
 function goToView(v) { window.dispatchEvent(new CustomEvent("mbp-goto", { detail: v })); }
-function useV2Tops() {
-  const [v, setV] = useState(__V2_TOPS);
-  React.useEffect(() => {
-    const handler = () => setV(__V2_TOPS);
-    window.addEventListener("mbp-v2tops", handler);
-    return () => window.removeEventListener("mbp-v2tops", handler);
-  }, []);
-  return v;
-}
 
 function computePaceV2(s) {
   const day = today().getDate();
@@ -6695,8 +6629,6 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const greetLine = (lk && lk < key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
-  const [editOpen, setEditOpen] = useState(false);
-  const v2t = useV2Tops();
   const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers, persona, v2t };
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
@@ -6718,10 +6650,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
     <div className="oh">
       <div className="oh-greet-row">
         <div className="overview-greeting" style={{ margin: 0 }}>Hi {name || "there"}, {greetLine}{"\u2026"}</div>
-        {!runTour && <button className="ev-open-btn" onClick={() => setEditOpen(true)}><Icon name="sliders" size={13} /> Edit view</button>}
       </div>
-
-      {editOpen && <EditViewModal layout={layout} onSave={onChangeHomeLayout} onClose={() => setEditOpen(false)} />}
 
       {!runTour && <DataGapBanner transactions={transactions} onOpenUpload={onOpenUpload} />}
 
@@ -6776,26 +6705,16 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         )}
       </TourTarget>
 
-      {(v2t || layout.month.length > 0) && (!runTour || tourStep >= 1) && (
-        v2t ? (
-          <ThisMonthV2 persona={persona} transactions={transactions} targets={targets} billExcludes={billExcludes} />
-        ) : (
-        <div className="oh-grid">
-          {layout.month.map((k, i) => (
-            <TourTarget key={k} active={runTour && tourStep === 1 && i === 0} className={"oh-grid-cell" + (HOME_WIDGETS[k] && HOME_WIDGETS[k].full ? " oh-cell-full" : "")}>
-              {HOME_WIDGETS[k].render(widgetProps)}
-            </TourTarget>
-          ))}
-        </div>
-        )
+      {(!runTour || tourStep >= 1) && (
+        <ThisMonthV2 persona={persona} transactions={transactions} targets={targets} billExcludes={billExcludes} />
       )}
 
-      {(v2t || layout.big.length > 0) && (!runTour || tourStep >= 2) && (
+      {(!runTour || tourStep >= 2) && (
         <>
           <div className="oh-sec"><span>The big picture</span><div className="oh-rule" /></div>
           <TourTarget active={runTour && tourStep === 2}>
-            <div className={"oh-grid" + (!v2t && layout.big.length === 3 ? " oh-grid-3" : "")}>
-              {(v2t ? ["net_worth", "goal_ring"] : layout.big).map((k) => (
+            <div className="oh-grid">
+              {["net_worth", "goal_ring"].map((k) => (
                 <div className="oh-grid-cell" key={k}>{HOME_WIDGETS[k].render(widgetProps)}</div>
               ))}
             </div>
@@ -7556,7 +7475,6 @@ function AdminBar({ onOpen }) {
 }
 
 function TestingBar({ personaKey, onSetPersona }) {
-  const v2 = useV2Tops();
   const opts = [...Object.keys(PERSONA_TEMPLATES).map((k) => ({ key: k, name: PERSONA_TEMPLATES[k].name })), { key: "no_targets", name: "Default (no targets)" }];
   return (
     <div className="admin-bar testing-bar" style={{ background: "#C2410C", flexWrap: "wrap", gap: 8 }}>
@@ -7576,17 +7494,6 @@ function TestingBar({ personaKey, onSetPersona }) {
           }}
         >{o.name}</button>
       ))}
-      <span style={{ width: 1, height: 16, background: "rgba(255,255,255,.4)", margin: "0 2px" }} />
-      <button
-        onClick={() => setV2Tops(!v2)}
-        style={{
-          fontSize: 12, padding: "3px 10px", borderRadius: 999, cursor: "pointer",
-          border: "1px solid rgba(255,255,255,.55)",
-          background: v2 ? "#fff" : "transparent",
-          color: v2 ? "#C2410C" : "#fff",
-          fontWeight: v2 ? 700 : 500,
-        }}
-      >Overview: {v2 ? "V2 (default)" : "V1 (test)"}</button>
     </div>
   );
 }
