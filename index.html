@@ -5700,7 +5700,7 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
             <div className="cvt2-row" key={r.c}>
               <span className="cvt2-nm">{displayCat(r.c)}</span>
               <div className="cvt2-track"><div className="cvt2-fill" style={{ width: fill + "%", background: catColor(r.c) }} /><div className="cvt2-tick" style={{ left: tickPct + "%" }} /></div>
-              <span className="cvt2-num">{formatMoney(Math.round(r.spent))} <span className="cvt2-tgt">/ {Math.round(r.target)}</span></span>
+              <span className="cvt2-num">{formatMoney(Math.round(r.spent))} <span className="cvt2-tgt">/ {formatMoney(Math.round(r.target))}</span></span>
               {isBillsPending
                 ? <span className="cvt2-d cvt2-mut">due {ordinalDay(earliestDue)}</span>
                 : r.target > 0
@@ -10272,12 +10272,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     /* 2 · Category vs target — stacked rows */
     .cvt2-grid { display: block; }
     .cvt2-grid > span { display: none; }
-    .cvt2-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; row-gap: 8px; padding: 13px 0; border-top: 1px solid var(--line); }
+    /* Three fixed columns so the spend/target and the delta line up down the card.
+       Previously .cvt2-num was left-aligned on its own row and .cvt2-d right-aligned
+       on another, so no two figures shared a column. */
+    .cvt2-row { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; column-gap: 10px; row-gap: 8px; padding: 13px 0; border-top: 1px solid var(--line); }
     .cvt2-row:first-of-type { border-top: none; padding-top: 2px; }
-    .cvt2-nm { grid-column: 1; grid-row: 1; font-size: 14px; }
-    .cvt2-d { grid-column: 2; grid-row: 1; font-size: 14px; }
+    .cvt2-nm { grid-column: 1; grid-row: 1; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cvt2-num { grid-column: 2; grid-row: 1; text-align: right; font-size: 13px; }
+    .cvt2-d { grid-column: 3; grid-row: 1; font-size: 13px; text-align: right; min-width: 76px; }
     .cvt2-track { grid-column: 1 / -1; grid-row: 2; height: 10px; }
-    .cvt2-num { grid-column: 1 / -1; grid-row: 3; text-align: left; font-size: 13px; }
     /* 3 · Spend by week — headroom for value labels */
     .sbw2-plot { height: 128px; padding-top: 24px; }
   }
@@ -10579,13 +10582,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .v2pt-chip, .v2pt-dd { order: 3; }
     .v2pt-track { order: 4; flex: 1 1 100%; width: 100%; height: 9px; }
 
-    /* "Where it's gone" now has its own % column; on narrow screens drop the bar to a
-       second line so it keeps full width rather than being squeezed to a sliver. */
-    .v2wg-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-    .v2wg-row .v2wg-nm { flex: 1 1 auto; order: 1; min-width: 0; }
-    .v2wg-row .v2wg-amt { order: 2; margin-left: auto; }
-    .v2wg-pc { order: 3; }
-    .v2wg-bar { order: 4; flex: 1 1 100%; width: 100%; }
+    /* "Where it's gone": bar drops to its own full-width line, but the figures stay
+       in a real grid. Flex + margin-left:auto let each row's £/% be positioned by
+       that row's label width, so nothing lined up down the column. Fixed trailing
+       tracks = every £ and % aligns. */
+    .v2wg-row { display: grid; grid-template-columns: 1fr 62px 40px; align-items: center; column-gap: 10px; row-gap: 7px; }
+    .v2wg-row .v2wg-nm { grid-column: 1; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .v2wg-row .v2wg-amt { grid-column: 2; grid-row: 1; text-align: right; }
+    .v2wg-row .v2wg-pc { grid-column: 3; grid-row: 1; text-align: right; }
+    .v2wg-bar { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 
     /* P4-3: stack the pace legend instead of cramming three items on a line */
     .v2-legend { flex-direction: column; gap: 6px; align-items: flex-start; }
