@@ -5701,132 +5701,10 @@ function ContributionBarsCard({ transactions }) {
   );
 }
 
-function GoalGetterHero({ targets, transactions, rollovers, billExcludes, goals, plan, banks, accountData }) {
-  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
-  const target = plan && plan.targetBalance > 0 ? plan.targetBalance : (goals && goals.length ? goals[0].target : 0);
-  const targetMonth = plan && plan.targetMonth ? plan.targetMonth : null;
-  if (target <= 0) return <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />;
-  const nw = totalEstimatedBalance(banks, accountData, transactions || []);
-  const saved = Math.max(0, nw !== null ? nw : (goals && goals.length ? goals[0].saved : 0));
-  const toGo = Math.max(0, target - saved);
-  const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-  const doneKeys = completedMonthsWithData(transactions || []);
-  const addKey = doneKeys.length ? doneKeys[doneKeys.length - 1] : null;
-  const added = addKey ? (incomeForMonth(transactions || [], addKey) - spendForMonth(transactions || [], addKey)) : null;
-  const contribs = doneKeys.map((k) => Math.max(0, incomeForMonth(transactions || [], k) - spendForMonth(transactions || [], k)));
-  const isBiggest = added != null && added > 0 && added >= Math.max(...contribs, 0);
-  const targetDateStr = targetMonth ? (monthLabelFromKey(targetMonth).slice(0, 3) + " " + targetMonth.slice(0, 4)) : null;
-  const proj = goalProjection({ target, saved }, transactions);
-  const targetDateObj = targetMonth ? new Date(Number(targetMonth.slice(0, 4)), Number(targetMonth.slice(5, 7)), 0) : null;
-  const aheadOfTarget = proj && proj.projected && targetDateObj ? proj.projected <= targetDateObj : true;
-  return (
-    <div className="safe-hero gg2-hero">
-      <div className="gg2-left">
-        <div className="gg2-goal-head">
-          <span className="fsr-label">Your {formatMoney(target)} goal</span>
-          <span className="gg2-pct">{pct}% there</span>
-        </div>
-        <div className="gg2-togo">{formatMoney(toGo)}<em>to go</em></div>
-        <div className="gg2-bar"><div className="gg2-bar-fill" style={{ width: pct + "%" }} /></div>
-        <div className="gg2-scale"><span><strong>{formatMoney(saved)}</strong> saved</span><span>{formatMoney(target)}</span></div>
-        {targetDateStr && aheadOfTarget && <div className="fsr-goal" style={{ marginTop: 16, marginBottom: 0 }}>{"🎯"} On track to finish ahead of your {targetDateStr} target</div>}
-        {targetDateStr && !aheadOfTarget && <div className="gg2-behind" style={{ marginTop: 16 }}>Lift your pace to reach your {targetDateStr} target</div>}
-      </div>
-      <div className="gg2-right">
-        {addKey != null ? (
-          <div>
-            <span className="fsr-label">Added in {monthLabelFromKey(addKey)}</span>
-            <div className={"gg2-added" + (added < 0 ? " gg2-added-neg" : "")}>{added >= 0 ? "+" : "−"}{formatMoney(Math.abs(added))}</div>
-            {isBiggest && <div className="oh-sub" style={{ marginTop: 7 }}>Your biggest month yet {"🎉"}</div>}
-          </div>
-        ) : (
-          <div>
-            <span className="fsr-label">Added so far</span>
-            <div className="oh-sub" style={{ marginTop: 6 }}>Your first full month’s contribution shows once it ends.</div>
-          </div>
-        )}
-        <div className="gg2-safe">
-          <span className="fsr-label">Safe to spend</span>
-          <div className="gg2-safe-v">{formatMoney(s.perDay)}<em>/day {"·"} {s.over ? "over" : "on track"}</em></div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function FreshStartHero({ targets, transactions, rollovers, billExcludes }) {
-  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
-  if (s.budget <= 0) return null;
-  const day = s.dayOfMonth, dim = s.daysInMonth;
-  const expected = s.budget * (day / dim);
-  const projEnd = Math.round(projectMonthEnd(s.spent));
-  const underBy = Math.round(s.budget - projEnd);
-  const ratio = expected > 0 ? s.spent / expected : 1;
-  const paceWord = s.over ? "a little ahead of" : ratio >= 0.9 ? "right on" : ratio >= 0.7 ? "a little under" : "well under";
-  const pctOf = (v) => Math.min(100, Math.max(0, (v / Math.max(s.budget, 1)) * 100));
-  const spentPct = pctOf(s.spent), resPct = pctOf(s.reserved), expPct = pctOf(expected);
-  return (
-    <div className="safe-hero fsr-hero">
-      <div className="fsr-top">
-        <span className="fsr-label">Safe to spend · {currentMonthName()}</span>
-        <span className={"cst-chip " + (s.over ? "cst-warn" : "cst-ok")}>{s.over ? "Over budget" : "On track"}</span>
-      </div>
-      <div className="fsr-main">
-        <div className="fsr-num">{formatMoney(s.perDay)}<em>a day</em></div>
-        <div className="fsr-say">Spend up to this each day and you'll still finish {currentMonthName()} on budget. You've spent just <strong>{formatMoney(s.spent)}</strong> so far — {paceWord} your usual <strong>{formatMoney(Math.round(expected))}</strong> by now.</div>
-      </div>
-      {!s.over && underBy > 0 && <div className="fsr-goal"><Icon name="checkcircle" size={14} /> On track to finish around <br className="fsr-goal-brk" /><strong>{formatMoney(projEnd)}</strong> — about <strong>{formatMoney(underBy)}</strong> under budget</div>}
-      <div className="fsr-pace-head">
-        <span className="fsr-label">Your pace this month</span>
-        <span className="fsr-pace-of"><strong>{formatMoney(s.spent)}</strong> of {formatMoney(s.budget)} budget</span>
-      </div>
-      <div className="fsr-bar-wrap">
-        <div className="fsr-bar">
-          <div className="fsr-seg fsr-seg-spent" style={{ width: spentPct + "%" }} />
-          {s.reserved > 0 && <div className="fsr-seg fsr-seg-res" style={{ width: resPct + "%" }} />}
-        </div>
-        <div className="fsr-mark" style={{ left: expPct + "%" }} />
-        <div className="fsr-mark-lb" style={{ left: expPct + "%" }}><span className="fsr-caret">{"▴"}</span>expected by today</div>
-      </div>
-      <div className="fsr-legend">
-        <span><span className="fsr-dot fsr-dot-spent" /> {formatMoney(s.spent)} spent</span>
-        {s.reserved > 0 && <span><span className="fsr-dot fsr-dot-res" /> {formatMoney(s.reserved)} bills set aside</span>}
-        <span><span className="fsr-dot fsr-dot-free" /> {formatMoney(Math.max(0, s.free))} free</span>
-      </div>
-    </div>
-  );
-}
 
 /* ---------------- Budget Hawk components ---------------- */
 
-function BudgetHawkHero({ targets, transactions, rollovers, billExcludes }) {
-  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
-  if (s.budget <= 0) return null;
-  const day = s.dayOfMonth;
-  const expected = s.budget * (day / s.daysInMonth);
-  const delta = s.spent - expected;
-  const under = delta <= 0;
-  const spare = Math.round(Math.abs(delta));
-  return (
-    <div className="safe-hero bh2-hero">
-      <div className="bh2-left">
-        <span className="fsr-label">Safe to spend · {currentMonthName()}</span>
-        <div className="bh2-num">{formatMoney(s.perDay)}<em>/day</em></div>
-        <span className={"cst-chip " + (under ? "cst-ok" : "cst-warn")}>{under ? "Under pace · " + formatMoney(spare) + " to spare" : "Over pace · " + formatMoney(spare) + " over"}</span>
-      </div>
-      <div className="bh2-right">
-        <span className="fsr-label" style={{ display: "block", marginBottom: 14 }}>How we get this</span>
-        <div className="bh2-ledger">
-          <div className="bh2-ln"><span>Monthly budget{s.roll !== 0 ? " + rollover" : ""}</span><span className="bh2-dots" /><strong>{formatMoney(s.pot)}</strong></div>
-          <div className="bh2-ln"><span>− Spent so far</span><span className="bh2-dots" /><strong>{formatMoney(s.spent)}</strong></div>
-          {s.reserved > 0 && <div className="bh2-ln"><span>− Bills reserved</span><span className="bh2-dots" /><strong>{formatMoney(s.reserved)}</strong></div>}
-          <div className="bh2-ln"><span>= Free to spend, ÷ {s.daysLeft} days left</span><span className="bh2-dots" /><strong>{formatMoney(Math.max(0, s.free))}</strong></div>
-          <div className="bh2-ln bh2-total"><span>Safe to spend</span><span className="bh2-dots-blank" /><strong>{s.over ? formatMoney(0) + "/day" : "≈ " + formatMoney(s.perDay) + "/day"}</strong></div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
   const key = currentMonthKey();
@@ -5992,36 +5870,6 @@ function avg3moSpendByCategory(transactions) {
   return out;
 }
 
-function PowerViewHero({ targets, transactions, rollovers, billExcludes, banks, accountData, goals }) {
-  const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
-  const key = currentMonthKey();
-  const income = incomeForMonth(transactions || [], key);
-  const kept = income > 0 ? Math.round(((income - s.spent) / income) * 100) : null;
-  const avg = avg3moSpendByCategory(transactions);
-  const avgTotal = Object.keys(avg).reduce((t, c) => t + avg[c], 0);
-  const elapsed = s.dayOfMonth / s.daysInMonth;
-  const spentVsAvg = avgTotal > 0 ? Math.round(((s.spent - avgTotal * elapsed) / Math.max(avgTotal * elapsed, 1)) * 100) : null;
-  const nw = totalEstimatedBalance(banks, accountData, transactions || []);
-  const acctCount = Array.from(new Set([...(banks || []).filter(Boolean), ...((transactions || []).map((t) => t.bank).filter(Boolean))])).length;
-  const day = s.dayOfMonth;
-  const expected = s.budget * (day / s.daysInMonth);
-  const paceD = Math.round(s.spent - expected);
-  const stats = [];
-  if (s.budget > 0) stats.push({ k: "Safe to spend / day", v: formatMoney(s.perDay), s: formatMoney(Math.abs(paceD)) + (paceD <= 0 ? " under your usual pace" : " over your usual pace"), good: paceD <= 0 });
-  stats.push({ k: "Spent this month", v: formatMoney(Math.round(s.spent)), s: spentVsAvg === null ? null : Math.abs(spentVsAvg) + "% " + (spentVsAvg <= 0 ? "below" : "above") + " your 3-month average", good: spentVsAvg !== null ? spentVsAvg <= 0 : true });
-  if (!stats.length) return null;
-  return (
-    <div className="pv-kpis">
-      {stats.slice(0, 4).map((st, i) => (
-        <div className="pv-kpi" key={i}>
-          <div className="pv-kpi-k">{st.k}</div>
-          <div className="pv-kpi-v">{st.v}</div>
-          {st.s && <div className={"pv-kpi-s " + (st.mut ? "pv-kpi-mut" : (st.good ? "pv-good" : "pv-bad"))}>{st.s}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function CategoryDeltaCard({ transactions }) {
   const key = currentMonthKey();
@@ -6915,13 +6763,13 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         ) : (
           <>
             {persona === "fresh_start"
-              ? (v2t ? <FreshStartHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} /> : <FreshStartHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />)
+              ? <FreshStartHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
               : persona === "goal_getter"
-              ? (v2t ? <GoalGetterHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} /> : <GoalGetterHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} />)
+              ? <GoalGetterHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} goals={goals} plan={plan} banks={banks} accountData={accountData} />
               : persona === "budget_hawk"
-              ? (v2t ? <BudgetHawkHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} /> : <BudgetHawkHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />)
+              ? <BudgetHawkHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
               : persona === "power_view"
-              ? (v2t ? <PowerViewHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} /> : <PowerViewHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} banks={banks} accountData={accountData} goals={goals} />)
+              ? <PowerViewHeroV2 targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />
               : <SafeToSpendHero targets={targets} transactions={transactions} rollovers={rollovers} billExcludes={billExcludes} />}
             <InsightPill transactions={transactions} targets={targets} />
           </>
@@ -8293,7 +8141,7 @@ function App() {
         }
         const uid = session.user.id;
         setUserId(uid);
-        setIsDev(session.user.email === DEV_EMAIL);
+        setIsDev(TESTING_EMAILS.includes(session.user.email));
         setIsAdmin(session.user.email === ADMIN_EMAIL);
         DEV_MODE = session.user.email === DEV_EMAIL;
         const profile = await fetchProfile(uid);
@@ -8332,6 +8180,9 @@ function App() {
   const openLegal = (tab, from) => { setLegalTab(tab); setReturnStage(from); setStage("legal"); };
 
   const DEV_EMAIL = "testing@mybudgetpal.com";
+  const QA_EMAIL = "qa@mybudgetpal.com";
+  /* Accounts that get the orange testing bar (persona switcher + view toggle). */
+  const TESTING_EMAILS = [DEV_EMAIL, QA_EMAIL];
   const ADMIN_EMAIL = "admin@mybudgetpal.com";
 
   const reloadFxData = async () => {
