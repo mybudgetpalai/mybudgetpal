@@ -989,6 +989,20 @@ function topMerchantsFor(txs, k, n) {
   txs.filter((t) => t.amount < 0 && (!k || t.date.slice(0, 7) === k)).forEach((t) => { o[t.name] = (o[t.name] || 0) + Math.abs(t.amount); });
   return Object.entries(o).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount).slice(0, n);
 }
+/* Rounding each share independently made the column sum to 99% or 101%.
+   Largest-remainder: floor everything, then hand the leftover points to the
+   rows with the biggest fractional parts, so the column always totals 100%. */
+function sharePercents(values, total) {
+  const t = Number(total) || 0;
+  if (t <= 0) return (values || []).map(() => 0);
+  const exact = (values || []).map((v) => ((Number(v) || 0) / t) * 100);
+  const floors = exact.map((e) => Math.floor(e));
+  let left = Math.round(exact.reduce((s, e) => s + e, 0)) - floors.reduce((s, f) => s + f, 0);
+  const order = exact.map((e, i) => ({ i, frac: e - Math.floor(e) })).sort((a, b) => b.frac - a.frac);
+  const out = floors.slice();
+  for (let j = 0; j < order.length && left > 0; j++, left--) out[order[j].i] += 1;
+  return out;
+}
 function ordinalDay(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 function remainingBillsThisMonth(txs, excludes) {
   const ex = excludes || [];
@@ -6422,13 +6436,13 @@ function CompositionCardV2({ transactions, depth }) {
             <div className="v2wg-hole"><span className="v2wg-amt">{formatMoney(total)}</span><span className="v2wg-lb">SPENT</span></div>
           </div>
           <div className="v2wg-leg">
-            {seg.map((sg, i) => (
+            {(() => { const lp = sharePercents(seg.map((sg) => sg.v), total); return seg.map((sg, i) => (
               <React.Fragment key={i}>
                 <span className="v2wg-nm"><span className="v2wg-dot" style={{ background: sg.color }} />{sg.label}</span>
                 <span className="v2wg-v">{formatMoney(sg.v)}</span>
-                <span className="v2wg-p">{pctOf(sg.v)}%</span>
+                <span className="v2wg-p">{lp[i]}%</span>
               </React.Fragment>
-            ))}
+            )); })()}
           </div>
         </div>
         <div className="v2wg-foot">{foot}</div>
@@ -6437,16 +6451,19 @@ function CompositionCardV2({ transactions, depth }) {
   }
 
   const maxV = entries[0][1] || 1;
+  /* Whole-column rounding so the % values sum to exactly 100. */
+  const rowPcts = sharePercents(entries.map((e) => e[1]), total);
   return (
     <div className="glass-card dash-card v2wg">
       <div className="v2wg-head"><span className="card-label" style={{ margin: 0 }}>Where it's gone</span><span className="v2wg-ctx">{formatMoney(total)} this month</span></div>
+      <div className="v2wg-cap">bar = size vs biggest {"\u00B7"} % = share of total</div>
       <div className="v2wg-rows">
-        {entries.map(([c, v]) => (
+        {entries.map(([c, v], i) => (
           <div className="v2wg-row" key={c}>
             <span className="v2wg-nm"><span className="v2wg-dot" style={{ background: catColor(c) }} />{displayCat(c)}</span>
             <div className="v2wg-bar"><i style={{ width: Math.max(4, (v / maxV) * 100) + "%", background: catColor(c) }} /></div>
-            <span className="v2wg-amt">{formatMoney(Math.round(v))}</span>
-            <span className="v2wg-pc">{pctOf(v)}%</span>
+            <span className="v2wg-amt">{formatMoney(v)}</span>
+            <span className="v2wg-pc">{rowPcts[i]}%</span>
           </div>
         ))}
       </div>
@@ -6620,8 +6637,8 @@ function TopMerchantsV2({ transactions, depth }) {
   const maxAmt = top[0].amt || 1;
 
   let foot = null;
-  if (depth === "plain") foot = <span>{top[0].disp} was your biggest this month, at {formatMoney(Math.round(top[0].amt))}.</span>;
-  else if (depth === "detailed") foot = <span>Your top {top.length} merchants are <strong>{formatMoney(Math.round(top.reduce((s, r) => s + r.amt, 0)))}</strong> — {conc}% of your spend this month.</span>;
+  if (depth === "plain") foot = <span>{top[0].disp} was your biggest this month, at {formatMoney(top[0].amt)}.</span>;
+  else if (depth === "detailed") foot = <span>Your top {top.length} merchants are <strong>{formatMoney(top.reduce((s, r) => s + r.amt, 0))}</strong> — {conc}% of your spend this month.</span>;
   else if (depth === "analytical") foot = <span>Your top {top.length} merchants account for <strong>{conc}%</strong> of spend this month.</span>;
 
   return (
@@ -6630,7 +6647,7 @@ function TopMerchantsV2({ transactions, depth }) {
       <div className="v2-mm">
         {top.map((r, i) => (
           <div className="v2-mmrow" key={i}>
-            <div className="v2-mmtop"><span className="v2-mmnm"><span className="v2-dotc" style={{ background: catColor(r.cat) }} />{r.disp}</span><span className="v2-mmv">{formatMoney(Math.round(r.amt))}</span></div>
+            <div className="v2-mmtop"><span className="v2-mmnm"><span className="v2-dotc" style={{ background: catColor(r.cat) }} />{r.disp}</span><span className="v2-mmv">{formatMoney(r.amt)}</span></div>
             <div className="v2-mmbar"><i style={{ width: Math.max(6, (r.amt / maxAmt) * 100) + "%", background: catColor(r.cat) }} /></div>
           </div>
         ))}
@@ -9227,6 +9244,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     .brand { font-size: 14px; }
     .main-content { padding: 16px; gap: 14px; }
     .dash-card { padding: var(--card-pad-sm); border-radius: var(--radius-card); }
+    .oh-needs { padding: var(--card-pad-sm); }
     .summary-spent { font-size: 24px; }
     .tx-name { font-size: 13px; }
     .tx-category { font-size: 11px; }
@@ -9965,8 +9983,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .oh-pill { display: flex; align-items: center; gap: 12px; background: var(--accent-soft); border-radius: 999px; padding: 11px 18px; margin-top: 14px; }
   .oh-pill-icon { color: var(--accent); display: flex; flex-shrink: 0; }
   .oh-pill-text { font-size: 14px; color: var(--ink); line-height: 1.45; }
-  .oh-needs { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-card); }
-  .oh-needs-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+  /* Matches .dash-card (surface-2 / --radius-card / --card-pad) — it used to be
+     the only card on the page with a white fill, 12px radius and an accent bar. */
+  .oh-needs { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); }
+  .oh-needs-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
   .oh-needs-count { font-size: 12px; color: var(--ink-3); }
   .oh-need { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
   .oh-need:first-of-type { border-top: none; }
@@ -10026,7 +10046,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   
   .nw-card { display: flex; flex-direction: column; }
 
-  .oh-greet-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  /* The greeting sets margin:0 inline, so its own 16px bottom margin never applied
+     and "Needs you" sat hard against the text above. Space the row instead. */
+  .oh-greet-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
   .ev-open-btn { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; cursor: pointer; transition: background 0.15s; }
   .ev-open-btn:hover { background: var(--surface-2); }
   .ev-modal { max-width: 520px; max-height: 86vh; overflow-y: auto; }
@@ -10419,6 +10441,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* ===== v2 . Where it's gone (Composition card) ===== */
   .v2wg-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:14px; }
   .v2wg-ctx { font-size:11px; color:var(--ink-3); }
+  .v2wg-cap { font-size:11px; color:var(--ink-3); margin:-8px 0 12px; }
   .v2wg-donut { width:120px; height:120px; border-radius:999px; display:flex; align-items:center; justify-content:center; }
   .v2wg-hole { width:80px; height:80px; border-radius:999px; background:var(--card); display:flex; flex-direction:column; align-items:center; justify-content:center; }
   .v2wg-amt { font-size:19px; font-weight:700; color:var(--ink); }
