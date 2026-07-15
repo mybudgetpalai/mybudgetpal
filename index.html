@@ -838,6 +838,15 @@ function formatTxDate(d) {
   return d;
 }
 function monthLabelFromKey(k) { return MONTHS_LABEL[+k.slice(5, 7) - 1]; }
+/* ISO yyyy-mm-dd -> "13 Jul" to match the date style used elsewhere in the app. */
+function isoToShortDate(s) {
+  if (!s) return "";
+  const p = String(s).slice(0, 10).split("-");
+  if (p.length !== 3) return String(s);
+  const mi = +p[1] - 1;
+  if (!(mi >= 0 && mi < 12)) return String(s);
+  return +p[2] + " " + MONTHS_LABEL[mi] + " " + p[0];
+}
 function latestMonthKey(txs) {
   let max = "";
   (txs || []).forEach((t) => { if (t.date && t.date.slice(0, 7) > max) max = t.date.slice(0, 7); });
@@ -3534,13 +3543,19 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
   filtered = filtered.slice().sort((a, b) => sort === "amt" ? Math.abs(b.amount) - Math.abs(a.amount) : (b.date || "").localeCompare(a.date || ""));
 
   const spentTotal = filtered.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const inTotal = filtered.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  /* Header used to always say "out", so filtering to Money in read "£0 out" next to a
+     £2,500 inflow. Report whichever sides are actually present. */
+  const totalParts = [];
+  if (spentTotal > 0) totalParts.push(formatMoney(spentTotal) + " out");
+  if (inTotal > 0) totalParts.push(formatMoney(inTotal) + " in");
   const hasFilter = q || cat !== "all" || month !== "all" || type !== "all" || minVal > 0;
 
   return (
     <div className="glass-card dash-card">
       <div className="bd-box-head">
         <span className="card-label">Transactions</span>
-        <span className="tx-count">{filtered.length} {filtered.length === 1 ? "result" : "results"}{filtered.length ? " \u00B7 " + formatMoney(spentTotal) + " out" : ""}</span>
+        <span className="tx-count">{filtered.length} {filtered.length === 1 ? "result" : "results"}{totalParts.length ? " \u00B7 " + totalParts.join(" \u00B7 ") : ""}</span>
       </div>
       <p className="tx-instructions">Search or filter to find any transaction. Hit <b>Edit</b> under a category to recategorise it — the change applies to that merchant everywhere.</p>
       <div className="tx-filters">
@@ -3958,6 +3973,11 @@ function TrendsCard({ transactions, compact }) {
   const flowMax = Math.max(...income, ...spend, 1);
   const spendMax = Math.max(...spend, 1);
   const catMax = Math.max(...catSpend, 1);
+  /* The newest key isn't necessarily a finished month — labelling it "last month"
+     while it's the month in progress reports the wrong period. */
+  const lastKey = keys[keys.length - 1];
+  const lastIsCurrent = lastKey === currentMonthKey();
+  const lastLabel = lastIsCurrent ? "so far this month" : "last month";
   return (
     <div className="trends-wrap">
       {!compact && (<>
@@ -3979,7 +3999,7 @@ function TrendsCard({ transactions, compact }) {
           <span className="legend-item"><span className="legend-dot" style={{ background: catColor("Income") }} />Money in</span>
           <span className="legend-item"><span className="legend-dot" style={{ background: "var(--accent)" }} />Money out</span>
         </div>
-        <p className="summary-note">Net last month: {formatMoney(net[net.length - 1])}</p>
+        <p className="summary-note">{lastIsCurrent ? "Net so far this month" : "Net last month"}: {formatMoney(net[net.length - 1])}</p>
       </div>
 
       <div className="glass-card dash-card">
@@ -3995,7 +4015,7 @@ function TrendsCard({ transactions, compact }) {
             </div>
           ))}
         </div>
-        <p className="summary-note">Total spend per month {"\u00B7"} {formatMoney(spend[spend.length - 1])} last month</p>
+        <p className="summary-note">Total spend per month {"\u00B7"} {formatMoney(spend[spend.length - 1])} {lastLabel}</p>
       </div>
       </>)}
 
@@ -4017,7 +4037,7 @@ function TrendsCard({ transactions, compact }) {
             </div>
           ))}
         </div>
-        <p className="summary-note">{cat} {"\u00B7"} {formatMoney(catSpend[catSpend.length - 1])} last month</p>
+        <p className="summary-note">{cat} {"\u00B7"} {formatMoney(catSpend[catSpend.length - 1])} {lastLabel}</p>
       </div>
     </div>
   );
@@ -4073,7 +4093,9 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
   return (
     <div className="glass-card dash-card">
       <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
-      <p className="subtitle" style={{ margin: "0 0 12px" }}>Nothing's counted as a bill until you say so. We've spotted a few regular payments below {"—"} tell us which are really bills, and add any we missed.</p>
+      <p className="subtitle" style={{ margin: "0 0 12px" }}>Nothing's counted as a bill until you say so. {suspected.length > 0
+        ? <>We've spotted a few regular payments below {"—"} tell us which are really bills, and add any we missed.</>
+        : <>Add any regular payments you want tracked as bills.</>}</p>
 
       {suspected.length > 0 && (
         <div style={{ marginBottom: 4 }}>
@@ -4092,7 +4114,9 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
 
       <span className="card-label" style={{ display: "block", margin: "16px 0 6px" }}>Your bills</span>
       {myBills.length === 0 ? (
-        <p className="subtitle" style={{ margin: "0 0 4px" }}>No bills added yet {"—"} confirm the ones above, or add your own below.</p>
+        <p className="subtitle" style={{ margin: "0 0 4px" }}>{suspected.length > 0
+          ? <>No bills added yet {"—"} confirm the ones above, or add your own below.</>
+          : <>No bills added yet {"—"} add your own below.</>}</p>
       ) : (
         <>
           <div className="tx-list">
@@ -4156,7 +4180,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
         <span className="card-label" style={{ margin: 0 }}>Bank accounts</span>
         {totalBal !== null && <span className="ba-total">{formatMoney(totalBal)}<span className="ba-total-lb">across {list.length} account{list.length !== 1 ? "s" : ""}</span></span>}
       </div>
-      {lastUpd && <span className="ba-updated">Last statement to {lastUpd}</span>}
+      {lastUpd && <span className="ba-updated">Last statement to {isoToShortDate(lastUpd)}</span>}
       <div className="tx-list">
         {list.map((b) => {
           const row = bankRows.find((r) => r.bank_name === b);
@@ -4176,7 +4200,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
                 <div className="stmt-list">
                   {bankStmts.map((s) => (
                     <div className="stmt-row" key={s.id}>
-                      <span className="stmt-period">{s.periodStart && s.periodEnd ? s.periodStart + " → " + s.periodEnd : (s.fileName || "Statement")}</span>
+                      <span className="stmt-period">{s.periodStart && s.periodEnd ? isoToShortDate(s.periodStart) + " → " + isoToShortDate(s.periodEnd) : (s.fileName || "Statement")}</span>
                       {s.status === "reconciled" && <span className="stmt-badge stmt-ok">✓ Balances</span>}
                       {s.status === "mismatch" && <span className="stmt-badge stmt-bad"><Icon name="alert" size={10} /> Off by {formatMoneyNative(Math.abs(s.difference), FX.bankCurrency[b] || "GBP")}</span>}
                       {s.status === "unverified" && <span className="stmt-badge stmt-na">○ Unchecked</span>}
@@ -6464,7 +6488,7 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
           </div>
         ))}
       </div>
-      <div className="v2wg-foot">You're <strong className={netUnder >= 0 ? "v2-good" : "v2-bad"}>{formatMoney(Math.abs(netUnder))} {netUnder >= 0 ? "under" : "over"}</strong> {isCurrentMonth ? "your day-" + day + " pace" : "your targets"} — {goal ? (netUnder >= 0 ? "that underspend is heading toward your goal." : "worth easing off to keep the goal on track.") : aheadPhrase}.</div>
+      <div className="v2wg-foot">You're <strong className={netUnder >= 0 ? "v2-good" : "v2-bad"}>{formatMoney(Math.abs(netUnder))} {netUnder >= 0 ? "under" : "over"}</strong> {isCurrentMonth ? "your day-" + day + " pace" : "your targets"} — {goal ? (netUnder >= 0 ? "that underspend is heading toward your goal" : "worth easing off to keep the goal on track") : aheadPhrase}.</div>
     </div>
   );
 }
@@ -6603,7 +6627,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const noBudget = totalBudget <= 0 || persona === "no_targets";
 
   const needs = [];
-  if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " need a category", cta: "Review", action: onOpenCatReview });
+  if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s need" : " needs") + " a category", cta: "Review", action: onOpenCatReview });
   const showNeeds = runTour || needs.length > 0;
 
   if (!hasData && !runTour) {
@@ -6703,7 +6727,7 @@ function UncatBanner({ count, onSort, label }) {
   if (!count || hidden) return null;
   return (
     <div className="catrev-banner uncat-banner-block">
-      <span className="catrev-banner-text"><Icon name="tag" size={13} /> <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || "still need a category"} {"—"} still counted in your spending, just not assigned to a category yet.</span>
+      <span className="catrev-banner-text"><Icon name="tag" size={13} /> <strong>{count}</strong> transaction{count !== 1 ? "s" : ""} {label || (count !== 1 ? "still need a category" : "still needs a category")} {"—"} still counted in your spending, just not assigned to a category yet.</span>
       <div className="catrev-banner-actions">
         <button className="catrev-banner-btn" onClick={onSort}>Sort now</button>
         <button className="catrev-banner-later" onClick={() => setHidden(true)}>Later</button>
@@ -6877,23 +6901,24 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
   const [custom, setCustom] = useState((catConfig.custom || []).map((c) => ({ ...c, keywords: [...(c.keywords || [])] })));
   const [newName, setNewName] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [justSaved, setJustSaved] = useState(false); /* only claim "Saved" after a real save */
 
   const nextColor = () => { const used = custom.map((c) => c.color); return CAT_PALETTE.find((c) => !used.includes(c)) || CAT_PALETTE[custom.length % CAT_PALETTE.length]; };
   const setBuiltinName = (canonical, val) => {
     setRenames((prev) => { const nx = { ...prev }; const t = val.trim(); if (!t || t === canonical) delete nx[canonical]; else nx[canonical] = t; return nx; });
-    setDirty(true);
+    setDirty(true); setJustSaved(false);
   };
   const addCustom = () => {
     const nm = newName.trim(); if (!nm) return;
     const taken = [...spendCategories(), "Income", "Other"].some((c) => c.toLowerCase() === nm.toLowerCase()) || custom.some((c) => c.name.toLowerCase() === nm.toLowerCase());
     if (taken) return;
-    setCustom((prev) => [...prev, { name: nm, color: nextColor(), keywords: [] }]); setNewName(""); setDirty(true);
+    setCustom((prev) => [...prev, { name: nm, color: nextColor(), keywords: [] }]); setNewName(""); setDirty(true); setJustSaved(false);
   };
-  const updateCustom = (i, patch) => { setCustom((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c))); setDirty(true); };
-  const removeCustom = (i) => { setCustom((prev) => prev.filter((_, j) => j !== i)); setDirty(true); };
+  const updateCustom = (i, patch) => { setCustom((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c))); setDirty(true); setJustSaved(false); };
+  const removeCustom = (i) => { setCustom((prev) => prev.filter((_, j) => j !== i)); setDirty(true); setJustSaved(false); };
   const save = (thenRescan) => {
     const clean = { renames, custom: custom.map((c) => ({ name: c.name.trim(), color: c.color, keywords: (c.keywords || []).map((k) => String(k).trim()).filter(Boolean) })).filter((c) => c.name) };
-    onSaveCatConfig(clean); setDirty(false);
+    onSaveCatConfig(clean); setDirty(false); setJustSaved(true);
     if (thenRescan && onRescanCategories) onRescanCategories();
   };
 
@@ -6934,7 +6959,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
       </div>
 
       <div className="catman-actions">
-        <button className={"glass-btn " + (dirty ? "ghost" : "confirmed")} disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : "\u2713 Saved"}</button>
+        <button className={"glass-btn " + (dirty ? "ghost" : "confirmed")} disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : justSaved ? "\u2713 Saved" : "No changes"}</button>
         <button className="glass-btn primary" onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
       </div>
     </div>
@@ -7103,7 +7128,10 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const completedMonths = completedMonthsWithData(viewTransactions || []);
   const inboxTasks = [];
   if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "tag", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
-  if (setupPending) inboxTasks.push({ id: "overview-setup", icon: "target", title: "Set up your overview", desc: "3 minutes: a few questions plus your targets, and we'll shape your dashboard.", action: () => { if (onResumeSetup) onResumeSetup(); } });
+  /* setupPending only reflects profile.setup_completed; if targets already exist the task is
+     stale and unclearable, so treat real targets as evidence setup is effectively done. */
+  const hasAnyTarget = Object.values(viewTargets || {}).some((v) => Number(v) > 0);
+  if (setupPending && !hasAnyTarget) inboxTasks.push({ id: "overview-setup", icon: "target", title: "Set up your overview", desc: "3 minutes: a few questions plus your targets, and we'll shape your dashboard.", action: () => { if (onResumeSetup) onResumeSetup(); } });
   if (showExtraBanner) inboxTasks.push({ id: "setup", icon: "sliders", title: "Finish setting up your account", desc: "A couple of quick questions to personalise things.", action: () => { if (onCompleteExtra) onCompleteExtra(); } });
   const reviewBaseline = signupMonth || new Date().toISOString().slice(0, 7);
   if (completedMonths.length && onOpenReview) { const rm = completedMonths[completedMonths.length - 1]; if (rm >= reviewBaseline) inboxTasks.push({ id: "review-" + rm, icon: "calendar", title: "Month-end review for " + monthLabelFromKey(rm), desc: "See how the month landed versus your plan.", action: () => onOpenReview(rm) }); }
@@ -7250,7 +7278,7 @@ function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, use
         </div>
         <div className="dash-card settings-section">
           <span className="card-label">Profile</span>
-          {setupPending && (
+          {setupPending && !Object.values(targets || {}).some((v) => Number(v) > 0) && (
             <div className="settings-nudge">
               <span>Set up your overview — a few questions plus your targets, and we'll shape your dashboard around your goals.</span>
               <button className="glass-btn primary settings-nudge-btn" onClick={onResumeSetup}>Set up now</button>
@@ -9173,9 +9201,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   }
 
   /* trend / cash flow bar charts */
-  .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; margin-top: 16px; }
-  .trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
-  .trend-bar-wrap { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+  .trend-chart { display: flex; align-items: flex-end; justify-content: center; gap: 10px; height: 140px; margin-top: 16px; padding-top: 6px; }
+  /* max-width stops a 1-2 month series stretching into full-width slabs;
+     min-height:0 lets the wrap shrink inside the fixed-height chart instead of overflowing it. */
+  .trend-bar-col { flex: 1 1 0; max-width: 96px; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
+  .trend-bar-wrap { width: 100%; height: 100%; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
   .trend-bar-wrap { position: relative; }
   .trend-tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 6; }
   .trend-bar-col:hover .trend-tip { opacity: 1; }
