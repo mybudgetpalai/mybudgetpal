@@ -4117,6 +4117,132 @@ function TrendsCard({ transactions, compact }) {
   );
 }
 
+function titleCaseBillName(n) {
+  const KEEP_UP = ["DD", "UK", "US", "EU", "UAE", "USA", "LLC", "PLC", "VAT"];
+  return String(n || "").toLowerCase().split(" ")
+    .map((w) => KEEP_UP.includes(w.toUpperCase()) ? w.toUpperCase() : (w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
+/* Two-step bills setup. Everything detected starts ticked — the common case is
+   "yes, these are all bills", so the work should be untick-the-odd-one, not
+   answer-a-question-per-row. */
+function BillsSetupModal({ transactions, confirmed, onSave, onClose }) {
+  const detected = React.useMemo(() => detectRecurringBills(transactions || []).filter((b) => b.amount > 0), [transactions]);
+  const detectedNames = React.useMemo(() => new Set(detected.map((b) => b.name)), [detected]);
+  const [step, setStep] = useState(detected.length ? 0 : 1);
+  const [picked, setPicked] = useState(() => {
+    const conf = confirmed || [];
+    /* Re-opening the flow should remember previous choices; first run ticks all. */
+    return new Set(conf.length ? detected.filter((b) => conf.includes(b.name)).map((b) => b.name) : detected.map((b) => b.name));
+  });
+  const [extra, setExtra] = useState(() => (confirmed || []).filter((n) => !detectedNames.has(n)));
+  const [search, setSearch] = useState("");
+
+  const merchants = React.useMemo(() => {
+    const by = {};
+    (transactions || []).filter((t) => t.amount < 0 && t.name).forEach((t) => {
+      if (!by[t.name]) by[t.name] = { n: 0, sum: 0, days: [] };
+      by[t.name].n += 1; by[t.name].sum += Math.abs(t.amount);
+      const d = +String(t.date || "").slice(8, 10); if (d >= 1 && d <= 31) by[t.name].days.push(d);
+    });
+    return Object.entries(by).map(([name, v]) => ({
+      name, amount: v.sum / v.n,
+      due: v.days.length ? ordinalDay(Math.round(v.days.reduce((a, b) => a + b, 0) / v.days.length)) : "",
+    })).sort((a, b) => b.amount - a.amount);
+  }, [transactions]);
+
+  const chosen = [...picked, ...extra];
+  const rowsFor = (n) => detected.find((b) => b.name === n) || merchants.find((m) => m.name === n) || { name: n, amount: 0, due: "" };
+  const total = chosen.reduce((s, n) => s + (rowsFor(n).amount || 0), 0);
+  const toggle = (n) => setPicked((p) => { const x = new Set(p); x.has(n) ? x.delete(n) : x.add(n); return x; });
+  const addExtra = (n) => { if (!chosen.includes(n)) setExtra((e) => [...e, n]); setSearch(""); };
+
+  const searchable = merchants
+    .filter((m) => !chosen.includes(m.name))
+    .filter((m) => search.trim() && m.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .slice(0, 6);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="glass-card bsm" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-x" onClick={onClose}><Icon name="x" size={16} /></button>
+
+        {step === 0 && (
+          <>
+            <div className="bsm-step">Step 1 of 2</div>
+            <p className="bsm-h">Are these your bills?</p>
+            <p className="bsm-s">We spotted these repeating each month. Untick anything that isn't a bill.</p>
+            <div className="bsm-rows">
+              {detected.map((b) => {
+                const on = picked.has(b.name);
+                return (
+                  <div className={"bsm-row" + (on ? "" : " bsm-off")} key={b.name} role="button" tabIndex={0}
+                    onClick={() => toggle(b.name)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(b.name); } }}>
+                    <span className="bsm-nm">{titleCaseBillName(b.name)}<span className="bsm-meta">{b.frequency}{b.due ? " · due " + b.due : ""}</span></span>
+                    <span className="bsm-amt">{formatMoney(b.amount)}</span>
+                    <span className={"bsm-tick" + (on ? " bsm-tick-on" : "")}>{on && <Icon name="check" size={13} />}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="glass-btn primary bsm-cta" onClick={() => setStep(1)}>
+              Next {"\u00B7"} {picked.size} bill{picked.size !== 1 ? "s" : ""}
+            </button>
+            <p className="bsm-note">Nothing counts as a bill until you say so.</p>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <div className="bsm-step">Step 2 of 2</div>
+            <p className="bsm-h">Anything we missed?</p>
+            <p className="bsm-s">Add a bill we didn't spot {"\u2014"} rent, a standing order, anything paid by card.</p>
+            {extra.length > 0 && (
+              <div className="bsm-rows">
+                {extra.map((n) => {
+                  const r = rowsFor(n);
+                  return (
+                    <div className="bsm-row" key={n}>
+                      <span className="bsm-nm">{titleCaseBillName(n)}<span className="bsm-meta">Monthly{r.due ? " · due " + r.due : ""}</span></span>
+                      <span className="bsm-amt">{formatMoney(r.amount)}</span>
+                      <button className="bsm-rm" onClick={() => setExtra((e) => e.filter((x) => x !== n))}><Icon name="x" size={14} /></button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <input className="glass-input bsm-inp" placeholder="Search your payments" value={search} onChange={(e) => setSearch(e.target.value)} />
+            {searchable.length > 0 && (
+              <div className="bsm-sug">
+                {searchable.map((m) => (
+                  <button className="bsm-sug-row" key={m.name} onClick={() => addExtra(m.name)}>
+                    <span className="bsm-nm">{titleCaseBillName(m.name)}<span className="bsm-meta">~{formatMoney(m.amount)}{m.due ? " · due " + m.due : ""}</span></span>
+                    <Icon name="plus" size={14} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {search.trim() && !searchable.length && <p className="bsm-note" style={{ textAlign: "left" }}>No payments match {"\u201C"}{search.trim()}{"\u201D"}.</p>}
+            <button className="glass-btn primary bsm-cta" onClick={() => { onSave(chosen); setStep(2); }}>Done</button>
+            <button className="glass-btn bsm-cta bsm-ghost" onClick={() => { onSave(chosen); setStep(2); }}>Skip {"\u2014"} I've got them all</button>
+          </>
+        )}
+
+        {step === 2 && (
+          <div className="bsm-done">
+            <div className="bsm-done-ic"><Icon name="check" size={24} /></div>
+            <p className="bsm-h">{chosen.length} bill{chosen.length !== 1 ? "s" : ""} tracked</p>
+            <p className="bsm-s">{formatMoney(total)} a month. We'll set it aside from your safe-to-spend and tell you what's still to come.</p>
+            <button className="glass-btn primary bsm-cta" onClick={() => { goToView("bills"); onClose(); }}>See my bills</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BillsCard({ transactions, confirmed, onToggleConfirm, editable }) {
   const [dismissed, setDismissed] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -6714,7 +6840,7 @@ function ThisMonthV2({ persona, transactions, targets, billExcludes }) {
   );
 }
 
-function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan, onOpenUpload }) {
+function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan, onOpenUpload, billsNudge, onOpenBillsSetup, onDismissBillsNudge }) {
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
@@ -6750,6 +6876,15 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
       {editOpen && <EditViewModal layout={layout} onSave={onChangeHomeLayout} onClose={() => setEditOpen(false)} />}
 
       {!runTour && <DataGapBanner transactions={transactions} onOpenUpload={onOpenUpload} />}
+
+      {!runTour && billsNudge > 0 && (
+        <div className="oh-bills-nudge">
+          <span className="obn-ic"><Icon name="bills" size={17} /></span>
+          <span className="obn-text"><strong>Set up your bills</strong><br />We spotted {billsNudge} regular payment{billsNudge !== 1 ? "s" : ""}. Takes about a minute.</span>
+          <button className="obn-cta" onClick={onOpenBillsSetup}>Review {"\u203A"}</button>
+          <button className="obn-x" aria-label="Dismiss" onClick={onDismissBillsNudge}><Icon name="x" size={14} /></button>
+        </div>
+      )}
 
       {showNeeds && (!runTour || tourStep >= 3) && (
         <TourTarget active={runTour && tourStep === 3}>
@@ -7071,9 +7206,9 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
     </div>
   );
 }
-function MainContent({ view, name, onOpenUpload, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories }) {
+function MainContent({ view, name, onOpenUpload, targets, banks, plan, onEditPlan, hasData, transactions, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, onResumeSetup, persona, goals, goalsApi, accountData, onRecategorize, runTour, tourStep, billExcludes, onToggleBillExclude, allTargets, isDev, onOpenReview, uncatCount, onOpenCatReview, rollovers, onSaveAllTargets, targetsInitialEdit, signupMonth, catConfig, onSaveCatConfig, onRescanCategories, billsNudge, onOpenBillsSetup, onDismissBillsNudge }) {
   if (view === "overview") return (
-    <OverviewHome onOpenUpload={onOpenUpload} name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} plan={plan} />
+    <OverviewHome onOpenUpload={onOpenUpload} name={name} targets={targets} transactions={transactions} rollovers={rollovers} banks={banks} accountData={accountData} goals={goals} billExcludes={billExcludes} uncatCount={uncatCount} onOpenCatReview={onOpenCatReview} runTour={runTour} tourStep={tourStep} hasData={hasData} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} plan={plan} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />
   );
   if (view === "breakdown") return hasData ? <BreakdownPage transactions={transactions} targets={targets} onOpenCatReview={onOpenCatReview} /> : <EmptyState text="No spending data yet — upload a statement to see your breakdown." />;
   if (view === "targets") return <TargetsPage allTargets={allTargets} targets={targets} transactions={transactions} onSaveAllTargets={onSaveAllTargets} initialEdit={targetsInitialEdit} onEditPlan={onEditPlan} />;
@@ -7201,10 +7336,26 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
   const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
   const [view, setView] = useState(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
+  /* Item 16: how many recurring payments we could offer to track. Only meaningful
+     once there's data and the Cx hasn't been through the flow yet. */
+  const billsDetectedN = React.useMemo(
+    () => (billsSetupDone || !hasData) ? 0 : detectRecurringBills(transactions || []).filter((b) => b.amount > 0).length,
+    [billsSetupDone, hasData, transactions]);
+  const billsNudge = billsNudgeHidden ? 0 : billsDetectedN;
+  /* One-time: open the sheet by itself on the first dashboard after onboarding.
+     Never while the tour is running — two overlays at once. */
+  const billsAutoRef = React.useRef(false);
+  React.useEffect(() => {
+    if (billsAutoRef.current) return;
+    if (runTour || setupIntroOpen || setupQuestionsOpen) return;
+    if (billsSetupDone || !hasData || billsDetectedN === 0) return;
+    billsAutoRef.current = true;
+    onOpenBillsSetup();
+  }, [billsSetupDone, hasData, billsDetectedN, runTour, setupIntroOpen, setupQuestionsOpen]);
   /* Cards nested well below this can request a page via goToView(). */
   React.useEffect(() => {
     const handler = (e) => { if (e && e.detail) { setView(e.detail); setTInitEdit(false); } };
@@ -7264,7 +7415,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
-        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} />)}</div>
+        <div className={"main-content " + (effectiveView === "overview" || effectiveView === "breakdown" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
       {runTour && (
         <div className="tour-card">
@@ -7291,6 +7442,15 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       {overlayScreen}
       {setupIntroOpen && <SetupIntroModal name={name} onStart={onSetupStart} onSkip={onSetupSkip} />}
       {setupQuestionsOpen && <SetupQuestionsScreen {...setupQuestionsProps} />}
+      {billsSetupOpen && (
+        <BillsSetupModal
+          transactions={transactions}
+          confirmed={billExcludes}
+          onSave={onSaveBillsSetup}
+          onClose={onCloseBillsSetup}
+        />
+      )}
+
       {uploadOpen && (
         <UploadStatementModal
           onClose={() => setUploadOpen(false)}
@@ -7819,6 +7979,11 @@ function App() {
   const [allTargets, setAllTargets] = useState({});
   const [targetsEditReq, setTargetsEditReq] = useState(false);
   const [billExcludes, setBillExcludes] = useState([]);
+  /* Item 16: bills setup is a one-time prompt after onboarding. Persisted on the
+     profile so it doesn't reappear on every login. */
+  const [billsSetupDone, setBillsSetupDone] = useState(true);
+  const [billsSetupOpen, setBillsSetupOpen] = useState(false);
+  const [billsNudgeHidden, setBillsNudgeHidden] = useState(false);
   const [catConfig, setCatConfig] = useState({ renames: {}, custom: [] });
   const [extraProfile, setExtraProfile] = useState(null);
   const [showExtraBanner, setShowExtraBanner] = useState(false);
@@ -8149,7 +8314,7 @@ function App() {
           setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
           setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false); setPersonaKey((profile && profile.persona) || null);
           setNavViews(parseNavLayout(profile));
-          setBillExcludes(parseBillExcludes(profile)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
+          setBillExcludes(parseBillExcludes(profile)); setBillsSetupDone(!!(profile && profile.bills_setup_done)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
       setPlan(planFromProfile(profile));
           setStage("dashboard");
         } else {
@@ -8270,6 +8435,16 @@ function App() {
   const handleChangeNavViews = (newViews) => {
     setNavViews(newViews);
     if (userId) supabaseClient.from("profiles").upsert({ id: userId, nav_layout: newViews }).then(() => {}, () => {});
+  };
+  const markBillsSetupDone = () => {
+    setBillsSetupDone(true);
+    if (userId) supabaseClient.from("profiles").upsert({ id: userId, bills_setup_done: true }).then(() => {}, () => {});
+  };
+  const handleSaveBillsSetup = (names) => {
+    const next = Array.isArray(names) ? names : [];
+    setBillExcludes(next);
+    if (userId) supabaseClient.from("profiles").upsert({ id: userId, bill_excludes: next, bills_setup_done: true }).then(() => {}, () => {});
+    setBillsSetupDone(true);
   };
   const handleToggleBillExclude = (name) => {
     setBillExcludes((prev) => {
@@ -8477,7 +8652,7 @@ function App() {
               setUploadedFiles(Object.fromEntries(bankRows.map((b) => [b.bank_name, [{ name: "existing", size: 1, id: b.id }]])));
               setOverviewSlots(parseOverviewLayout(profile)); setHomeLayout(parseHomeLayout(profile)); setTheme(normalizeTheme(profile && profile.theme)); setShowSetupBanner(!!profile && profile.setup_completed === false); setPersonaKey((profile && profile.persona) || null);
               setNavViews(parseNavLayout(profile));
-              setBillExcludes(parseBillExcludes(profile)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
+              setBillExcludes(parseBillExcludes(profile)); setBillsSetupDone(!!(profile && profile.bills_setup_done)); { const _cc = parseCategoryConfig(profile); CAT_CONFIG = _cc; setCatConfig(_cc); }
       setPlan(planFromProfile(profile));
               setShowSplash(true);
               setTimeout(() => setShowSplash(false), 2900);
@@ -8615,6 +8790,13 @@ function App() {
         allTargets={allTargets}
         billExcludes={billExcludes}
         onToggleBillExclude={handleToggleBillExclude}
+        billsSetupDone={billsSetupDone}
+        billsSetupOpen={billsSetupOpen}
+        onOpenBillsSetup={() => setBillsSetupOpen(true)}
+        onCloseBillsSetup={() => { setBillsSetupOpen(false); markBillsSetupDone(); }}
+        onSaveBillsSetup={handleSaveBillsSetup}
+        billsNudgeHidden={billsNudgeHidden}
+        onDismissBillsNudge={() => { setBillsNudgeHidden(true); markBillsSetupDone(); }}
         overlayScreen={overlayScreen}
         catConfig={catConfig}
         onSaveCatConfig={handleSaveCatConfig}
@@ -9708,6 +9890,39 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     position: fixed; inset: 0; z-index: 200; background: rgba(6, 10, 22, 0.6); display: flex; align-items: center; justify-content: center; padding: 20px;
   }
   .modal-card { max-width: 420px; }
+
+  /* ---- Bills setup sheet (item 16) ---- */
+  .bsm { max-width: 400px; width: 100%; position: relative; padding: 22px; }
+  .bsm-step { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin-bottom: 6px; }
+  .bsm-h { font-size: 19px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 5px; color: var(--ink); }
+  .bsm-s { font-size: 13px; color: var(--ink-3); margin: 0 0 15px; line-height: 1.5; }
+  .bsm-rows { display: flex; flex-direction: column; margin-bottom: 6px; }
+  .bsm-row { display: grid; grid-template-columns: 1fr auto 26px; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .bsm-row:first-of-type { border-top: none; }
+  .bsm-off { opacity: .45; }
+  .bsm-nm { font-size: 14px; font-weight: 600; color: var(--ink); min-width: 0; }
+  .bsm-meta { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--ink-3); }
+  .bsm-amt { font-size: 14px; font-weight: 700; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bsm-tick { width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid var(--line); display: flex; align-items: center; justify-content: center; background: var(--card); color: #fff; }
+  .bsm-tick-on { background: var(--accent); border-color: var(--accent); }
+  .bsm-rm { width: 26px; height: 26px; border: none; background: none; color: var(--ink-3); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .bsm-cta { width: 100%; margin-top: 16px; padding: 13px; font-size: 15px; }
+  .bsm-ghost { margin-top: 8px; }
+  .bsm-note { font-size: 12px; color: var(--ink-3); margin: 12px 0 0; text-align: center; line-height: 1.5; }
+  .bsm-inp { width: 100%; box-sizing: border-box; margin-top: 6px; }
+  .bsm-sug { display: flex; flex-direction: column; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .bsm-sug-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--surface-2); border: none; border-bottom: 1px solid var(--line); font-family: inherit; text-align: left; cursor: pointer; color: var(--accent); }
+  .bsm-sug-row:last-child { border-bottom: none; }
+  .bsm-sug-row:hover { background: var(--accent-soft); }
+  .bsm-done { text-align: center; padding: 6px 0; }
+  .bsm-done-ic { width: 46px; height: 46px; border-radius: 999px; background: var(--pos-soft, #E3F5EE); color: var(--pos); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+
+  /* Bills nudge on the Overview */
+  .oh-bills-nudge { display: flex; align-items: center; gap: 11px; background: var(--accent-soft); border-radius: 12px; padding: 12px 13px; margin-bottom: 16px; }
+  .oh-bills-nudge .obn-ic { color: var(--accent); display: flex; flex-shrink: 0; }
+  .obn-text { flex: 1; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .obn-cta { font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; padding: 0; }
+  .obn-x { background: none; border: none; color: var(--ink-3); cursor: pointer; padding: 0; display: flex; flex-shrink: 0; }
 
   /* goals */
   .goal-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
