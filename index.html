@@ -44,13 +44,17 @@
      which #root was empty and the screen was simply blank. This paints instantly
      from plain CSS and is torn out the moment React mounts. */
   .boot-shell { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #F5F7FA; font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; z-index: 1; }
-  .boot-logo { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: #0B1220; }
+  /* Matches the login splash: gradient tile + two-tone wordmark. */
+  .boot-tile { width: 84px; height: 84px; border-radius: 22px; background: linear-gradient(150deg, #3B6BFF 0%, #7C4DFF 60%, #9B5CF0 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 44px rgba(90, 90, 255, .28); }
+  .boot-logo { font-size: 27px; font-weight: 700; letter-spacing: -0.03em; }
+  .boot-my { color: #0B1220; }
+  .boot-bp { color: #2E5BFF; }
   .boot-bar { width: 148px; height: 4px; border-radius: 999px; background: #E2E7F0; overflow: hidden; }
   .boot-bar > i { display: block; width: 40%; height: 100%; border-radius: 999px; background: #2E5BFF; animation: bootSlide 1.1s ease-in-out infinite; }
   .boot-sub { font-size: 13px; color: #63708B; }
   @keyframes bootSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
   @media (prefers-color-scheme: dark) {
-    .boot-shell { background: #0F1218; } .boot-logo { color: #F2F5FA; } .boot-bar { background: #232B38; } .boot-sub { color: #8A96AC; }
+    .boot-shell { background: #0F1218; } .boot-my { color: #F2F5FA; } .boot-bp { color: #6C8CFF; } .boot-bar { background: #232B38; } .boot-sub { color: #8A96AC; }
   }
   @media (prefers-reduced-motion: reduce) { .boot-bar > i { animation: none; width: 100%; } }
 
@@ -106,7 +110,14 @@ if ('serviceWorker' in navigator) {
 </head>
 <body>
 <div id="root"><div class="boot-shell" id="boot-shell">
-  <div class="boot-logo">MyBudgetPal</div>
+  <div class="boot-tile">
+    <svg width="46" height="46" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="14" width="4.6" height="7" rx="2.3" fill="#fff" />
+      <rect x="9.7" y="9" width="4.6" height="12" rx="2.3" fill="#fff" />
+      <rect x="16.4" y="4" width="4.6" height="17" rx="2.3" fill="#fff" />
+    </svg>
+  </div>
+  <div class="boot-logo"><span class="boot-my">My</span><span class="boot-bp">BudgetPal</span></div>
   <div class="boot-bar"><i></i></div>
   <div class="boot-sub">Getting things ready…</div>
 </div></div>
@@ -1121,8 +1132,95 @@ function buildInsights(txs, targets) {
     else out.push({ type: "warning", text: "You're " + formatMoney(spent - totalTarget) + " over your total monthly target." });
   }
   const top = topMerchantsFor(txs, cur, 1)[0];
-  if (top) out.push({ type: "info", text: "Your biggest merchant this month is " + top.name + " (" + formatMoney(top.amount) + ")." });
-  return out.slice(0, 5);
+  if (top) out.push({ type: "info", text: "Your biggest merchant this month is " + titleCaseBill(top.name) + " (" + formatMoney(top.amount) + ")." });
+
+  /* ---- Deeper reads: things the Overview can't already show you. ---- */
+  const all = txs || [];
+  const monthsWithData = [...new Set(all.filter((t) => t.date).map((t) => t.date.slice(0, 7)))].sort();
+  const prevKey = lastNMonthKeys(cur, 2)[0];
+
+  /* A recurring payment that showed up for the first time this month. */
+  const recurring = detectRecurringBills(all).filter((b) => b.amount > 0);
+  recurring.forEach((b) => {
+    const seen = all.filter((t) => t.amount < 0 && t.name === b.name && t.date).map((t) => t.date.slice(0, 7)).sort();
+    const firstSeen = seen[0];
+    if (firstSeen === cur && monthsWithData.length > 1 && b.amount >= 3) {
+      out.push({ type: "info", text: "New regular payment: " + titleCaseBill(b.name) + " at " + formatMoney(b.amount) + " a month. That's " + formatMoney(b.amount * 12) + " a year." });
+    }
+  });
+
+  /* Something that used to come out every month and has now stopped. */
+  if (monthsWithData.length >= 3 && prevKey) {
+    recurring.forEach((b) => {
+      const inPrev = all.some((t) => t.amount < 0 && t.name === b.name && t.date && t.date.slice(0, 7) === prevKey);
+      const inCur = all.some((t) => t.amount < 0 && t.name === b.name && t.date && t.date.slice(0, 7) === cur);
+      if (inPrev && !inCur && !inProgress) {
+        out.push({ type: "positive", text: titleCaseBill(b.name) + " didn't come out this month — cancelled, or worth checking?" });
+      }
+    });
+  }
+
+  /* A recurring cost that has crept up compared with its usual amount. */
+  recurring.forEach((b) => {
+    const rows = all.filter((t) => t.amount < 0 && t.name === b.name && t.date).sort((x, y) => x.date.localeCompare(y.date));
+    if (rows.length < 3) return;
+    const latest = Math.abs(rows[rows.length - 1].amount);
+    const earlier = rows.slice(0, -1).map((t) => Math.abs(t.amount));
+    const avgEarlier = earlier.reduce((s, v) => s + v, 0) / earlier.length;
+    if (avgEarlier > 3 && latest > avgEarlier * 1.15) {
+      out.push({ type: "warning", text: titleCaseBill(b.name) + " has gone up — " + formatMoney(latest) + " now vs " + formatMoney(avgEarlier) + " before. That's " + formatMoney((latest - avgEarlier) * 12) + " more a year." });
+    }
+  });
+
+  /* A single charge far bigger than the usual one for that merchant. */
+  const curTxs = all.filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === cur);
+  curTxs.forEach((t) => {
+    const hist = all.filter((x) => x.amount < 0 && x.name === t.name && x.date && x.date.slice(0, 7) !== cur).map((x) => Math.abs(x.amount));
+    if (hist.length < 3) return;
+    const avg = hist.reduce((s, v) => s + v, 0) / hist.length;
+    const amt = Math.abs(t.amount);
+    if (avg > 5 && amt > avg * 2 && amt - avg > 20) {
+      out.push({ type: "warning", text: "One-off: " + formatMoney(amt) + " at " + titleCaseBill(t.name) + ", about " + Math.round(amt / avg) + "× your usual " + formatMoney(avg) + "." });
+    }
+  });
+
+  /* Where this month sits against every completed month on record. */
+  const completed = monthsWithData.filter((k) => k !== currentMonthKey());
+  if (completed.length >= 3) {
+    const totals = completed.map((k) => ({ k, v: spendForMonth(all, k) })).filter((x) => x.v > 0);
+    if (totals.length >= 3) {
+      const sorted = totals.slice().sort((a, b) => a.v - b.v);
+      const lowest = sorted[0], highest = sorted[sorted.length - 1];
+      if (!inProgress && cur === lowest.k) out.push({ type: "positive", text: "This was your lowest-spending month on record at " + formatMoney(lowest.v) + "." });
+      else if (!inProgress && cur === highest.k) out.push({ type: "warning", text: "This was your highest-spending month on record at " + formatMoney(highest.v) + "." });
+      else {
+        const avgAll = totals.reduce((s, x) => s + x.v, 0) / totals.length;
+        out.push({ type: "info", text: "Your average month is " + formatMoney(avgAll) + " — lowest " + formatMoney(lowest.v) + ", highest " + formatMoney(highest.v) + "." });
+      }
+    }
+  }
+
+  /* How much of what came in actually stayed in. */
+  if (completed.length >= 1) {
+    const lastDone = completed[completed.length - 1];
+    const inc = incomeForMonth(all, lastDone), sp = spendForMonth(all, lastDone);
+    if (inc > 0 && sp > 0) {
+      const rate = Math.round(((inc - sp) / inc) * 100);
+      const label = monthLabelFromKey(lastDone);
+      if (rate > 0) out.push({ type: rate >= 20 ? "positive" : "info", text: "In " + label + " you kept " + rate + "% of what came in (" + formatMoney(inc - sp) + " of " + formatMoney(inc) + ")." });
+      else out.push({ type: "warning", text: "In " + label + " you spent " + formatMoney(sp - inc) + " more than came in." });
+    }
+  }
+
+  /* What the recurring commitments actually cost over a year. */
+  const recTotal = recurring.reduce((s, b) => s + b.amount, 0);
+  if (recTotal > 0 && recurring.length >= 2) {
+    out.push({ type: "info", text: "Your " + recurring.length + " regular payments come to " + formatMoney(recTotal) + " a month — " + formatMoney(recTotal * 12) + " a year." });
+  }
+
+  /* Dedupe by text, then cap. The page can carry more than the Overview card. */
+  const seenText = new Set();
+  return out.filter((o) => (seenText.has(o.text) ? false : (seenText.add(o.text), true))).slice(0, 12);
 }
 
 function inferDateOrder(values) {
@@ -4503,7 +4601,9 @@ function InsightsAsk({ transactions }) {
   );
 }
 function InsightsCard({ transactions, targets, full, onOpenUpload }) {
-  const built = buildInsights(transactions || [], targets);
+  /* The dashboard card is a teaser (top few); the Insights page shows the lot. */
+  const allBuilt = buildInsights(transactions || [], targets);
+  const built = full ? allBuilt : allBuilt.slice(0, 5);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
   const insightList = (
     <div className="glass-card dash-card">
@@ -7015,8 +7115,12 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
       </div>
 
       <div className="catman-actions">
-        <button className={"glass-btn " + (dirty ? "ghost" : "confirmed")} disabled={!dirty} onClick={() => save(false)}>{dirty ? "Save changes" : justSaved ? "\u2713 Saved" : "No changes"}</button>
-        <button className="glass-btn primary" onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
+        {/* Was a disabled Save button relabelled to "No changes" — a status
+            message wearing a button's clothes. Status is text; buttons act. */}
+        {dirty
+          ? <button className="glass-btn ghost" onClick={() => save(false)}>Save changes</button>
+          : <span className="catman-status">{justSaved ? "\u2713 Saved" : "No changes yet"}</span>}
+        <button className="glass-btn primary" disabled={!dirty} onClick={() => save(true)}>Save {"\u0026"} re-sort transactions</button>
       </div>
     </div>
   );
@@ -9747,11 +9851,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   /* Bills nudge on the Overview */
   /* Locked card: real card blurred underneath, one prompt on top. */
   .lockw { position: relative; border-radius: var(--radius-card); overflow: hidden; }
-  .lockw-under { filter: blur(5px); opacity: .5; pointer-events: none; user-select: none; }
-  .lockw-veil { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; padding: 16px; background: color-mix(in srgb, var(--bg) 62%, transparent); }
+  /* Light blur only: the point is to show what's behind and make it worth
+     unlocking. At blur(5px)/opacity .5 it just looked broken. */
+  .lockw-under { filter: blur(2.5px); opacity: .78; pointer-events: none; user-select: none; }
+  .lockw-veil { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; padding: 16px; background: color-mix(in srgb, var(--bg) 45%, transparent); }
   .lockw-ic { width: 36px; height: 36px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
   .lockw-t { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); }
-  .lockw-btn { padding: 8px 16px; font-size: 13px; }
+  /* Needs explicit sizing: in a column flex container the button stretched to
+     the full height of the card and rendered as a huge blue slab. */
+  .lockw-btn { flex: 0 0 auto; width: auto; align-self: center; padding: 9px 18px; font-size: 13px; line-height: 1.2; height: auto; }
 
   .oh-bills-nudge { display: flex; align-items: center; gap: 11px; background: var(--accent-soft); border-radius: 12px; padding: 12px 13px; margin-bottom: 16px; }
   .oh-bills-nudge .obn-ic { color: var(--accent); display: flex; flex-shrink: 0; }
@@ -10462,6 +10570,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   .catman-swatch.on { border-color: var(--ink); }
   .catman-kw { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--input-bg, rgba(127,127,127,0.06)); color: var(--ink); font: inherit; }
   .catman-add { display: flex; gap: 8px; margin-top: 12px; }
+  .catman-status { align-self: center; font-size: 13px; color: var(--ink-3); }
   .catman-actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .catman-actions .glass-btn:disabled { opacity: 0.5; cursor: default; }
 
