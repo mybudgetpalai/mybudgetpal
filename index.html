@@ -1198,7 +1198,6 @@ function buildInsights(txs, targets) {
      (day 1 => -99%). Completed months compare full vs full as normal. */
   const inProgress = cur === currentMonthKey();
   const dom = today().getDate();
-  const cmpSuffix = inProgress ? "% vs the same point last month." : "% vs last month.";
   let curCats, prevCats, enoughData;
   if (inProgress) {
     curCats = spendByCategoryForMonthUpToDay(txs, cur, dom);
@@ -1213,8 +1212,10 @@ function buildInsights(txs, targets) {
     const a = curCats[c], b = prevCats[c];
     if (b > 20 && a > 20) {
       const chg = Math.round(((a - b) / b) * 100);
-      if (chg >= 25) out.push({ type: "warning", text: displayCat(c) + " spend is up " + chg + cmpSuffix });
-      else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " spend is down " + Math.abs(chg) + cmpSuffix });
+      const delta = formatMoney(Math.abs(a - b));
+      const tail = inProgress ? " than by this point last month." : " than last month.";
+      if (chg >= 25) out.push({ type: "warning", text: displayCat(c) + " is up " + chg + "% — " + delta + " more" + tail });
+      else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " is down " + Math.abs(chg) + "% — " + delta + " less" + tail });
     }
   });
   /* Spend categories only — Income is stored in targets too, and including it inflated the
@@ -4793,9 +4794,21 @@ function InsightsAsk({ transactions }) {
   );
 }
 function InsightsCard({ transactions, targets, full, onOpenUpload }) {
-  /* The dashboard card is a teaser (top few); the Insights page shows the lot. */
-  const allBuilt = buildInsights(transactions || [], targets);
-  const built = full ? allBuilt : allBuilt.slice(0, 5);
+  /* Rank by materiality, then cap. Ten insights is noise; the biggest four get read.
+     Money mentioned in the text is the best available proxy for "does this matter". */
+  const rankInsights = (list) => {
+    const weight = { warning: 3, positive: 2, info: 1 };
+    const biggestNumber = (s) => {
+      const nums = String(s).match(/[\d,]+(?:\.\d+)?/g) || [];
+      return nums.reduce((mx, n) => Math.max(mx, Number(n.replace(/,/g, "")) || 0), 0);
+    };
+    return list
+      .map((ins, i) => ({ ins, i, w: weight[ins.type] || 1, mag: biggestNumber(ins.text) }))
+      .sort((a, b) => (b.w - a.w) || (b.mag - a.mag) || (a.i - b.i))
+      .map((o) => o.ins);
+  };
+  const allBuilt = rankInsights(buildInsights(transactions || [], targets));
+  const built = full ? allBuilt.slice(0, 4) : allBuilt.slice(0, 3);
   const insights = built.length ? built : [{ type: "info", text: "Upload a couple more months of statements to unlock month-on-month insights." }];
   const insightList = (
     <div className="glass-card dash-card">
@@ -9739,16 +9752,16 @@ function App() {
   }
 
   /* trend / cash flow bar charts */
-  .trend-chart { display: flex; align-items: flex-end; justify-content: center; gap: 10px; height: 140px; margin-top: 16px; padding-top: 6px; }
+  .trend-chart { display: flex; align-items: flex-end; justify-content: stretch; gap: 10px; height: 140px; margin-top: 16px; padding-top: 6px; }
   /* max-width stops a 1-2 month series stretching into full-width slabs;
      min-height:0 lets the wrap shrink inside the fixed-height chart instead of overflowing it. */
-  .trend-bar-col { flex: 1 1 0; max-width: 96px; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
+  .trend-bar-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
   .trend-bar-wrap { width: 100%; height: 100%; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
   .trend-bar-wrap { position: relative; }
   .trend-tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 6; }
   .trend-bar-col:hover .trend-tip { opacity: 1; }
-  .trend-bar { width: 60%; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
-  .trend-bar-wrap.dual .trend-bar { width: 40%; }
+  .trend-bar { width: 60%; max-width: 54px; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
+  .trend-bar-wrap.dual .trend-bar { width: 40%; max-width: 34px; }
   .income-bar { background: linear-gradient(180deg, var(--pos), #2fae90); }
   .spend-bar { background: var(--accent); }
   .trend-bar-label { color: var(--ink-3); font-size: 11px; }
