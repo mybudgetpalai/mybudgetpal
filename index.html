@@ -1214,8 +1214,8 @@ function buildInsights(txs, targets) {
       const chg = Math.round(((a - b) / b) * 100);
       const delta = formatMoney(Math.abs(a - b));
       const tail = inProgress ? " than by this point last month." : " than last month.";
-      if (chg >= 25) out.push({ type: "warning", text: displayCat(c) + " is up " + chg + "% — " + delta + " more" + tail });
-      else if (chg <= -25) out.push({ type: "positive", text: displayCat(c) + " is down " + Math.abs(chg) + "% — " + delta + " less" + tail });
+      if (chg >= 25) out.push({ type: "warning", kind: "catchange", text: displayCat(c) + " is up " + chg + "% — " + delta + " more" + tail });
+      else if (chg <= -25) out.push({ type: "positive", kind: "catchange", text: displayCat(c) + " is down " + Math.abs(chg) + "% — " + delta + " less" + tail });
     }
   });
   /* Spend categories only — Income is stored in targets too, and including it inflated the
@@ -1224,15 +1224,48 @@ function buildInsights(txs, targets) {
   const spent = spendForMonth(txs, cur);
   if (totalTarget > 0 && cur === currentMonthKey()) {
     const projected = projectMonthEnd(spent);
-    if (projected > totalTarget) out.unshift({ type: "warning", text: "At this rate you'll spend ~" + formatMoney(projected) + " this month — " + formatMoney(projected - totalTarget) + " over your target." });
-    else out.push({ type: "positive", text: "At this rate you'll finish ~" + formatMoney(totalTarget - projected) + " under your monthly target." });
+    if (projected > totalTarget) out.unshift({ type: "warning", kind: "projection", text: "At this rate you'll spend ~" + formatMoney(projected) + " this month — " + formatMoney(projected - totalTarget) + " over your target." });
+    else out.push({ type: "positive", kind: "projection", text: "At this rate you'll finish ~" + formatMoney(totalTarget - projected) + " under your monthly target." });
   }
   if (totalTarget > 0) {
-    if (spent <= totalTarget) out.push({ type: "positive", text: "You've used " + Math.round((spent / totalTarget) * 100) + "% of your monthly target." });
-    else out.push({ type: "warning", text: "You're " + formatMoney(spent - totalTarget) + " over your total monthly target." });
+    if (spent <= totalTarget) out.push({ type: "positive", kind: "budget", text: "You've used " + Math.round((spent / totalTarget) * 100) + "% of your monthly target." });
+    else out.push({ type: "warning", kind: "budget", text: "You're " + formatMoney(spent - totalTarget) + " over your total monthly target." });
   }
   const top = topMerchantsFor(txs, cur, 1)[0];
-  if (top) out.push({ type: "info", text: "Your biggest merchant this month is " + titleCaseBill(top.name) + " (" + formatMoney(top.amount) + ")." });
+  if (top) out.push({ type: "info", kind: "merchant", text: "Your biggest merchant this month is " + titleCaseBill(top.name) + " (" + formatMoney(top.amount) + ")." });
+
+  /* A bill that's past its usual day and hasn't gone out yet. */
+  if (inProgress) {
+    const norm2 = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const paidSet = new Set(txs.filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === cur).map((t) => norm2(t.name)));
+    detectRecurringBills(txs).filter((b) => b.amount > 0).forEach((b) => {
+      const dd = parseInt(b.due, 10) || 0;
+      if (dd > 0 && dd < dom && !paidSet.has(norm2(b.name))) {
+        out.push({ type: "warning", kind: "unpaidbill", text: titleCaseBill(b.name) + " (" + formatMoney(b.amount) + ") usually leaves on the " + dd + "th — it hasn't yet this month." });
+      }
+    });
+  }
+
+  /* A place you go back to again and again — count matters more than size here. */
+  const visitCount = {};
+  const visitSpend = {};
+  txs.filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === cur && (t.category === "Dining" || t.category === "Groceries")).forEach((t) => {
+    const n = titleCaseBill(t.name);
+    visitCount[n] = (visitCount[n] || 0) + 1;
+    visitSpend[n] = (visitSpend[n] || 0) + Math.abs(t.amount);
+  });
+  const haunt = Object.keys(visitCount).sort((a, b) => visitCount[b] - visitCount[a])[0];
+  if (haunt && visitCount[haunt] >= 3) {
+    out.push({ type: "info", kind: "haunt", text: "You've been to " + haunt + " " + visitCount[haunt] + " times this month — " + formatMoney(visitSpend[haunt]) + " in total." });
+  }
+
+  /* How much of what came in you actually kept. */
+  const inc = incomeForMonth(txs, prev);
+  const sp = spendForMonth(txs, prev);
+  if (inc > 0 && sp > 0) {
+    const kept = Math.round(((inc - sp) / inc) * 100);
+    if (kept > 0) out.push({ type: "positive", kind: "savingsrate", text: "In " + monthLabelFromKey(prev) + " you kept " + kept + "% of what came in (" + formatMoney(inc - sp) + ")." });
+  }
 
   /* ---- Deeper reads: things the Overview can't already show you. ---- */
   const all = txs || [];
@@ -1245,7 +1278,7 @@ function buildInsights(txs, targets) {
     const seen = all.filter((t) => t.amount < 0 && t.name === b.name && t.date).map((t) => t.date.slice(0, 7)).sort();
     const firstSeen = seen[0];
     if (firstSeen === cur && monthsWithData.length > 1 && b.amount >= 3) {
-      out.push({ type: "info", text: "New regular payment: " + titleCaseBill(b.name) + " at " + formatMoney(b.amount) + " a month. That's " + formatMoney(b.amount * 12) + " a year." });
+      out.push({ type: "info", kind: "newbill", text: "New regular payment: " + titleCaseBill(b.name) + " at " + formatMoney(b.amount) + " a month. That's " + formatMoney(b.amount * 12) + " a year." });
     }
   });
 
@@ -1255,7 +1288,7 @@ function buildInsights(txs, targets) {
       const inPrev = all.some((t) => t.amount < 0 && t.name === b.name && t.date && t.date.slice(0, 7) === prevKey);
       const inCur = all.some((t) => t.amount < 0 && t.name === b.name && t.date && t.date.slice(0, 7) === cur);
       if (inPrev && !inCur && !inProgress) {
-        out.push({ type: "positive", text: titleCaseBill(b.name) + " didn't come out this month — cancelled, or worth checking?" });
+        out.push({ type: "positive", kind: "stoppedbill", text: titleCaseBill(b.name) + " didn't come out this month — cancelled, or worth checking?" });
       }
     });
   }
@@ -1268,7 +1301,7 @@ function buildInsights(txs, targets) {
     const earlier = rows.slice(0, -1).map((t) => Math.abs(t.amount));
     const avgEarlier = earlier.reduce((s, v) => s + v, 0) / earlier.length;
     if (avgEarlier > 3 && latest > avgEarlier * 1.15) {
-      out.push({ type: "warning", text: titleCaseBill(b.name) + " has gone up — " + formatMoney(latest) + " now vs " + formatMoney(avgEarlier) + " before. That's " + formatMoney((latest - avgEarlier) * 12) + " more a year." });
+      out.push({ type: "warning", kind: "billup", text: titleCaseBill(b.name) + " has gone up — " + formatMoney(latest) + " now vs " + formatMoney(avgEarlier) + " before. That's " + formatMoney((latest - avgEarlier) * 12) + " more a year." });
     }
   });
 
@@ -1280,7 +1313,7 @@ function buildInsights(txs, targets) {
     const avg = hist.reduce((s, v) => s + v, 0) / hist.length;
     const amt = Math.abs(t.amount);
     if (avg > 5 && amt > avg * 2 && amt - avg > 20) {
-      out.push({ type: "warning", text: "One-off: " + formatMoney(amt) + " at " + titleCaseBill(t.name) + ", about " + Math.round(amt / avg) + "× your usual " + formatMoney(avg) + "." });
+      out.push({ type: "warning", kind: "oneoff", text: "One-off: " + formatMoney(amt) + " at " + titleCaseBill(t.name) + ", about " + Math.round(amt / avg) + "× your usual " + formatMoney(avg) + "." });
     }
   });
 
@@ -4802,10 +4835,23 @@ function InsightsCard({ transactions, targets, full, onOpenUpload }) {
       const nums = String(s).match(/[\d,]+(?:\.\d+)?/g) || [];
       return nums.reduce((mx, n) => Math.max(mx, Number(n.replace(/,/g, "")) || 0), 0);
     };
-    return list
+    const sorted = list
       .map((ins, i) => ({ ins, i, w: weight[ins.type] || 1, mag: biggestNumber(ins.text) }))
       .sort((a, b) => (b.w - a.w) || (b.mag - a.mag) || (a.i - b.i))
       .map((o) => o.ins);
+    /* Ranking on money alone surfaced four of the same shape ("X is up Y%").
+       Cap each kind so the list reads as four different observations. */
+    const cap = { catchange: 2 };
+    const seen = {};
+    const picked = [];
+    sorted.forEach((ins) => {
+      const k = ins.kind || "other";
+      const lim = cap[k] || 1;
+      if ((seen[k] || 0) < lim) { seen[k] = (seen[k] || 0) + 1; picked.push(ins); }
+    });
+    /* If variety left us short, top up with whatever's left rather than show fewer. */
+    sorted.forEach((ins) => { if (!picked.includes(ins)) picked.push(ins); });
+    return picked;
   };
   const allBuilt = rankInsights(buildInsights(transactions || [], targets));
   const built = full ? allBuilt.slice(0, 4) : allBuilt.slice(0, 3);
@@ -9760,8 +9806,8 @@ function App() {
   .trend-bar-wrap { position: relative; }
   .trend-tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 6; }
   .trend-bar-col:hover .trend-tip { opacity: 1; }
-  .trend-bar { width: 60%; max-width: 54px; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
-  .trend-bar-wrap.dual .trend-bar { width: 40%; max-width: 34px; }
+  .trend-bar { width: 60%; max-width: 120px; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
+  .trend-bar-wrap.dual .trend-bar { width: 42%; max-width: 78px; }
   .income-bar { background: linear-gradient(180deg, var(--pos), #2fae90); }
   .spend-bar { background: var(--accent); }
   .trend-bar-label { color: var(--ink-3); font-size: 11px; }
