@@ -4086,7 +4086,7 @@ function PieChart({ slices, total, activeName, onPick }) {
   };
   const pick = (p) => { if (onPick) onPick(activeName === p.name ? null : p.name); };
   return (
-    <div className="bd-pie-wrap" ref={wrapRef} data-active={activeName || "none"} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <div className="bd-pie-wrap" ref={wrapRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
       <svg viewBox="0 0 200 200" className="bd-pie-svg">
         {paths.map((p) => (
           p.full
@@ -4224,7 +4224,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
                 .filter((t) => t.amount < 0 && t.category === name && t.date.slice(0, 7) === activeKey)
                 .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
               return (
-                <div className="bd-cat" key={name}>
+                <div className={"bd-cat" + (openCat && !isOpen ? " bd-cat-dim" : "")} key={name}>
                   <div className={"bd-cat-row" + (isOpen ? " bd-open" : "")} onClick={() => setOpenCat(isOpen ? null : name)}>
                     <div className="category-top">
                       <span className="category-name">
@@ -9702,8 +9702,9 @@ function App() {
   .bd-legend-item { cursor: pointer; transition: opacity .18s; }
   .bd-legend-dim { opacity: 0.35; }
   /* Selecting a category mutes the others so the chosen one reads clearly. */
-  .bd-list.bd-has-open .bd-cat:not(:has(.bd-open)) { opacity: 0.38; transition: opacity .18s; }
-  .bd-list.bd-has-open .bd-cat:not(:has(.bd-open)):hover { opacity: 0.72; }
+  .bd-cat { transition: opacity .18s; }
+  .bd-cat-dim { opacity: 0.4; }
+  .bd-cat-dim:hover { opacity: 0.75; }
   .bd-headline { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .bd-sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
