@@ -1920,7 +1920,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
 
       <div className="lp-nav">
-        <div className="brand-row" style={{ marginBottom: 0 }}><div className="brand-dot" /><span className="brand-name" style={{ fontSize: 18, fontWeight: 700, color: "var(--ink)" }}>{APP_NAME}</span></div>
+        <div className="brand"><span className="brand-word">My<span className="brand-word-2">BudgetPal</span></span></div>
         <div className="lp-nav-actions">
           <button className="btn btn-ghost" onClick={onLogin}>Log in</button>
           <button className="btn btn-primary" onClick={onSignup}>Start free trial</button>
@@ -1937,7 +1937,6 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
           </div>
-          <span className="hero-trust">No bank login, ever &mdash; your statements, your control.</span>
         </div>
       </div>
 
@@ -1949,7 +1948,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <span className="lp-trust-dot" />
           <span className="lp-trust-fact"><Icon name="sparkles" size={16} /> AI-categorised in seconds</span>
         </div>
-        <p className="lp-trust-note">Built by one person, in early access &mdash; shaped by the people testing it.</p>
+        <p className="lp-trust-note">No bank login, ever &mdash; your statements, your control.</p>
       </div>
 
       <div className="lp-section lp-wrap" id="lp-how">
@@ -2045,6 +2044,8 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
               <svg viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
                 <polyline points="0,26 24,20 48,22 72,12 96,14 120,4" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
+              <div className="fc-trend-axis"><span>Today</span><span>Dec</span></div>
+              <div className="fc-trend-foot"><span className="fc-trend-foot-label">On track for</span><span className="fc-trend-foot-val">&pound;4,200</span></div>
             </div>
           </div>
           <div className="feature-card reveal">
@@ -9900,6 +9901,10 @@ function App() {
   .fc-roll-arrow { color: var(--ink-3); font-weight: 700; }
   .fc-viz-trend { display: block; padding-top: 12px; }
   .fc-viz-trend svg { width: 100%; height: 30px; display: block; }
+  .fc-trend-axis { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11px; color: var(--ink-3); }
+  .fc-trend-foot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; padding-top: 7px; border-top: 1px solid var(--line); }
+  .fc-trend-foot-label { font-size: 11px; color: var(--ink-2); }
+  .fc-trend-foot-val { font-size: 13px; font-weight: 700; color: var(--accent); }
   .fc-chip { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 20px; }
   .fc-chip-soft { color: var(--ink-3); background: var(--surface-2); }
   .fc-viz-goal { gap: 10px; }
@@ -10332,7 +10337,6 @@ function App() {
   .lp-hero-copy { max-width: 640px; margin: 0 auto; }
   .lp-hero-copy h1 { font-size: 52px; }
   .lp-hero-copy p { max-width: 520px; margin-left: auto; margin-right: auto; }
-  .hero-trust { display: block; margin-top: 18px; font-size: 13px; color: var(--ink-3); }
   .lp-trust-strip { max-width: 760px; margin: 0 auto; padding: 0 24px 8px; text-align: center; }
   .lp-trust-facts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; }
   .lp-trust-fact { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
@@ -10429,8 +10433,8 @@ function App() {
   @media (max-width: 460px) {
     /* Landing nav on very small screens */
     .lp-nav { padding: 14px 16px; gap: 10px; }
-    .lp-nav .brand-row { min-width: 0; }
-    .lp-nav .brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lp-nav .brand { min-width: 0; }
+    .lp-nav .brand-word { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lp-nav-actions { flex-shrink: 0; gap: 8px; }
     .lp-nav-actions .btn { padding: 9px 12px; font-size: 13px; }
   }
