@@ -4648,7 +4648,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejecte
       )}
 
       <div style={{ marginTop: 14 }}>
-        <button className="glass-btn ghost" style={{ flex: "0 0 auto", padding: "10px 16px", fontSize: 14 }} onClick={() => setPickerOpen((v) => !v)}>{pickerOpen ? "Close" : "Add another bill"}</button>
+        <button className="glass-btn ghost targets-rebuild-btn" style={{ flex: "0 0 auto" }} onClick={() => setPickerOpen((v) => !v)}>{pickerOpen ? "Close" : "Add another bill"}</button>
         {pickerOpen && (
           <div style={{ marginTop: 10 }}>
             <input className="catman-input" style={{ width: "100%", marginBottom: 8 }} placeholder="Search all your payments…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -4658,7 +4658,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejecte
               ) : allMerchants.slice(0, 60).map((n) => (
                 <div className="tx-row" key={n}>
                   <div className="tx-info"><span className="tx-name">{n}</span><span className="tx-category">~{formatMoney(merchantMap[n])} total</span></div>
-                  <button className="glass-btn ghost" style={{ padding: "5px 12px", fontSize: 13, flex: "0 0 auto" }} onClick={() => onToggleConfirm(n)}>Add</button>
+                  <button className="glass-btn ghost targets-rebuild-btn" style={{ flex: "0 0 auto" }} onClick={() => onToggleConfirm(n)}>Add</button>
                 </div>
               ))}
             </div>
@@ -10016,6 +10016,7 @@ function App() {
     .summary-head:has(+ .page-intro) > .slot-select,
     .summary-head:has(+ .page-intro) > .bd-month-select { position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
   }
+  /* Standard secondary button size — Targets, Bills. */
   .targets-rebuild-btn { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
   @media (max-width: 640px) {
     .summary-head { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
