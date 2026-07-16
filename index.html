@@ -1259,6 +1259,55 @@ function buildInsights(txs, targets) {
     out.push({ type: "info", kind: "haunt", text: "You've been to " + haunt + " " + visitCount[haunt] + " times this month — " + formatMoney(visitSpend[haunt]) + " in total." });
   }
 
+  /* ---- Always-available reads: no history or repeat visits needed. ---- */
+  const monthTx = txs.filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === cur);
+
+  /* Weekend vs weekday rate. */
+  if (monthTx.length >= 8) {
+    let we = 0, wd = 0, weD = new Set(), wdD = new Set();
+    monthTx.forEach((t) => {
+      const d = new Date(t.date + "T00:00:00");
+      const day = d.getDay();
+      if (day === 0 || day === 6) { we += Math.abs(t.amount); weD.add(t.date); }
+      else { wd += Math.abs(t.amount); wdD.add(t.date); }
+    });
+    const wePer = weD.size ? we / weD.size : 0;
+    const wdPer = wdD.size ? wd / wdD.size : 0;
+    if (wePer > 0 && wdPer > 0) {
+      const ratio = wePer / wdPer;
+      if (ratio >= 1.4) out.push({ type: "info", kind: "weekend", text: "Weekends cost you " + (Math.round(ratio * 10) / 10) + "\u00D7 a weekday — " + formatMoney(wePer) + " vs " + formatMoney(wdPer) + " a day." });
+      else if (ratio <= 0.7) out.push({ type: "positive", kind: "weekend", text: "Your weekends are cheap — " + formatMoney(wePer) + " a day vs " + formatMoney(wdPer) + " midweek." });
+    }
+  }
+
+  /* The single priciest day. */
+  if (monthTx.length >= 5) {
+    const byDay = {};
+    monthTx.forEach((t) => { byDay[t.date] = (byDay[t.date] || 0) + Math.abs(t.amount); });
+    const worst = Object.keys(byDay).sort((a, b) => byDay[b] - byDay[a])[0];
+    if (worst && byDay[worst] > 0) {
+      const n = monthTx.filter((t) => t.date === worst).length;
+      const d = new Date(worst + "T00:00:00");
+      const lbl = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] + " " + d.getDate() + " " + monthLabelFromKey(cur);
+      out.push({ type: "info", kind: "bigday", text: lbl + " was your priciest day — " + formatMoney(byDay[worst]) + " across " + n + " transaction" + (n === 1 ? "" : "s") + "." });
+    }
+  }
+
+  /* How concentrated the spend is. */
+  const concCats = Object.keys(curCats).filter((c) => curCats[c] > 0).sort((a, b) => curCats[b] - curCats[a]);
+  const concTotal = concCats.reduce((s, c) => s + curCats[c], 0);
+  if (concCats.length >= 3 && concTotal > 0) {
+    const top2 = curCats[concCats[0]] + curCats[concCats[1]];
+    const pct = Math.round((top2 / concTotal) * 100);
+    if (pct >= 50) out.push({ type: "info", kind: "concentration", text: displayCat(concCats[0]) + " and " + displayCat(concCats[1]) + " are " + pct + "% of everything you spent — " + formatMoney(top2) + "." });
+  }
+
+  /* Volume and average. */
+  if (monthTx.length >= 10) {
+    const tot = monthTx.reduce((s, t) => s + Math.abs(t.amount), 0);
+    out.push({ type: "info", kind: "volume", text: monthTx.length + " transactions this month, averaging " + formatMoney(tot / monthTx.length) + " each." });
+  }
+
   /* How much of what came in you actually kept. */
   const inc = incomeForMonth(txs, prev);
   const sp = spendForMonth(txs, prev);
@@ -1348,7 +1397,7 @@ function buildInsights(txs, targets) {
   /* What the recurring commitments actually cost over a year. */
   const recTotal = recurring.reduce((s, b) => s + b.amount, 0);
   if (recTotal > 0 && recurring.length >= 2) {
-    out.push({ type: "info", text: "Your " + recurring.length + " regular payments come to " + formatMoney(recTotal) + " a month — " + formatMoney(recTotal * 12) + " a year." });
+    out.push({ type: "info", kind: "billload", text: "Your " + recurring.length + " regular payments come to " + formatMoney(recTotal) + " a month — " + formatMoney(recTotal * 12) + " a year." });
   }
 
   /* Dedupe by text, then cap. The page can carry more than the Overview card. */
@@ -4831,17 +4880,25 @@ function InsightsCard({ transactions, targets, full, onOpenUpload }) {
      Money mentioned in the text is the best available proxy for "does this matter". */
   const rankInsights = (list) => {
     const weight = { warning: 3, positive: 2, info: 1 };
+    /* Kind matters more than tone: an overspend must lead, but a "priciest day"
+       read is more useful than a fourth "category is up" line. */
+    const kindBoost = {
+      projection: 40, unpaidbill: 34, budget: 30, oneoff: 26, billup: 24,
+      catchange: 20, newbill: 18, stoppedbill: 16, haunt: 14, weekend: 13,
+      bigday: 12, concentration: 11, savingsrate: 10, billload: 9,
+      volume: 7, merchant: 6
+    };
     const biggestNumber = (s) => {
       const nums = String(s).match(/[\d,]+(?:\.\d+)?/g) || [];
       return nums.reduce((mx, n) => Math.max(mx, Number(n.replace(/,/g, "")) || 0), 0);
     };
     const sorted = list
-      .map((ins, i) => ({ ins, i, w: weight[ins.type] || 1, mag: biggestNumber(ins.text) }))
-      .sort((a, b) => (b.w - a.w) || (b.mag - a.mag) || (a.i - b.i))
+      .map((ins, i) => ({ ins, i, k: kindBoost[ins.kind] || 5, w: weight[ins.type] || 1, mag: biggestNumber(ins.text) }))
+      .sort((a, b) => (b.k - a.k) || (b.w - a.w) || (b.mag - a.mag) || (a.i - b.i))
       .map((o) => o.ins);
     /* Ranking on money alone surfaced four of the same shape ("X is up Y%").
        Cap each kind so the list reads as four different observations. */
-    const cap = { catchange: 2 };
+    const cap = {};
     const seen = {};
     const picked = [];
     sorted.forEach((ins) => {
