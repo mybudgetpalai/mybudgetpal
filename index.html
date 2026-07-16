@@ -3936,7 +3936,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
         <span className="card-label">Transactions</span>
         <span className="tx-count">{filtered.length} {filtered.length === 1 ? "result" : "results"}{totalParts.length ? " \u00B7 " + totalParts.join(" \u00B7 ") : ""}</span>
       </div>
-      <p className="tx-instructions">Search or filter to find any transaction. Hit <b>Edit</b> under a category to recategorise it — the change applies to that merchant everywhere.</p>
+      <p className="page-intro">Search or filter to find any transaction. Hit <b>EDIT</b> under a category to recategorise it — the change applies to that merchant everywhere.</p>
       <div className="tx-filters">
         <input className="tx-input tx-search" type="text" placeholder="Search merchant, category, month…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <select className="bd-month-select" value={cat} onChange={(e) => setCat(e.target.value)}>
@@ -5117,7 +5117,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
           </select>
         </div>
         {onOpenReview && monthKey >= (signupMonth || new Date().toISOString().slice(0, 7)) && <button className="link-btn inline" style={{ marginTop: 4 }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
-        <p className="subtitle" style={{ margin: "2px 0 14px" }}>How {label} actually turned out, next to what you planned.</p>
+        <p className="page-intro">How {label} actually turned out, next to what you planned.</p>
         {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
         <div className="review-cards">
           <div className={"review-tile " + (spendDiff === 0 ? "rt-flat" : (spendDiff < 0 ? "rt-good" : "rt-bad"))}>
@@ -5326,7 +5326,7 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
 
       <div className="glass-card dash-card">
         <span className="card-label">Month by month</span>
-        <p className="subtitle" style={{ margin: "6px 0 10px" }}>Months across the top — columns tagged <span className="ltp-actual-chip">✓ actual</span> are finished (straight from your statements); the rest are your plan. The bottom-right cell is where you land.</p>
+        <p className="page-intro">Months across the top — columns tagged <span className="ltp-actual-chip">✓ actual</span> are finished (straight from your statements); the rest are your plan. The bottom-right cell is where you land.</p>
         <div className="ltp-wrap">
           <table className="ltp-table">
             <thead>
@@ -7217,7 +7217,7 @@ function TargetsPage({ allTargets, targets, transactions, onSaveAllTargets, init
           </div>
         )}
       </div>
-      <p className="subtitle" style={{ margin: "4px 0 14px" }}>Your category targets across every month. {editing ? "Adjust any cell, then save." : "Rebuild the whole plan from a savings goal, or fine-tune individual numbers."}</p>
+      <p className="page-intro">Your category targets across every month. {editing ? "Adjust any cell, then save." : "Rebuild the whole plan from a savings goal, or fine-tune individual numbers."}</p>
 
       <div className="budget-table-wrap">
         <table className="budget-table targets-table">
@@ -7314,7 +7314,7 @@ function CategoryManager({ transactions, catConfig, onSaveCatConfig, onRescanCat
     <div className="catman">
       <div className="glass-card dash-card">
         <span className="card-label">Your categories</span>
-        <p className="subtitle" style={{ margin: "2px 0 12px" }}>Rename any to suit you {"—"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"}. Renaming only changes the label; your data stays put. Add your own buckets at the bottom.</p>
+        <p className="page-intro">Rename any to suit you {"—"} {"\u201C"}Dining{"\u201D"} could be {"\u201C"}Eating out{"\u201D"}. Renaming only changes the label; your data stays put. Add your own buckets at the bottom.</p>
         <div className="catman-list">
           {TX_CATEGORIES.map((c) => (
             <div className="catman-row" key={c}>
@@ -9501,8 +9501,8 @@ function App() {
   select.glass-input { appearance: none; -webkit-appearance: none; cursor: pointer; }
   .tx-positive { color: var(--pos); }
   .tx-count { color: var(--ink-3); font-size: 12px; }
-  .tx-instructions { color: var(--ink-2); font-size: 13px; margin: 6px 0 0; line-height: 1.5; }
-  .tx-instructions b { color: var(--accent); font-weight: 600; }
+  .page-intro { color: var(--ink-2); font-size: 13px; margin: 6px 0 14px; line-height: 1.5; }
+  .page-intro b { color: var(--accent); font-weight: 600; }
   .mr-sample-note { color: #ffb84f !important; }
   .tx-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
   .tx-input { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none; }
@@ -9521,7 +9521,7 @@ function App() {
   .category-fill { height: 100%; border-radius: 3px; }
 
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
-  .page-heading { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin: 0 4px 14px; }
+  .page-heading { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin: 0 0 14px; }
   .bd-box { max-width: none; }
   /* Hero tile holds one line of figures + a ring, so the stock card padding
      left a big empty band underneath. Tighten it to hug its content. */
