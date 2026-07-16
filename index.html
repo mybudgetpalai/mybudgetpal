@@ -9887,19 +9887,19 @@ function App() {
   .step-num { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent); font-weight: 700; font-size: 13px; margin-bottom: 12px; color: var(--on-accent); }
 
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .feature-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px 20px; box-shadow: var(--shadow-card); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+  .feature-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px 20px; box-shadow: var(--shadow-card); transition: transform 0.2s ease, box-shadow 0.2s ease; display: flex; flex-direction: column; }
   .feature-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-pop); }
   .feature-icon { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 14px; }
   .feature-card h4 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--ink); }
-  .feature-card p { font-size: 13px; color: var(--ink-2); margin: 0; line-height: 1.55; }
-  .fc-viz { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; }
+  .feature-card p { font-size: 13px; color: var(--ink-2); margin: 0 0 16px; line-height: 1.55; }
+  .fc-viz { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 28px; }
   .fc-q { font-size: 11px; font-weight: 600; color: var(--on-accent); background: var(--accent); padding: 4px 9px; border-radius: 12px 12px 12px 3px; }
   .fc-a { font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); padding: 4px 9px; border-radius: 12px; }
   .fc-roll-from, .fc-roll-to { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 20px; }
   .fc-roll-from { color: var(--ink-2); background: var(--surface-2); }
   .fc-roll-to { color: var(--accent); background: var(--accent-soft); }
   .fc-roll-arrow { color: var(--ink-3); font-weight: 700; }
-  .fc-viz-trend { display: block; padding-top: 12px; }
+  .fc-viz-trend { display: block; margin-top: auto; padding-top: 12px; }
   .fc-viz-trend svg { width: 100%; height: 30px; display: block; }
   .fc-trend-axis { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11px; color: var(--ink-3); }
   .fc-trend-foot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; padding-top: 7px; border-top: 1px solid var(--line); }
