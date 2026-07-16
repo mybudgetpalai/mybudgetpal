@@ -4090,8 +4090,8 @@ function PieChart({ slices, total, activeName, onPick }) {
       <svg viewBox="0 0 200 200" className="bd-pie-svg">
         {paths.map((p) => (
           p.full
-            ? <circle key={p.i} data-slice={p.name} cx={cx} cy={cy} r={r} fill={p.color} style={{ opacity: opacityFor(p), transition: "opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
-            : <path key={p.i} data-slice={p.name} d={bdArc(cx, cy, r, p.start, p.end)} fill={p.color} style={{ opacity: opacityFor(p), transition: "opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
+            ? <circle key={p.i} data-slice={p.name} cx={cx} cy={cy} r={r} fill={p.color} fillOpacity={opacityFor(p)} style={{ transition: "fill-opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
+            : <path key={p.i} data-slice={p.name} d={bdArc(cx, cy, r, p.start, p.end)} fill={p.color} fillOpacity={opacityFor(p)} style={{ transition: "fill-opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
         ))}
       </svg>
       {hover !== null && (
