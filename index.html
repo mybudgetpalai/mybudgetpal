@@ -10011,6 +10011,10 @@ function App() {
   @media (min-width: 641px) {
     .summary-head:has(> .targets-actions) { position: relative; min-height: 16px; }
     .summary-head > .targets-actions { position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
+    /* Tall controls next to a page title must not drive the row height. */
+    .summary-head:has(+ .page-intro) { position: relative; min-height: 16px; }
+    .summary-head:has(+ .page-intro) > .slot-select,
+    .summary-head:has(+ .page-intro) > .bd-month-select { position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
   }
   .targets-rebuild-btn { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
   @media (max-width: 640px) { .summary-head { flex-direction: column; align-items: flex-start; gap: 10px; } .targets-actions { flex-wrap: wrap; } }
