@@ -3777,7 +3777,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
       </div>
       <div className="topbar-right">
         <div className="upload-statement-wrap">
-          <button className="btn btn-primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
+          <button className="glass-btn primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
         <div className="inbox-wrap" ref={inboxRef}>
@@ -8118,7 +8118,7 @@ function AdminScreen({ onBack, pushToast }) {
           <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", fontWeight: 700 }}>{APP_NAME}</div>
           <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.01em", color: "var(--ink)" }}>Admin tools</div>
         </div>
-        <button className="btn" onClick={onBack}>← Back to app</button>
+        <button className="glass-btn ghost" onClick={onBack}>← Back to app</button>
       </div>
 
       {loading ? (
@@ -8173,7 +8173,7 @@ function AdminScreen({ onBack, pushToast }) {
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Users ({users.length})</div>
-            <button className="btn" onClick={openBroadcast}>Message all users</button>
+            <button className="glass-btn ghost" onClick={openBroadcast}>Message all users</button>
           </div>
 
           {composer && (
@@ -8181,8 +8181,8 @@ function AdminScreen({ onBack, pushToast }) {
               <div style={{ fontSize: 13, color: "var(--ink-2)", marginBottom: 8, fontWeight: 600 }}>{composer.to}</div>
               <textarea className="tx-input" style={{ width: "100%", minHeight: 64, boxSizing: "border-box", resize: "vertical" }} placeholder="Write an in-app message they'll see next time they log in" value={msg} onChange={(e) => setMsg(e.target.value)} />
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <button className="btn btn-primary" disabled={sending || !msg.trim()} onClick={send}>{sending ? "Sending\u2026" : "Send"}</button>
-                <button className="btn" onClick={() => setComposer(null)}>Cancel</button>
+                <button className="glass-btn primary" disabled={sending || !msg.trim()} onClick={send}>{sending ? "Sending\u2026" : "Send"}</button>
+                <button className="glass-btn ghost" onClick={() => setComposer(null)}>Cancel</button>
               </div>
             </div>
           )}
@@ -9286,6 +9286,7 @@ function App() {
     --ink: #101828; --ink-2: #475467; --ink-3: #667085;
     --line: #E4E9F0; --line-strong: #CBD4E1;
     --accent: #2E5BFF; --accent-solid: #2E5BFF; --accent-soft: #EBF0FF; --on-accent: #FFFFFF;
+    --accent-disabled: #B9C8FF;
     --accent-shadow: rgba(46,91,255,0.22);
     --grad-2: #2E5BFF; --grad-3: #2E5BFF; --grad-nav: #2E5BFF;
     --pos: #12A150; --neg: #D92D20; --warn: #B54708;
@@ -9302,6 +9303,7 @@ function App() {
     --ink: #EDF0F5; --ink-2: #A9B1C0; --ink-3: #8B94A5;
     --line: #232A36; --line-strong: #313B4B;
     --accent: #6C8CFF; --accent-solid: #6C8CFF; --accent-soft: #1D2740; --on-accent: #FFFFFF;
+    --accent-disabled: #38477A;
     --accent-shadow: rgba(108,140,255,0.28);
     --grad-2: #6C8CFF; --grad-3: #6C8CFF; --grad-nav: #6C8CFF;
     --pos: #3DD68C; --neg: #F97066; --warn: #F0A050;
@@ -9506,7 +9508,7 @@ function App() {
   .nav-row { display: flex; gap: 12px; margin-top: 24px; }
   .glass-btn { flex: 1; font-family: inherit; font-size: 16px; font-weight: 600; padding: 15px; border-radius: 16px; cursor: pointer; border: 1px solid var(--line); transition: all 0.18s ease; }
   .glass-btn.primary { color: var(--on-accent); background: var(--grad-2); box-shadow: 0 6px 20px var(--accent-shadow); }
-  .glass-btn.primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+  .glass-btn.primary:disabled { background: var(--accent-disabled); color: var(--on-accent); cursor: not-allowed; box-shadow: none; }
   .glass-btn.primary:not(:disabled):hover { filter: brightness(1.08); }
   .glass-btn.ghost { color: var(--ink); background: var(--surface-2); flex: 0 0 130px; }
   .glass-btn.ghost:hover { background: var(--surface-3); }
@@ -9577,7 +9579,7 @@ function App() {
   .brand-word { font-weight: 800; letter-spacing: -0.7px; color: var(--ink); line-height: 1; }
   .brand-word-2 { color: var(--grad-3); }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
-  .upload-statement-btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .upload-statement-btn { flex: 0 0 auto; width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .upload-btn-icon { display: block; flex-shrink: 0; }
   .avatar-wrap { position: relative; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -10633,6 +10635,9 @@ function App() {
   .notif-banner-x { background: none; border: none; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; font-family: inherit; }
   .menu-item-admin { color: var(--accent); font-weight: 600; }
   .admin-page { max-width: 1000px; margin: 0 auto; padding: 24px 20px 60px; min-height: 100vh; }
+  /* Admin buttons sit in inline rows, not full-width modal footers, so they
+     size to their label instead of inheriting glass-btn's flex sizing. */
+  .admin-page .glass-btn { flex: 0 0 auto; padding: 10px 18px; font-size: 14px; border-radius: 12px; }
   .admin-act { font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; margin-left: 6px; }
   .admin-act:hover { background: var(--surface-2); }
   .admin-act-danger { color: var(--neg); border-color: rgba(217,45,32,0.35); }
