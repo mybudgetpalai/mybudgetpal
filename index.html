@@ -4086,12 +4086,12 @@ function PieChart({ slices, total, activeName, onPick }) {
   };
   const pick = (p) => { if (onPick) onPick(activeName === p.name ? null : p.name); };
   return (
-    <div className="bd-pie-wrap" ref={wrapRef} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <div className="bd-pie-wrap" ref={wrapRef} data-active={activeName || "none"} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
       <svg viewBox="0 0 200 200" className="bd-pie-svg">
         {paths.map((p) => (
           p.full
-            ? <circle key={p.i} cx={cx} cy={cy} r={r} fill={p.color} style={{ opacity: opacityFor(p), transition: "opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
-            : <path key={p.i} d={bdArc(cx, cy, r, p.start, p.end)} fill={p.color} style={{ opacity: opacityFor(p), transition: "opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
+            ? <circle key={p.i} data-slice={p.name} cx={cx} cy={cy} r={r} fill={p.color} style={{ opacity: opacityFor(p), transition: "opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
+            : <path key={p.i} data-slice={p.name} d={bdArc(cx, cy, r, p.start, p.end)} fill={p.color} style={{ opacity: opacityFor(p), transition: "opacity .18s", cursor: onPick ? "pointer" : "default" }} onMouseEnter={() => setHover(p.i)} onClick={() => pick(p)} />
         ))}
       </svg>
       {hover !== null && (
@@ -9702,8 +9702,8 @@ function App() {
   .bd-legend-item { cursor: pointer; transition: opacity .18s; }
   .bd-legend-dim { opacity: 0.35; }
   /* Selecting a category mutes the others so the chosen one reads clearly. */
-  .bd-list.bd-has-open .bd-cat-row:not(.bd-open) { opacity: 0.38; transition: opacity .18s; }
-  .bd-list.bd-has-open .bd-cat-row:not(.bd-open):hover { opacity: 0.7; }
+  .bd-list.bd-has-open .bd-cat:not(:has(.bd-open)) { opacity: 0.38; transition: opacity .18s; }
+  .bd-list.bd-has-open .bd-cat:not(:has(.bd-open)):hover { opacity: 0.72; }
   .bd-headline { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .bd-sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
