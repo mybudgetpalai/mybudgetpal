@@ -6756,9 +6756,10 @@ function PaceTileV2({ s, p, pre, post, legendPos }) {
       </div>
       <div className="v2-ptile-big">{formatMoney(s.spent)}<span className="v2-of">of {formatMoney(s.pot)}</span></div>
       <div className="v2-ptile-caprow">
-        <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {p.usedPct}% used</div>
+        <div className="v2-ptile-cap">day {p.day} of {p.dim} {"\u00B7"} {s.noDataYet ? "nothing recorded yet" : p.usedPct + "% used"}</div>
         {pos === "caption" && legend}
       </div>
+      {s.noDataYet && <p className="v2-fore">No {currentMonthName()} spending recorded yet {"\u2014"} upload your latest statement to be sure.</p>}
       {pre}
       {pos === "above" && legend}
       <div className="v2-pace-wrap">
@@ -7321,7 +7322,12 @@ function computeSafeToSpend(targets, transactions, rollovers, billExcludes) {
   const daysLeft = isCurrent ? Math.max(1, daysInMonth - dayOfMonth + 1) : 0;
   const over = free < 0;
   const perDay = (over || !isCurrent) ? 0 : Math.floor(free / daysLeft);
-  return { key, budget, roll, spent, reserved, pot, free, daysLeft, daysInMonth, dayOfMonth, isCurrent, over, perDay };
+  /* Part-way through a month with nothing recorded almost always means the
+     latest statement hasn't been uploaded, not that nothing was spent. The
+     per-day figure is arithmetically right but reads as optimistic, so flag
+     what it rests on. */
+  const noDataYet = spent <= 0 && dayOfMonth > 3;
+  return { key, budget, roll, spent, reserved, pot, free, daysLeft, daysInMonth, dayOfMonth, isCurrent, over, perDay, noDataYet };
 }
 
 function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
@@ -7330,10 +7336,7 @@ function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
   const { spent, reserved, pot, free, daysLeft, over, perDay, roll } = s;
   const pw = (v) => Math.min(100, Math.max(0, (v / Math.max(pot, 1)) * 100));
   const spentPct = pw(spent), resPct = pw(reserved);
-  /* No spend recorded part-way through the month almost always means the latest
-     statement hasn't been uploaded, not that nothing was spent. The number is
-     honest; this says what it rests on. */
-  const noDataYet = spent <= 0 && today().getDate() > 3;
+  const noDataYet = s.noDataYet;
   return (
     <div className="safe-hero">
       <div className="safe-hero-row">
