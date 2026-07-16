@@ -9475,6 +9475,7 @@ function App() {
   .dash-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); max-width: none; }
   .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; line-height: 1; padding-top: 2px; padding-bottom: 2px; }
   .summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .summary-head:has(+ .page-intro) { margin-bottom: 0; }
   .summary-head > .card-label { flex: 1 1 auto; }
   .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
   .pace-good { background: rgba(18,161,80,0.18); color: var(--pos); }
@@ -9502,7 +9503,7 @@ function App() {
   select.glass-input { appearance: none; -webkit-appearance: none; cursor: pointer; }
   .tx-positive { color: var(--pos); }
   .tx-count { color: var(--ink-3); font-size: 12px; }
-  .page-intro { color: var(--ink-2); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
+  .page-intro { color: var(--ink-2); font-size: 13px; margin: 12px 0 14px; line-height: 1.5; }
   .page-intro b { color: var(--accent); font-weight: 600; }
   .mr-sample-note { color: #ffb84f !important; }
   .tx-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
