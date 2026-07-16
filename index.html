@@ -3932,7 +3932,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
 
   return (
     <div className="glass-card dash-card">
-      <div className="bd-box-head">
+      <div className="summary-head">
         <span className="card-label">Transactions</span>
         <span className="tx-count">{filtered.length} {filtered.length === 1 ? "result" : "results"}{totalParts.length ? " \u00B7 " + totalParts.join(" \u00B7 ") : ""}</span>
       </div>
@@ -4086,8 +4086,8 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
 
       <div className="bd-row">
         <div className="glass-card dash-card bd-box bd-box-where">
-          <div className="bd-box-head">
-            <span className="bd-box-title">{whereTitle}<span className="bd-box-hint">Tap a category to see its transactions</span></span>
+          <div className="summary-head">
+            <span className="card-label">{whereTitle}<span className="bd-box-hint">Tap a category to see its transactions</span></span>
             <label className="bd-check">
               <input type="checkbox" checked={compareTargets} onChange={(e) => setCompareTargets(e.target.checked)} />
               <span>Compare to targets</span>
@@ -4149,7 +4149,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
         </div>
 
         <div className="glass-card dash-card bd-box bd-box-pie">
-          <span className="bd-box-title">Spending mix</span>
+          <span className="card-label">Spending mix</span>
           <div className="bd-pie-body">
             <PieChart slices={pieSlices} total={total} />
             <div className="bd-legend">
@@ -4162,7 +4162,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
 
         {showTrend && (
           <div className="glass-card dash-card bd-box bd-box-trend">
-            <span className="bd-box-title">Trend analysis</span>
+            <span className="card-label">Trend analysis</span>
             <div className="bd-movers">
               {movers.map((m) => {
                 const up = m.diff > 0;
@@ -4199,8 +4199,8 @@ function BreakdownCard({ transactions, targets }) {
   const whereTitle = isCurrentMonth ? "Where your money is going" : "Where your money went";
   return (
     <div className="glass-card dash-card">
-      <div className="bd-box-head">
-        <span className="bd-box-title">{whereTitle}</span>
+      <div className="summary-head">
+        <span className="card-label">{whereTitle}</span>
         <label className="bd-check">
           <input type="checkbox" checked={compareTargets} onChange={(e) => setCompareTargets(e.target.checked)} />
           <span>Compare to targets</span>
@@ -4606,7 +4606,7 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejecte
   return (
     <div className="glass-card dash-card">
       <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
-      <p className="subtitle" style={{ margin: "0 0 12px" }}>Nothing's counted as a bill until you say so. {suspected.length > 0
+      <p className="page-intro">Nothing's counted as a bill until you say so. {suspected.length > 0
         ? <>We've spotted a few regular payments below {"—"} tell us which are really bills, and add any we missed.</>
         : <>Add any regular payments you want tracked as bills.</>}</p>
 
@@ -9473,8 +9473,8 @@ function App() {
   .overview-slot-body .category-list,
   .overview-slot-body .insight-list { flex: 1; overflow-y: auto; min-height: 0; }
   .dash-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); max-width: none; }
-  .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-  .summary-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; }
+  .summary-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
   .pace-good { background: rgba(18,161,80,0.18); color: var(--pos); }
   .pace-over { background: rgba(217,45,32,0.18); color: var(--neg); }
@@ -9501,7 +9501,7 @@ function App() {
   select.glass-input { appearance: none; -webkit-appearance: none; cursor: pointer; }
   .tx-positive { color: var(--pos); }
   .tx-count { color: var(--ink-3); font-size: 12px; }
-  .page-intro { color: var(--ink-2); font-size: 13px; margin: 6px 0 14px; line-height: 1.5; }
+  .page-intro { color: var(--ink-2); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
   .page-intro b { color: var(--accent); font-weight: 600; }
   .mr-sample-note { color: #ffb84f !important; }
   .tx-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
@@ -9525,9 +9525,7 @@ function App() {
   .bd-box { max-width: none; }
   /* Hero tile holds one line of figures + a ring, so the stock card padding
      left a big empty band underneath. Tighten it to hug its content. */
-  .bd-box-hero { padding-top: 18px; padding-bottom: 18px; }
   .bd-box-hero .summary-head { margin-bottom: 2px; }
-  .bd-box-title { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
   /* Sits under the section title: the rows are clickable but nothing said so. */
   .bd-box-hint { display: block; margin-top: 3px; font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ink-3); opacity: 0.85; }
   .bd-row { display: flex; gap: 16px; align-items: stretch; }
@@ -9542,7 +9540,6 @@ function App() {
   .bd-track-over { box-shadow: 0 0 0 1.5px var(--neg); }
   .bd-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; }
   .bd-legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
-  .bd-box-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .bd-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); cursor: pointer; user-select: none; }
   .bd-check input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
   .bd-notarget { color: var(--ink-3); font-weight: 400; font-size: 12px; }
