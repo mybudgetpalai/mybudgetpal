@@ -9473,9 +9473,9 @@ function App() {
   .overview-slot-body .category-list,
   .overview-slot-body .insight-list { flex: 1; overflow-y: auto; min-height: 0; }
   .dash-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); max-width: none; }
-  .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; }
+  .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; line-height: 1; padding-top: 2px; padding-bottom: 2px; }
   .summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .summary-head > .card-label { flex: 1 1 auto; padding-top: 2px; }
+  .summary-head > .card-label { flex: 1 1 auto; }
   .pace-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
   .pace-good { background: rgba(18,161,80,0.18); color: var(--pos); }
   .pace-over { background: rgba(217,45,32,0.18); color: var(--neg); }
@@ -9522,7 +9522,7 @@ function App() {
   .category-fill { height: 100%; border-radius: 3px; }
 
   .bd-page { display: flex; flex-direction: column; gap: 16px; }
-  .page-heading { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin: 0 0 14px; }
+  .page-heading { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); line-height: 1; padding: 2px 0; margin: 0 0 12px; }
   .bd-box { max-width: none; }
   /* Hero tile holds one line of figures + a ring, so the stock card padding
      left a big empty band underneath. Tighten it to hug its content. */
