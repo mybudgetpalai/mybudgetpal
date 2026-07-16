@@ -1179,11 +1179,21 @@ function detectRecurringBills(txs) {
   Object.values(groups).forEach((list) => {
     const months = new Set(list.map((t) => t.date.slice(0, 7)));
     if (months.size < 2) return;
-    const avg = list.reduce((s, t) => s + Math.abs(t.amount), 0) / list.length;
-    const steady = list.every((t) => Math.abs(Math.abs(t.amount) - avg) <= Math.max(avg * 0.2, 2));
+    /* A real bill is the same amount every month, on roughly the same day, once a
+       month. The old test (20% tolerance, floor of 2) passed things that merely
+       recur: Amazon at 45.99 vs 62.30 sat inside a 10.83 window, and a 2.00 floor
+       let small irregular amounts (cinema tickets) through. All three checks below
+       are needed — amount alone still admits a coincidence. */
+    if (list.length !== months.size) return;           // more than one hit in a month => not a bill
+    const amounts = list.map((t) => Math.abs(t.amount));
+    const avg = amounts.reduce((s, a) => s + a, 0) / amounts.length;
+    const steady = amounts.every((a) => Math.abs(a - avg) <= Math.max(avg * 0.05, 0.5));
     if (!steady) return;
     const days = list.map((t) => +t.date.slice(8, 10));
-    const due = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
+    const dayAvg = days.reduce((a, b) => a + b, 0) / days.length;
+    const sameDay = days.every((d) => Math.abs(d - dayAvg) <= 3);
+    if (!sameDay) return;
+    const due = Math.round(dayAvg);
     bills.push({ name: list[0].name, amount: Math.round(avg * 100) / 100, frequency: "Monthly", due: ordinalDay(due) });
   });
   return bills.sort((a, b) => b.amount - a.amount);
@@ -1549,7 +1559,22 @@ function buildTxDigest(transactions) {
     merchants[n] = r2((merchants[n] || 0) + Math.abs(Number(t.amount) || 0));
   });
   const topMerchants = Object.entries(merchants).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([name, total]) => ({ name, total }));
-  return { home: FX.home, count: txs.length, today: today().toISOString().slice(0, 10), current_month: currentMonthKey(), totals: { months, top_merchants: topMerchants }, transactions: lines };
+  /* Per-month totals alone left every cross-month question ("how much do subscriptions
+     cost me?") to the model's own arithmetic, which is exactly what grounding was meant
+     to remove. Ship the all-months rollup too, so the span the user asked about already
+     has an authoritative figure. */
+  const allCats = {};
+  months.forEach((m) => Object.keys(m.by_category).forEach((c) => { allCats[c] = r2((allCats[c] || 0) + m.by_category[c]); }));
+  const monthsCovered = months.length;
+  const allTime = {
+    months_covered: monthsCovered,
+    period: monthsCovered ? { from: monthKeys[monthKeys.length - 1], to: monthKeys[0] } : null,
+    income: r2(months.reduce((s, m) => s + m.income, 0)),
+    spend: r2(months.reduce((s, m) => s + m.spend, 0)),
+    by_category: allCats,
+    by_category_monthly_average: Object.fromEntries(Object.keys(allCats).map((c) => [c, r2(allCats[c] / (monthsCovered || 1))])),
+  };
+  return { home: FX.home, count: txs.length, today: today().toISOString().slice(0, 10), current_month: currentMonthKey(), totals: { months, all_time: allTime, top_merchants: topMerchants }, transactions: lines };
 }
 async function aiAskInsights(question, transactions) {
   const { data, error } = await supabaseClient.functions.invoke("ai-statement", {
@@ -5305,7 +5330,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
                   <span className="review-cat"><span className="cat-dot" style={{ background: catColor(c) }} />{c}</span>
                   <span>{formatMoney(b)}</span>
                   <span>{formatMoney(a)}</span>
-                  <span className={d === 0 ? "rv-flat" : (over ? "rv-over" : "rv-under")}>{b === 0 ? "—" : (d === 0 ? formatMoney(0) : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d)))}</span>
+                  <span className={d === 0 ? "rv-flat" : (over ? "rv-over" : "rv-under")}>{b === 0 && a === 0 ? "—" : (b === 0 ? "-" + formatMoney(a) + " unbudgeted" : (d === 0 ? formatMoney(0) : (over ? "-" + formatMoney(d) : "+" + formatMoney(-d))))}</span>
                 </div>
               );
             })}
@@ -5322,7 +5347,7 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
             })}
             {(() => {
               const tp = TX_CATEGORIES.reduce((s, c) => s + (Number(budgets[c]) || 0), 0);
-              const ta = [...TX_CATEGORIES, ...extraCats].reduce((s, c) => s + Math.round(byCat[c] || 0), 0);
+              const ta = Math.round([...TX_CATEGORIES, ...extraCats].reduce((s, c) => s + (byCat[c] || 0), 0));
               const td = ta - tp;
               const over = td > 0;
               return (
@@ -5659,12 +5684,20 @@ function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, 
 }
 
 
-const OVERVIEW_TOUR = [
-  { title: "Safe to spend", body: "This is roughly what you can spend each day for the rest of the month and still stay on budget." },
-  { title: "Where it's gone", body: "See what you've spent on so far this month, broken down by category." },
-  { title: "The big picture", body: "Your overall net worth and how you're tracking towards your savings goal." },
-  { title: "Needs you", body: "Anything that needs a quick action — like transactions to categorise — shows up here." },
-];
+/* Tour copy must match what the hero actually renders. The hero is data-driven:
+   no targets -> "Spent so far", targets set -> "Safe to spend". The month shown is
+   the latest month with data, which is not necessarily the current month. */
+function overviewTour({ hasTargets, monthLabel }) {
+  const per = monthLabel ? "in " + monthLabel : "this month";
+  return [
+    hasTargets
+      ? { title: "Safe to spend", body: "This is roughly what you can spend each day for the rest of the month and still stay on budget." }
+      : { title: "Spent so far", body: "This is what you've spent " + per + ". Set targets to unlock a safe-to-spend figure." },
+    { title: "Where it's gone", body: "See what you spent " + per + ", broken down by category." },
+    { title: "The big picture", body: "Your overall net worth and how you're tracking towards your savings goal." },
+    { title: "Needs you", body: "Anything that needs a quick action — like transactions to categorise — shows up here." },
+  ];
+}
 
 function TourTarget({ active, className, children }) {
   const ref = React.useRef(null);
@@ -7677,8 +7710,14 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
   const SPECIAL_VIEWS = ["settings", "mapping", "ask"];
   const effectiveView = runTour ? "overview" : ((navKeys.includes(view) || SPECIAL_VIEWS.includes(view)) ? view : "overview");
-  const copy = OVERVIEW_TOUR[tourStep] || { title: "", body: "" };
-  const advanceTour = () => { if (tourStep >= OVERVIEW_TOUR.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
+  const tourHasTargets = TX_CATEGORIES.some((c) => Number((targets || {})[c]) > 0);
+  const tourMonthKey = overviewMonthKey(transactions || []);
+  const tourCopy = overviewTour({
+    hasTargets: tourHasTargets,
+    monthLabel: tourMonthKey === currentMonthKey() ? "" : monthLabelFromKey(tourMonthKey),
+  });
+  const copy = tourCopy[tourStep] || { title: "", body: "" };
+  const advanceTour = () => { if (tourStep >= tourCopy.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
   const demoActive = runTour && !hasData;
   const viewTransactions = demoActive ? DEMO_TRANSACTIONS : transactions;
   const viewTargets = demoActive ? DEMO_TARGETS : targets;
@@ -7717,13 +7756,13 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
         <div className="tour-card">
           <button className="tour-skip-x" onClick={onFinishTour} aria-label="Skip tour" title="Skip tour"
             style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: "var(--muted)", fontSize: 15, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
-          <div className="tour-step-count">Step {tourStep + 1} of {OVERVIEW_TOUR.length}</div>
+          <div className="tour-step-count">Step {tourStep + 1} of {tourCopy.length}</div>
           <h3 className="tour-title">{copy.title}</h3>
           <p className="tour-body">{copy.body}</p>
           <div className="tour-dots">
-            {OVERVIEW_TOUR.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
+            {tourCopy.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
           </div>
-          <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= OVERVIEW_TOUR.length - 1 ? "Finish" : "Next"}</button>
+          <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= tourCopy.length - 1 ? "Finish" : "Next"}</button>
           <button className="tour-skip" onClick={onFinishTour}
             style={{ display: "block", width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Skip tour</button>
         </div>
