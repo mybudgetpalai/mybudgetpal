@@ -10005,6 +10005,10 @@ function App() {
   .ltp-table td.ltp-actual { background: rgba(18,161,80,0.045); }
 
   .targets-actions { display: flex; align-items: center; gap: 12px; }
+  @media (min-width: 641px) {
+    .summary-head:has(> .targets-actions) { position: relative; min-height: 16px; }
+    .summary-head > .targets-actions { position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
+  }
   .targets-rebuild-btn { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
   @media (max-width: 640px) { .summary-head { flex-direction: column; align-items: flex-start; gap: 10px; } .targets-actions { flex-wrap: wrap; } }
   .targets-table th.bt-month-head { text-align: right; }
