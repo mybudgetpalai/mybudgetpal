@@ -5116,8 +5116,8 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
             {done.slice().reverse().map((k) => <option key={k} value={k}>{monthLabelFromKey(k) + " " + k.slice(0, 4)}</option>)}
           </select>
         </div>
-        {onOpenReview && monthKey >= (signupMonth || new Date().toISOString().slice(0, 7)) && <button className="link-btn inline" style={{ marginTop: 4 }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
         <p className="page-intro">How {label} actually turned out, next to what you planned.</p>
+        {onOpenReview && monthKey >= (signupMonth || new Date().toISOString().slice(0, 7)) && <button className="link-btn inline" style={{ margin: "-6px 0 14px" }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
         {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
         <div className="review-cards">
           <div className={"review-tile " + (spendDiff === 0 ? "rt-flat" : (spendDiff < 0 ? "rt-good" : "rt-bad"))}>
@@ -9473,7 +9473,10 @@ function App() {
   .overview-slot-body .category-list,
   .overview-slot-body .insight-list { flex: 1; overflow-y: auto; min-height: 0; }
   .dash-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); max-width: none; }
-  .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; line-height: 1; padding-top: 2px; padding-bottom: 2px; }
+  .card-label { color: var(--ink-3); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; }
+  /* Page titles only: first card-label in a card, sitting directly in the card or its summary-head. */
+  .dash-card > .card-label:first-child,
+  .dash-card > .summary-head:first-child > .card-label:first-child { line-height: 1; padding: 2px 0; }
   .summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
   .summary-head:has(+ .page-intro) { margin-bottom: 0; }
   .summary-head > .card-label { flex: 1 1 auto; }
@@ -11007,7 +11010,7 @@ function App() {
     .v2-pv { grid-template-columns: 1fr; }
   }
   /* ===== v2 . Where it's gone (Composition card) ===== */
-  .v2wg-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .v2wg-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:14px; }
   .v2wg-ctx { font-size:11px; color:var(--ink-3); }
   .v2wg-cap { font-size:11px; color:var(--ink-3); margin:-8px 0 12px; }
   .v2wg-donut { width:120px; height:120px; border-radius:999px; display:flex; align-items:center; justify-content:center; }
