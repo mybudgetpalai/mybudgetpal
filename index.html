@@ -2040,12 +2040,9 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <div className="feature-icon"><Icon name="trending" size={18} /></div>
             <h4>Long-term plan</h4>
             <p>Plan months ahead and reconcile your actual spending against the plan.</p>
-            <div className="fc-viz fc-viz-trend">
-              <svg viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
-                <polyline points="0,26 24,20 48,22 72,12 96,14 120,4" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <div className="fc-trend-axis"><span>Today</span><span>Dec</span></div>
-              <div className="fc-trend-foot"><span className="fc-trend-foot-label">On track for</span><span className="fc-trend-foot-val">&pound;4,200</span></div>
+            <div className="fc-viz fc-viz-goal">
+              <div className="fc-bar"><span style={{ width: "92%" }} /></div>
+              <span className="fc-bar-label">92% to plan</span>
             </div>
           </div>
           <div className="feature-card reveal">
@@ -9899,12 +9896,6 @@ function App() {
   .fc-roll-from { color: var(--ink-2); background: var(--surface-2); }
   .fc-roll-to { color: var(--accent); background: var(--accent-soft); }
   .fc-roll-arrow { color: var(--ink-3); font-weight: 700; }
-  .fc-viz-trend { display: block; margin-top: auto; padding-top: 12px; }
-  .fc-viz-trend svg { width: 100%; height: 30px; display: block; }
-  .fc-trend-axis { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11px; color: var(--ink-3); }
-  .fc-trend-foot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; padding-top: 7px; border-top: 1px solid var(--line); }
-  .fc-trend-foot-label { font-size: 11px; color: var(--ink-2); }
-  .fc-trend-foot-val { font-size: 13px; font-weight: 700; color: var(--accent); }
   .fc-chip { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 20px; }
   .fc-chip-soft { color: var(--ink-3); background: var(--surface-2); }
   .fc-viz-goal { gap: 10px; }
