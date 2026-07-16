@@ -3775,7 +3775,7 @@ function ExtraQuestionsScreen({ onDone, onSkip, pushToast, userId }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks, dataGap, isAdmin, onOpenAdmin }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, tasks, dataGap, isAdmin, onOpenAdmin, tourSpot }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const menuRef = React.useRef(null);
@@ -3795,17 +3795,17 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
   const taskList = tasks || [];
   const initial = (name[0] || "?").toUpperCase();
   return (
-    <div className="topbar">
+    <div className={"topbar" + (tourSpot === "upload" || tourSpot === "inbox" ? " topbar-tour-lift" : "")}>
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
         <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-word">My<span className="brand-word-2">BudgetPal</span></span></div>
       </div>
       <div className="topbar-right">
-        <div className="upload-statement-wrap">
+        <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")}>
           <button className="glass-btn primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
-        <div className="inbox-wrap" ref={inboxRef}>
+        <div className={"inbox-wrap" + (tourSpot === "inbox" ? " tour-spot" : "")} ref={inboxRef}>
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="bell" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
           </button>
@@ -3839,10 +3839,10 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     </div>
   );
 }
-function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose }) {
+function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose, tourSpot }) {
   const list = views || VIEWS;
   return (
-    <div className={"side-panel " + (open ? "side-panel-open" : "")}>
+    <div className={"side-panel " + (open ? "side-panel-open" : "") + (tourSpot === "menu" ? " tour-spot" : "")}>
       <div className="side-panel-label-row">
         <span className="side-panel-label">Views</span>
         <div className="side-panel-label-actions">
@@ -5696,7 +5696,35 @@ function overviewTour({ hasTargets, monthLabel }) {
     { title: "Where it's gone", body: "See what you spent " + per + ", broken down by category." },
     { title: "The big picture", body: "Your overall net worth and how you're tracking towards your savings goal." },
     { title: "Needs you", body: "Anything that needs a quick action — like transactions to categorise — shows up here." },
+    { title: "Add a statement", body: "Tap the blue plus whenever you want to add a new bank statement. The more you add, the sharper your numbers get.", spot: "upload" },
+    { title: "You've got mail", body: "Your inbox is here. We'll pop a note in whenever something needs a look — a month-end review, or a few transactions to tidy up.", spot: "inbox" },
+    { title: "Your views", body: "Every part of your money lives down the side here — spending, targets, bills, insights and more. Ready-made views you can jump into any time.", spot: "menu" },
   ];
+}
+
+/* The overview scrolls inside .main-content-wide on desktop, not on window, so a
+   plain scrollIntoView can no-op. Find the nearest scrollable ancestor and drive it
+   directly; fall back to scrollIntoView if none is found (mobile: page scrolls). */
+function scrollTourTargetIntoView(el) {
+  if (!el) return;
+  let sc = el.parentElement;
+  while (sc && sc !== document.body) {
+    const st = window.getComputedStyle(sc);
+    const oy = st.overflowY;
+    if ((oy === "auto" || oy === "scroll") && sc.scrollHeight > sc.clientHeight + 4) break;
+    sc = sc.parentElement;
+  }
+  if (!sc || sc === document.body) {
+    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+    return;
+  }
+  const er = el.getBoundingClientRect();
+  const sr = sc.getBoundingClientRect();
+  /* Tour card sits bottom-centre ~220px tall, so aim the section into the upper half. */
+  const pad = Math.max(20, (sc.clientHeight - 240 - er.height) / 2);
+  const top = sc.scrollTop + (er.top - sr.top) - Math.max(20, Math.min(pad, 140));
+  try { sc.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); }
+  catch (e) { sc.scrollTop = Math.max(0, top); }
 }
 
 function TourTarget({ active, className, children }) {
@@ -5704,8 +5732,11 @@ function TourTarget({ active, className, children }) {
   React.useEffect(() => {
     if (active && ref.current) {
       const el = ref.current;
-      const t = setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 120);
-      return () => clearTimeout(t);
+      /* Two passes: the first fires once the step's section has mounted, the second
+         after layout settles, since revealing a section changes everything below it. */
+      const t1 = setTimeout(() => scrollTourTargetIntoView(el), 140);
+      const t2 = setTimeout(() => scrollTourTargetIntoView(el), 460);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
     }
   }, [active]);
   return <div ref={ref} className={(className || "") + (active ? " oh-tour-active" : "")}>{children}</div>;
@@ -7731,6 +7762,20 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
     monthLabel: tourMonthKey === currentMonthKey() ? "" : monthLabelFromKey(tourMonthKey),
   });
   const copy = tourCopy[tourStep] || { title: "", body: "" };
+  const tourSpot = runTour ? (copy.spot || null) : null;
+  /* The last three steps point at the top bar and the side menu rather than at
+     anything in the scrolling overview, so bring the page back up to show them.
+     The side menu also has to be open for the menu step to mean anything. */
+  React.useEffect(() => {
+    if (!tourSpot) return;
+    if (tourSpot === "menu") setPanelOpen(true);
+    const sc = document.querySelector(".main-content-wide");
+    const t = setTimeout(() => {
+      try { if (sc) sc.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
+    }, 60);
+    return () => clearTimeout(t);
+  }, [tourSpot]);
   const advanceTour = () => { if (tourStep >= tourCopy.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
   const demoActive = runTour && !hasData;
   const viewTransactions = demoActive ? DEMO_TRANSACTIONS : transactions;
@@ -7760,14 +7805,14 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
         </div>
       )}
       {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} dataGap={dataGap} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} tasks={inboxTasks} dataGap={dataGap} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} tourSpot={tourSpot} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} />
+        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} />
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
       {runTour && (
-        <div className="tour-card">
+        <div className={"tour-card" + (tourSpot ? " tour-card-spot tour-card-spot-" + tourSpot : "")}>
           <button className="tour-skip-x" onClick={onFinishTour} aria-label="Skip tour" title="Skip tour"
             style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: "var(--muted)", fontSize: 15, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
           <div className="tour-step-count">Step {tourStep + 1} of {tourCopy.length}</div>
@@ -10485,6 +10530,34 @@ function App() {
   .tour-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-3); }
   .tour-dot-on { background: var(--accent); }
   .tour-next { width: 100%; }
+
+  /* ---- tour spotlight (steps that point at the top bar / side menu) ---- */
+  /* .topbar sets transform+z-index, so it owns a stacking context and a child can
+     never rise above the tour card from inside it. Lift the bar itself instead. */
+  .topbar-tour-lift { z-index: 61; }
+  .tour-spot { position: relative; z-index: 1; border-radius: 14px; animation: tourSpotPulse 1.6s ease-in-out infinite; }
+  /* .side-panel clips with overflow:hidden, so an outset ring gets cut — inset it. */
+  .side-panel.tour-spot { z-index: 61; border-radius: 0; animation: tourSpotPulseInset 1.6s ease-in-out infinite; }
+  @keyframes tourSpotPulse {
+    0%   { box-shadow: 0 0 0 0 var(--accent-shadow), 0 0 0 2px var(--accent); }
+    70%  { box-shadow: 0 0 0 12px transparent, 0 0 0 2px var(--accent); }
+    100% { box-shadow: 0 0 0 0 transparent, 0 0 0 2px var(--accent); }
+  }
+  @keyframes tourSpotPulseInset {
+    0%   { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 2px var(--accent-shadow); }
+    70%  { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 12px transparent; }
+    100% { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 0 0 transparent; }
+  }
+  /* Keep the card clear of whatever it's pointing at. */
+  .tour-card-spot-upload, .tour-card-spot-inbox { bottom: auto; top: 96px; left: auto; right: 24px; transform: none; animation: tourCardInPlain 0.3s ease; }
+  .tour-card-spot-menu { bottom: auto; top: 120px; left: auto; right: 24px; transform: none; animation: tourCardInPlain 0.3s ease; }
+  @keyframes tourCardInPlain { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 560px) {
+    .tour-card-spot-upload, .tour-card-spot-inbox, .tour-card-spot-menu {
+      top: auto; bottom: 24px; left: 50%; right: auto; transform: translateX(-50%);
+      animation: tourCardIn 0.3s ease;
+    }
+  }
 
   /* ---- budget ring (monthly summary) ---- */
   .budget-ring-wrap { position: relative; display: flex; justify-content: center; align-items: center; margin: 10px 0 4px; }
