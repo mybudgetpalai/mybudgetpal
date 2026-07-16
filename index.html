@@ -10017,7 +10017,16 @@ function App() {
     .summary-head:has(+ .page-intro) > .bd-month-select { position: absolute; top: 50%; right: 0; transform: translateY(-50%); }
   }
   .targets-rebuild-btn { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
-  @media (max-width: 640px) { .summary-head { flex-direction: column; align-items: flex-start; gap: 10px; } .targets-actions { flex-wrap: wrap; } }
+  @media (max-width: 640px) {
+    .summary-head { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
+    .summary-head > .card-label { flex: 1 1 auto; min-width: 0; }
+    .summary-head > .slot-select,
+    .summary-head > .bd-month-select,
+    .summary-head > .link-btn { flex: 0 0 auto; margin-left: auto; }
+    /* Targets has two buttons — let that one stack, it can't fit on one line. */
+    .summary-head:has(> .targets-actions) { flex-direction: column; align-items: flex-start; }
+    .targets-actions { flex-wrap: wrap; }
+  }
   .targets-table th.bt-month-head { text-align: right; }
   .targets-table td.bt-cell { text-align: right; }
   .budget-table td.bt-cell { text-align: right; }
