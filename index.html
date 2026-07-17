@@ -6848,6 +6848,19 @@ function PaceTileV2({ s, p, pre, post, legendPos }) {
   );
 }
 
+/* Option B for the V2 heroes: the safe-to-spend figure is arithmetically correct
+   but derived purely from budget when no spending has been recorded, so it must
+   say so next to the number rather than in small grey text further down. */
+function NoDataNoteV2({ s }) {
+  if (!s || !s.noDataYet) return null;
+  return (
+    <div className="oh-gapnote oh-gapnote-v2">
+      <span className="oh-gapnote-ic"><Icon name="calendar" size={15} /></span>
+      <span className="oh-gapnote-tx"><strong>Estimate only.</strong> No {currentMonthName()} spending recorded yet {"\u2014"} this comes from your budget, not from what you{"\u2019"}ve actually spent.</span>
+    </div>
+  );
+}
+
 function FreshStartHeroV2({ targets, transactions, rollovers, billExcludes }) {
   const s = computeSafeToSpend(targets, transactions, rollovers, billExcludes);
   if (s.budget <= 0) return null;
@@ -6860,7 +6873,8 @@ function FreshStartHeroV2({ targets, transactions, rollovers, billExcludes }) {
       <div className="v2-hero">
         <span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span>
         <div className="v2-big">{formatMoney(s.perDay)}<em>a day</em></div>
-        <p className="v2-fs-line">That{"\u2019"}s what you can still spend each day for the rest of {currentMonthName()} and finish on budget.</p>
+        <p className="v2-fs-line">{s.noDataYet ? "That's your budget spread across the days left \u2014 upload " + currentMonthName() + " to see what you've really spent." : "That\u2019s what you can still spend each day for the rest of " + currentMonthName() + " and finish on budget."}</p>
+        <NoDataNoteV2 s={s} />
       </div>
       <PaceTileV2 s={s} p={p} post={post} />
     </div>
@@ -6892,6 +6906,7 @@ function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
           <div className="v2-ln"><span>= Left, {"\u00F7"} {s.daysLeft} days remaining</span><span className="v2-dots" /><b>{formatMoney(Math.max(0, s.free))}</b></div>
           <div className="v2-ln v2-total"><span>Can still spend / day</span><span className="v2-dots-blank" /><b>{"\u2248"} {formatMoney(s.perDay)}/day</b></div>
         </div>
+        <NoDataNoteV2 s={s} />
       </div>
       <PaceTileV2 s={s} p={p} pre={pre} legendPos="above" />
     </div>
@@ -6913,6 +6928,7 @@ function PowerViewHeroV2({ targets, transactions, rollovers, billExcludes }) {
           <div className="v2-pvk"><div className="v2-pvk-k">Can still spend / day</div><div className="v2-pvk-v">{formatMoney(s.perDay)}</div><div className="v2-pvk-s">{formatMoney(Math.max(0, s.free))} left {"\u00F7"} {s.daysLeft} days</div></div>
           <div className="v2-pvk"><div className="v2-pvk-k">Spent / day so far</div><div className="v2-pvk-v">{formatMoney(p.paceDay)}</div><div className="v2-pvk-s">{formatMoney(s.spent)} {"\u00F7"} {p.day} days</div></div>
         </div>
+        <NoDataNoteV2 s={s} />
       </div>
       <PaceTileV2 s={s} p={p} post={post} />
     </div>
@@ -6947,6 +6963,7 @@ function GoalGetterHeroV2(props) {
         {targetDateStr && onTrack && <div className="v2-gg-note">{"\uD83C\uDFAF"} On track for your {formatMoney(target)} by {targetDateStr}</div>}
         {targetDateStr && !onTrack && <div className="v2-gg-note v2-gg-note-warn">Lift your pace to reach your {formatMoney(target)} by {targetDateStr}</div>}
         {s.budget > 0 && <div className="v2-gg-second"><span className="v2-lab">Safe to spend {"\u00B7"} {currentMonthName()}</span><span className="v2-gg-safe">{formatMoney(s.perDay)}<em>/day</em></span></div>}
+        {s.budget > 0 && <NoDataNoteV2 s={s} />}
       </div>
       {s.budget > 0 && <PaceTileV2 s={s} p={p} post={post} />}
     </div>
@@ -10920,6 +10937,9 @@ function App() {
   .oh-gapnote-ic { color: #B26A00; display: flex; flex-shrink: 0; }
   .oh-gapnote-tx { flex: 1; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
   .oh-gapnote-cta { font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; padding: 0; flex-shrink: 0; }
+  /* Inside a V2 hero the note sits on the hero's own surface, so it needs its
+     own background rather than the card white used on the plain hero. */
+  .oh-gapnote-v2 { margin-top: 12px; background: var(--surface-2); border-color: var(--line-strong); }
   /* Last month, demoted. Margins match the cards exactly (flush, no inset). */
   .oh-lastmonth { margin: 0 0 18px; }
   .oh-lastmonth-head { display: flex; justify-content: space-between; align-items: baseline; }
