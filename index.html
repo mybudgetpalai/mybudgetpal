@@ -7282,6 +7282,15 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
 
       <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} {"·"} day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
 
+      {/* Option 2: the pill sits between the divider and the hero. This is above the
+          persona branch on purpose, so all five heroes get the identical treatment
+          and it can never fall below the fold on a tall hero like Goal Getter. */}
+      {showNeeds && (!runTour || tourStep >= 3) && (
+        <TourTarget active={runTour && tourStep === 3}>
+          <NeedsPill items={needs} expanded={needsOpen || (runTour && tourStep === 3)} onToggle={() => setNeedsOpen((v) => !v)} />
+        </TourTarget>
+      )}
+
       <TourTarget active={runTour && tourStep === 0}>
         {noBudget ? (
           <>
@@ -7304,12 +7313,6 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
           </>
         )}
       </TourTarget>
-
-      {showNeeds && (!runTour || tourStep >= 3) && (
-        <TourTarget active={runTour && tourStep === 3}>
-          <NeedsPill items={needs} expanded={needsOpen || (runTour && tourStep === 3)} onToggle={() => setNeedsOpen((v) => !v)} />
-        </TourTarget>
-      )}
 
       {(!runTour || tourStep >= 1) && (
         <ThisMonthV2 persona={persona} transactions={transactions} targets={targets} billExcludes={billExcludes} onResumeSetup={onResumeSetup} />
@@ -10858,7 +10861,7 @@ function App() {
      the only card on the page with a white fill, 12px radius and an accent bar. */
   .oh-needs { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); }
   /* Option A: the nag stack that used to sit above the hero is now one pill below it. */
-  .oh-needs-wrap { margin: 14px 4px 0; }
+  .oh-needs-wrap { margin: 0 4px 12px; }
   .oh-needs-pill { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: background 0.15s, border-color 0.15s; }
   .oh-needs-pill:hover { background: var(--surface-3); border-color: var(--line-strong); }
   .oh-needs-pill-ic { color: var(--accent); display: flex; flex-shrink: 0; }
@@ -10866,7 +10869,11 @@ function App() {
   .oh-needs-pill-cta { font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
   .oh-needs-chev { display: inline-block; transition: transform 0.2s; }
   .oh-needs-chev-open { transform: rotate(90deg); }
-  .oh-needs-open { margin-top: 8px; }
+  .oh-needs-open { margin-top: 8px; padding: 4px 14px; }
+  /* Expanded rows are compact: three of them now occupy roughly the height one
+     full-size row used to, so opening the pill doesn't shove the hero off-screen. */
+  .oh-needs-open .oh-need { padding: 8px 0; gap: 10px; }
+  .oh-needs-open .oh-need-text { font-size: 13px; }
   .oh-needs-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
   .oh-needs-count { font-size: 12px; color: var(--ink-3); }
   .oh-need { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
