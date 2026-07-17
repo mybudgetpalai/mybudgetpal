@@ -5757,22 +5757,63 @@ function InsightPill({ transactions, targets }) {
   );
 }
 
-function SpentSoFarHero({ transactions }) {
+/* Option B: this hero is pinned to the CURRENT month. It used to fall back to the
+   latest month that had data, which produced June figures sitting under a July
+   heading. Now an empty month reads as an empty month, with the gap stated
+   plainly and last month's total demoted to a reference card below. */
+function SpentSoFarHero({ transactions, onOpenUpload }) {
   const txs = transactions || [];
-  const key = overviewMonthKey(txs);
-  const isCur = key === currentMonthKey();
+  const key = currentMonthKey();
   const spent = spendForMonth(txs, key);
+  const lastKey = latestMonthKey(txs);
+  const hasAnyData = txs.some((t) => t.date);
+  const noDataThisMonth = spent <= 0 && hasAnyData && lastKey < key;
+  const lastDate = txs.filter((t) => t.date).map((t) => t.date).sort().pop();
   return (
-    <div className="safe-hero">
-      <div className="safe-hero-row">
-        <div className="safe-hero-main">
-          <span className="safe-hero-label">{isCur ? "Spent so far" : "Spent in"} {"·"} {monthLabelFromKey(key)}</span>
-          <span className="safe-hero-num">{formatMoney(spent)}</span>
+    <>
+      <div className="safe-hero">
+        <div className="safe-hero-row">
+          <div className="safe-hero-main">
+            <span className="safe-hero-label">Spent so far {"·"} {monthLabelFromKey(key)}</span>
+            <span className="safe-hero-num">{formatMoney(spent)}</span>
+          </div>
+          <div className="safe-hero-side">
+            <span>day {today().getDate()} of {daysInCurrentMonth()}</span>
+          </div>
         </div>
-        <div className="safe-hero-side">
-          <span>{isCur ? ("day " + today().getDate() + " of " + daysInCurrentMonth()) : (monthLabelFromKey(key) + " total")}</span>
-        </div>
+        {noDataThisMonth && (
+          <div className="oh-gapnote">
+            <span className="oh-gapnote-ic"><Icon name="calendar" size={15} /></span>
+            <span className="oh-gapnote-tx">Your last statement ended {formatTxDate(lastDate)}. Upload {monthLabelFromKey(key)} to see your real numbers.</span>
+            {onOpenUpload && <button className="oh-gapnote-cta" onClick={onOpenUpload}>Upload {"›"}</button>}
+          </div>
+        )}
       </div>
+      {noDataThisMonth && <LastFullMonthCard transactions={txs} monthKey={lastKey} />}
+    </>
+  );
+}
+
+/* Last month's total, demoted to a reference card. It is real data and still
+   useful, it just must not masquerade as this month's headline. */
+function LastFullMonthCard({ transactions, monthKey }) {
+  const spent = spendForMonth(transactions || [], monthKey);
+  if (spent <= 0) return null;
+  const byCat = spendByCategoryForMonth(transactions || [], monthKey);
+  const top = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).slice(0, 2);
+  const topShare = top.reduce((s, c) => s + (byCat[c] || 0), 0);
+  const pct = spent > 0 ? Math.round((topShare / spent) * 100) : 0;
+  return (
+    <div className="glass-card dash-card oh-lastmonth">
+      <div className="oh-lastmonth-head">
+        <span className="card-label">Last full month {"·"} {monthLabelFromKey(monthKey)}</span>
+        <span className="oh-lastmonth-tag">for reference</span>
+      </div>
+      <div className="oh-lastmonth-row">
+        <span className="oh-lastmonth-num">{formatMoney(spent)}</span>
+        <span className="oh-lastmonth-sub">spent</span>
+      </div>
+      {top.length > 0 && <div className="oh-sub">{top.map(displayCat).join(" and ")} made up {pct}% of it.</div>}
     </div>
   );
 }
@@ -7247,7 +7288,12 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const key = currentMonthKey();
   const txs = transactions || [];
   const lk = txs.length ? latestMonthKey(txs) : null;
-  const greetLine = (lk && lk < key) ? ("here's how " + monthLabelFromKey(lk) + " went") : ("here's how " + currentMonthName() + " is looking");
+  /* Option B: the greeting always names the CURRENT month. It used to name the
+     latest month with data, which meant it said "here's how Jun went" while the
+     divider underneath said July and the hero showed a July figure. The month
+     shown must never lag behind the calendar; the missing data is flagged
+     instead of being papered over by silently rewinding the month. */
+  const greetLine = "here's how " + currentMonthName() + " is looking";
 
   const layout = homeLayout || DEFAULT_HOME_LAYOUT;
   const widgetProps = { transactions, banks, accountData, goals, billExcludes, targets, plan, rollovers, persona };
@@ -7295,7 +7341,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
         {noBudget ? (
           <>
             <InsightPill transactions={transactions} targets={targets} />
-            <SpentSoFarHero transactions={transactions} />
+            <SpentSoFarHero transactions={transactions} onOpenUpload={onOpenUpload} />
             <SetupPushBand onResumeSetup={onResumeSetup} />
           </>
         ) : (
@@ -7397,9 +7443,15 @@ function SafeToSpendHero({ targets, transactions, rollovers, billExcludes }) {
             : <span>{formatMoney(free)} free {"·"} {daysLeft} day{daysLeft !== 1 ? "s" : ""} to go</span>}
           {reserved > 0 && <span className="safe-hero-roll">{formatMoney(reserved)} bills set aside</span>}
           {roll !== 0 && <span className="safe-hero-roll">{roll < 0 ? "after " + formatMoney(Math.abs(roll)) + " rollover" : "incl. " + formatMoney(roll) + " rollover"}</span>}
-          {noDataYet && <span className="safe-hero-roll">based on no {currentMonthName()} spending recorded yet</span>}
+
         </div>
       </div>
+      {noDataYet && (
+        <div className="oh-gapnote">
+          <span className="oh-gapnote-ic"><Icon name="calendar" size={15} /></span>
+          <span className="oh-gapnote-tx"><strong>Estimate only.</strong> No {currentMonthName()} spending recorded yet {"\u2014"} this is based on your budget, not on what you've actually spent.</span>
+        </div>
+      )}
       {!over && (
         <>
           <div className="safe-hero-track safe-hero-seg">
@@ -10862,6 +10914,19 @@ function App() {
   .oh-needs { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); }
   /* Option A: the nag stack that used to sit above the hero is now one pill below it. */
   .oh-needs-wrap { margin: 0 0 12px; }
+  /* Option B: the missing-data note lives inside the hero, directly under the
+     number it qualifies, so the caveat cannot be read separately from the figure. */
+  .oh-gapnote { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px dashed var(--line-strong); border-radius: 12px; padding: 10px 12px; margin-top: 14px; }
+  .oh-gapnote-ic { color: #B26A00; display: flex; flex-shrink: 0; }
+  .oh-gapnote-tx { flex: 1; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .oh-gapnote-cta { font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: none; cursor: pointer; font-family: inherit; white-space: nowrap; padding: 0; flex-shrink: 0; }
+  /* Last month, demoted. Margins match the cards exactly (flush, no inset). */
+  .oh-lastmonth { margin: 0 0 18px; }
+  .oh-lastmonth-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .oh-lastmonth-tag { font-size: 12px; color: var(--ink-3); }
+  .oh-lastmonth-row { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+  .oh-lastmonth-num { font-size: 30px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .oh-lastmonth-sub { font-size: 14px; color: var(--ink-3); font-weight: 500; }
   .oh-needs-pill { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: background 0.15s, border-color 0.15s; }
   .oh-needs-pill:hover { background: var(--surface-3); border-color: var(--line-strong); }
   .oh-needs-pill-ic { color: var(--accent); display: flex; flex-shrink: 0; }
