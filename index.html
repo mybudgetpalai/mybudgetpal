@@ -7215,6 +7215,34 @@ function ThisMonthV2({ persona, transactions, targets, billExcludes, onResumeSet
   );
 }
 
+/* Option A: everything that nags collapses into a single pill placed BELOW the
+   hero, so the first thing on screen is always a number. Expanding the pill
+   reveals the same rows that used to sit above the fold. */
+function NeedsPill({ items, expanded, onToggle }) {
+  if (!items || items.length === 0) return null;
+  const n = items.length;
+  return (
+    <div className="oh-needs-wrap">
+      <button className="oh-needs-pill" onClick={onToggle} aria-expanded={expanded}>
+        <span className="oh-needs-pill-ic"><Icon name="bell" size={15} /></span>
+        <span className="oh-needs-pill-tx">{n} thing{n !== 1 ? "s" : ""} need{n === 1 ? "s" : ""} you</span>
+        <span className="oh-needs-pill-cta">{expanded ? "Hide" : "View"} <span className={"oh-needs-chev" + (expanded ? " oh-needs-chev-open" : "")}>{"\u203A"}</span></span>
+      </button>
+      {expanded && (
+        <div className="oh-needs oh-needs-open">
+          {items.map((n2, i) => (
+            <div className="oh-need" key={i}>
+              <span className="oh-need-ic" style={{ color: n2.color }}><Icon name={n2.icon} size={17} /></span>
+              <span className="oh-need-text">{n2.text}</span>
+              {n2.action && <button className="oh-need-cta" onClick={n2.action}>{n2.cta} {"\u203A"}</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OverviewHome({ name, targets, transactions, rollovers, banks, accountData, goals, billExcludes, uncatCount, onOpenCatReview, runTour, tourStep, hasData, homeLayout, onChangeHomeLayout, onResumeSetup, persona, plan, onOpenUpload, billsNudge, onOpenBillsSetup, onDismissBillsNudge }) {
   const key = currentMonthKey();
   const txs = transactions || [];
@@ -7226,8 +7254,15 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
   const totalBudget = TX_CATEGORIES.reduce((s, c) => s + (Number((targets || {})[c]) || 0), 0);
   const noBudget = totalBudget <= 0 || persona === "no_targets";
 
+  const [needsOpen, setNeedsOpen] = useState(false);
+  /* One list feeds the single pill. The data gap and the bills nudge used to be
+     separate banners stacked above the hero; they are the same kind of thing as
+     "Needs you", so they join it rather than pushing the number down. */
+  const gapDays = dataGapDays(transactions);
   const needs = [];
   if (uncatCount > 0) needs.push({ icon: "tag", color: "var(--accent)", text: uncatCount + " transaction" + (uncatCount !== 1 ? "s need" : " needs") + " a category", cta: "Review", action: onOpenCatReview });
+  if (gapDays != null && gapDays >= 3 && onOpenUpload) needs.push({ icon: "calendar", color: "#B26A00", text: "Missing the last " + gapDays + " days of data", cta: "Upload", action: onOpenUpload });
+  if (billsNudge > 0 && onOpenBillsSetup) needs.push({ icon: "bills", color: "var(--accent)", text: "We spotted " + billsNudge + " regular payment" + (billsNudge !== 1 ? "s" : "") + " to set up", cta: "Review", action: onOpenBillsSetup });
   const showNeeds = runTour || needs.length > 0;
 
   if (!hasData && !runTour) {
@@ -7244,34 +7279,6 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
       <div className="oh-greet-row">
         <div className="overview-greeting" style={{ margin: 0 }}>Hi {name || "there"}, {greetLine}{"\u2026"}</div>
       </div>
-
-      {!runTour && <DataGapBanner transactions={transactions} onOpenUpload={onOpenUpload} />}
-
-      {!runTour && billsNudge > 0 && (
-        <div className="oh-bills-nudge">
-          <span className="obn-ic"><Icon name="bills" size={17} /></span>
-          <span className="obn-text"><strong>Set up your bills</strong><br />We spotted {billsNudge} regular payment{billsNudge !== 1 ? "s" : ""}. Takes about a minute.</span>
-          <button className="obn-cta" onClick={onOpenBillsSetup}>Review {"\u203A"}</button>
-          <button className="obn-x" aria-label="Dismiss" onClick={onDismissBillsNudge}><Icon name="x" size={14} /></button>
-        </div>
-      )}
-
-      {showNeeds && (!runTour || tourStep >= 3) && (
-        <TourTarget active={runTour && tourStep === 3}>
-          <div className="oh-needs">
-            <div className="oh-needs-head"><span className="card-label" style={{ margin: 0 }}>Needs you</span>{needs.length > 0 && <span className="oh-needs-count">{needs.length} item{needs.length !== 1 ? "s" : ""}</span>}</div>
-            {needs.length === 0 ? (
-              <div className="oh-need"><span className="oh-need-ic" style={{ color: "var(--pos)" }}><Icon name="checkcircle" size={17} /></span><span className="oh-need-text">You're all caught up.</span></div>
-            ) : needs.map((n, i) => (
-              <div className="oh-need" key={i}>
-                <span className="oh-need-ic" style={{ color: n.color }}><Icon name={n.icon} size={17} /></span>
-                <span className="oh-need-text">{n.text}</span>
-                {n.action && <button className="oh-need-cta" onClick={n.action}>{n.cta} {"›"}</button>}
-              </div>
-            ))}
-          </div>
-        </TourTarget>
-      )}
 
       <div className="oh-sec"><span>This month</span><span className="oh-sec-ctx">{currentMonthName()} {"·"} day {today().getDate()} of {daysInCurrentMonth()}</span><div className="oh-rule" /></div>
 
@@ -7297,6 +7304,12 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
           </>
         )}
       </TourTarget>
+
+      {showNeeds && (!runTour || tourStep >= 3) && (
+        <TourTarget active={runTour && tourStep === 3}>
+          <NeedsPill items={needs} expanded={needsOpen || (runTour && tourStep === 3)} onToggle={() => setNeedsOpen((v) => !v)} />
+        </TourTarget>
+      )}
 
       {(!runTour || tourStep >= 1) && (
         <ThisMonthV2 persona={persona} transactions={transactions} targets={targets} billExcludes={billExcludes} onResumeSetup={onResumeSetup} />
@@ -10844,6 +10857,16 @@ function App() {
   /* Matches .dash-card (surface-2 / --radius-card / --card-pad) — it used to be
      the only card on the page with a white fill, 12px radius and an accent bar. */
   .oh-needs { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-card); padding: var(--card-pad); }
+  /* Option A: the nag stack that used to sit above the hero is now one pill below it. */
+  .oh-needs-wrap { margin: 14px 4px 0; }
+  .oh-needs-pill { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; cursor: pointer; font-family: inherit; text-align: left; transition: background 0.15s, border-color 0.15s; }
+  .oh-needs-pill:hover { background: var(--surface-3); border-color: var(--line-strong); }
+  .oh-needs-pill-ic { color: var(--accent); display: flex; flex-shrink: 0; }
+  .oh-needs-pill-tx { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .oh-needs-pill-cta { font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+  .oh-needs-chev { display: inline-block; transition: transform 0.2s; }
+  .oh-needs-chev-open { transform: rotate(90deg); }
+  .oh-needs-open { margin-top: 8px; }
   .oh-needs-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
   .oh-needs-count { font-size: 12px; color: var(--ink-3); }
   .oh-need { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
