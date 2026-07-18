@@ -7795,7 +7795,7 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
-function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billRejects, onRejectBill, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
+function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, onSetPersona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billRejects, onRejectBill, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
   const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
   const [view, setView] = useHashView(openTargetsEdit ? "targets" : "overview");
   const [tInitEdit, setTInitEdit] = useState(!!openTargetsEdit);
@@ -7894,7 +7894,7 @@ function DashboardScreen({ name, targets, banks, plan, onEditPlan, onOpenAdmin, 
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} />
-        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
+        <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
       {runTour && (
         <div className={"tour-card" + (tourSpot ? " tour-card-spot tour-card-spot-" + tourSpot : "")}>
@@ -7949,7 +7949,7 @@ const THEMES = [
   { key: "dark", label: "Dark", preview: "linear-gradient(135deg, #171C25 55%, #6C8CFF 55%)" },
 ];
 function normalizeTheme(t) { return t === "dark" ? "dark" : "light"; }
-function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
+function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, name, banks, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   const [notifBudget, setNotifBudget] = useState(true);
@@ -7957,6 +7957,14 @@ function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, use
   const [savingProfile, setSavingProfile] = useState(false);
   const categories = Object.keys(targets || {}).filter((c) => c !== "Income");
   const [editingTargets, setEditingTargets] = useState(false);
+  const PERSONA_EMOJI = { fresh_start: "🌱", goal_getter: "🎯", budget_hawk: "🦅", power_view: "⚡" };
+  const [personaDraft, setPersonaDraft] = useState(persona);
+  const personaDirty = personaDraft && personaDraft !== persona && PERSONA_TEMPLATES[personaDraft];
+  const savePersona = () => {
+    if (!personaDirty) return;
+    try { onSetPersona(personaDraft); pushToast("Overview view updated", "success"); }
+    catch (e) { pushToast("Couldn't update view", "error"); }
+  };
   const [targetDrafts, setTargetDrafts] = useState(targets || {});
   const [savingTargets, setSavingTargets] = useState(false);
 
@@ -8026,6 +8034,29 @@ function SettingsScreen({ setupPending, onResumeSetup, name, banks, targets, use
               </button>
             ))}
           </div>
+        </div>
+        <div className="dash-card settings-section">
+          <span className="card-label">Overview view</span>
+          <p className="subtitle" style={{ margin: "2px 0 0" }}>Pick how your Overview page is laid out. This only changes the Overview — the rest of your dashboard and your data stay exactly the same.</p>
+          <div className="persona-grid">
+            {Object.keys(PERSONA_TEMPLATES).map((k) => {
+              const t = PERSONA_TEMPLATES[k];
+              const isCurrent = persona === k;
+              const isSelected = personaDraft === k;
+              return (
+                <button key={k} className={"persona-option" + (isSelected ? " persona-option-active" : "")} onClick={() => setPersonaDraft(k)}>
+                  {isCurrent && <span className="persona-current">Current</span>}
+                  <span className="persona-dot">{PERSONA_EMOJI[k]}</span>
+                  <span className="persona-text">
+                    <span className="persona-name">{t.name}</span>
+                    <span className="persona-blurb">{t.blurb}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="persona-note">Switching applies to your Overview straight away — any widgets you’ve added or rearranged there will be replaced by the new view’s layout.</p>
+          <button className="glass-btn primary" style={{ marginTop: 12, flex: "none" }} disabled={!personaDirty} onClick={savePersona}>Save</button>
         </div>
         <div className="dash-card settings-section">
           <span className="card-label">Profile</span>
@@ -9269,6 +9300,7 @@ function App() {
         setupPending={showSetupBanner}
         onResumeSetup={() => { setSetupResume(true); setSetupQuestionsOpen(true); setStage("dashboard"); }}
         persona={personaKey}
+        onSetPersona={handleSetPersona}
         setupIntroOpen={setupIntroOpen}
         setupQuestionsOpen={setupQuestionsOpen}
         setupQuestionsProps={{
@@ -11593,6 +11625,17 @@ function App() {
     .bd-list .category-track { height: 5px; }
   }
 
+  .persona-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .persona-option { position: relative; display: flex; align-items: flex-start; gap: 12px; text-align: left; background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 16px; cursor: pointer; font-family: inherit; transition: all .15s ease; }
+  .persona-option:hover { border-color: var(--line-strong); }
+  .persona-option-active, .persona-option-active:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .persona-dot { width: 36px; height: 36px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--surface-3); font-size: 16px; }
+  .persona-option-active .persona-dot { background: var(--accent); }
+  .persona-text { flex: 1; min-width: 0; }
+  .persona-name { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .persona-blurb { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.4; margin-top: 3px; }
+  .persona-current { position: absolute; top: 10px; right: 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); background: var(--card); border: 1px solid var(--accent); border-radius: 999px; padding: 3px 8px; }
+  .persona-note { font-size: 12px; color: var(--ink-3); margin: 12px 0 0; line-height: 1.4; }
 </style>
 </body>
 </html>
