@@ -8023,42 +8023,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
     <div className="settings-body">
       <h2 className="page-heading">Settings</h2>
         <div className="dash-card settings-section">
-          <span className="card-label">Appearance</span>
-          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Choose light or dark mode for your dashboard. Only you see it — it doesn't affect the public site.</p>
-          <div className="theme-grid">
-            {THEMES.map((t) => (
-              <button key={t.key} className={"theme-swatch" + ((normalizeTheme(theme)) === t.key ? " theme-swatch-active" : "")} onClick={() => onChangeTheme(t.key)}>
-                <span className="theme-chip" style={{ background: t.preview }} />
-                <span className="theme-name">{t.label}</span>
-                {(normalizeTheme(theme)) === t.key && <span className="theme-tick"><Icon name="check" size={12} strokeWidth={3} /></span>}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="dash-card settings-section">
-          <span className="card-label">Overview view</span>
-          <p className="subtitle" style={{ margin: "2px 0 0" }}>Pick how your Overview page is laid out. This only changes the Overview — the rest of your dashboard and your data stay exactly the same.</p>
-          <div className="persona-grid">
-            {Object.keys(PERSONA_TEMPLATES).map((k) => {
-              const t = PERSONA_TEMPLATES[k];
-              const isCurrent = persona === k;
-              const isSelected = personaDraft === k;
-              return (
-                <button key={k} className={"persona-option" + (isSelected ? " persona-option-active" : "")} onClick={() => setPersonaDraft(k)}>
-                  {isCurrent && <span className="persona-current">Current</span>}
-                  <span className="persona-dot">{PERSONA_EMOJI[k]}</span>
-                  <span className="persona-text">
-                    <span className="persona-name">{t.name}</span>
-                    <span className="persona-blurb">{t.blurb}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="persona-note">Switching applies to your Overview straight away — any widgets you’ve added or rearranged there will be replaced by the new view’s layout.</p>
-          <button className="glass-btn primary" style={{ marginTop: 12, flex: "none" }} disabled={!personaDirty} onClick={savePersona}>Save</button>
-        </div>
-        <div className="dash-card settings-section">
           <span className="card-label">Profile</span>
           {setupPending && !Object.values(targets || {}).some((v) => Number(v) > 0) && (
             <div className="settings-nudge">
@@ -8087,26 +8051,19 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
         </div>
 
         <div className="dash-card settings-section">
-          <span className="card-label">Linked banks</span>
-          <div className="settings-bank-list">
-            {(banks && banks.length > 0 ? banks : ["No banks linked yet"]).map((b) => (
-              <div className="settings-bank-row" key={b}>
-                <span>{b}</span>
-                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => onRemoveBank(b)} style={{ padding: "10px 8px", display: "inline-block" }}>Remove</button>}
-              </div>
-            ))}
-          </div>
-          <button className="link-btn inline" style={{ marginTop: 10 }}>+ Add another bank</button>
-        </div>
-
-        <div className="dash-card settings-section">
           <span className="card-label">Currency</span>
           <p className="subtitle" style={{ margin: "2px 0 12px" }}>Each bank keeps its own currency. Combined views convert everything into your home currency using a rate locked per month (fetched automatically — editable below).</p>
           <div className="field-group">
-            <label className="field-label">Home currency</label>
-            <select className="glass-input" value={homeCur} onChange={(e) => setHomeCur(e.target.value)}>
-              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <label className="field-label">View everything in</label>
+            <div className="cur-toggle">
+              {Array.from(new Set([homeCur, ...Object.values(bankCurs || {})].filter(Boolean))).map((c) => {
+                const sym = (CURRENCY_SYMBOLS[c] || "").trim();
+                return (
+                  <button key={c} className={"cur-seg" + (homeCur === c ? " cur-seg-active" : "")} onClick={() => setHomeCur(c)}>{c}{sym && sym !== c ? " " + sym : ""}</button>
+                );
+              })}
+            </div>
+            <p className="subtitle" style={{ margin: "8px 0 0", fontSize: 12 }}>Tap to switch — the blue one is what your dashboard shows. Your data doesn't change, just the display currency.</p>
           </div>
           <div className="settings-bank-list">
             {(banks || []).map((b) => (
@@ -8139,6 +8096,55 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
           )}
         </div>
 
+        <div className="dash-card settings-section">
+          <span className="card-label">Overview view</span>
+          <p className="subtitle" style={{ margin: "2px 0 0" }}>Pick how your Overview page is laid out. This only changes the Overview — the rest of your dashboard and your data stay exactly the same.</p>
+          <div className="persona-grid">
+            {Object.keys(PERSONA_TEMPLATES).map((k) => {
+              const t = PERSONA_TEMPLATES[k];
+              const isCurrent = persona === k;
+              const isSelected = personaDraft === k;
+              return (
+                <button key={k} className={"persona-option" + (isSelected ? " persona-option-active" : "")} onClick={() => setPersonaDraft(k)}>
+                  {isCurrent && <span className="persona-current">Current</span>}
+                  <span className="persona-dot">{PERSONA_EMOJI[k]}</span>
+                  <span className="persona-text">
+                    <span className="persona-name">{t.name}</span>
+                    <span className="persona-blurb">{t.blurb}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="persona-note">Switching applies to your Overview straight away — any widgets you’ve added or rearranged there will be replaced by the new view’s layout.</p>
+          <button className="glass-btn primary" style={{ marginTop: 12, flex: "none" }} disabled={!personaDirty} onClick={savePersona}>Save</button>
+        </div>
+        <div className="dash-card settings-section">
+          <span className="card-label">Linked banks</span>
+          <div className="settings-bank-list">
+            {(banks && banks.length > 0 ? banks : ["No banks linked yet"]).map((b) => (
+              <div className="settings-bank-row" key={b}>
+                <span>{b}</span>
+                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => onRemoveBank(b)} style={{ padding: "10px 8px", display: "inline-block" }}>Remove</button>}
+              </div>
+            ))}
+          </div>
+          <button className="link-btn inline" style={{ marginTop: 10 }}>+ Add another bank</button>
+        </div>
+
+        <div className="dash-card settings-section">
+          <span className="card-label">Appearance</span>
+          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Choose light or dark mode for your dashboard. Only you see it — it doesn't affect the public site.</p>
+          <div className="theme-grid">
+            {THEMES.map((t) => (
+              <button key={t.key} className={"theme-swatch" + ((normalizeTheme(theme)) === t.key ? " theme-swatch-active" : "")} onClick={() => onChangeTheme(t.key)}>
+                <span className="theme-chip" style={{ background: t.preview }} />
+                <span className="theme-name">{t.label}</span>
+                {(normalizeTheme(theme)) === t.key && <span className="theme-tick"><Icon name="check" size={12} strokeWidth={3} /></span>}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="dash-card settings-section">
           <div className="settings-section-head">
             <span className="card-label">Monthly targets</span>
@@ -11636,6 +11642,10 @@ function App() {
   .persona-blurb { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.4; margin-top: 3px; }
   .persona-current { position: absolute; top: 10px; right: 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); background: var(--card); border: 1px solid var(--accent); border-radius: 999px; padding: 3px 8px; }
   .persona-note { font-size: 12px; color: var(--ink-3); margin: 12px 0 0; line-height: 1.4; }
+  .cur-toggle { display: inline-flex; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+  .cur-seg { border: none; background: transparent; font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-3); padding: 10px 26px; border-radius: 9px; cursor: pointer; transition: all .15s ease; }
+  .cur-seg:hover { color: var(--ink); }
+  .cur-seg-active, .cur-seg-active:hover { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(46,91,255,0.35); }
 </style>
 </body>
 </html>
