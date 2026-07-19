@@ -2038,9 +2038,9 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
 
       <div className="lp-hero lp-wrap">
         <div className="lp-hero-copy">
-          <span className="hero-eyebrow">Now in early access</span>
-          <h1>See exactly where your money goes.</h1>
-          <p>Upload your bank statements, set monthly targets by category, and finally get a clear picture of your spending — without the spreadsheets.</p>
+          <span className="hero-eyebrow">Built in Dubai for UAE expats</span>
+          <h1>Your money here <em style={{fontStyle:"normal", color:"var(--accent)"}}>and</em> back home. One clear picture.</h1>
+          <p>One salary, two countries. Upload statements from your UAE and home-country banks &mdash; dirhams and pounds together, converted properly, with one honest total across both. No bank login, no spreadsheets.</p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
@@ -2052,21 +2052,21 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
         <div className="lp-trust-facts">
           <span className="lp-trust-fact"><Icon name="file" size={16} /> Works with PDF &amp; CSV</span>
           <span className="lp-trust-dot" />
-          <span className="lp-trust-fact"><Icon name="income" size={16} /> GBP + AED</span>
+          <span className="lp-trust-fact"><Icon name="income" size={16} /> AED + your home currency</span>
           <span className="lp-trust-dot" />
-          <span className="lp-trust-fact"><Icon name="sparkles" size={16} /> AI-categorised in seconds</span>
+          <span className="lp-trust-fact"><Icon name="sparkles" size={16} /> UAE &amp; UK banks supported</span>
         </div>
-        <p className="lp-trust-note">No bank login, ever &mdash; your statements, your control.</p>
+        <p className="lp-trust-note">No bank login, ever &mdash; not here, not back home.</p>
       </div>
 
       <div className="lp-section lp-wrap" id="lp-how">
-        <div className="section-head reveal"><h2>How it works</h2><p>From statement to clarity in three steps. No syncing, no permissions.</p></div>
+        <div className="section-head reveal"><h2>How it works</h2><p>From two countries&rsquo; worth of statements to one clear picture &mdash; in three steps. No syncing, no permissions.</p></div>
 
         <div className="lp-step reveal">
           <div className="lp-step-copy">
             <div className="step-num">1</div>
             <h3>Drop in your statements</h3>
-            <p>Add a few months of statements from any bank — PDF or CSV. No bank login, ever. Your files, your control.</p>
+            <p>Add statements from your UAE bank and your home-country bank &mdash; Emirates NBD, HSBC, Monzo, any bank. PDF or CSV. No login, ever.</p>
           </div>
           <LpUploadDemo />
         </div>
@@ -2084,7 +2084,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <div className="lp-step-copy">
             <div className="step-num">3</div>
             <h3>Your dashboard fills in</h3>
-            <p>Spending, budgets, goals and trends populate instantly &mdash; your whole picture, live from your real data.</p>
+            <p>Spending, budgets and trends populate instantly across both countries &mdash; your whole picture, live from your real data.</p>
           </div>
           <LpViewsDemo />
         </div>
@@ -2092,7 +2092,16 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       </div>
 
       <div className="lp-section lp-wrap">
-        <div className="section-head reveal"><h2>The parts people love</h2><p>A taste of what makes TwoPockets feel less like a spreadsheet.</p></div>
+        <div className="section-head reveal"><h2>The parts people love</h2><p>Built around the reality of a life &mdash; and money &mdash; in two countries.</p></div>
+
+        <div className="lp-step reveal">
+          <div className="lp-step-copy">
+            <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
+            <h3>Two currencies. One life. One total.</h3>
+            <p>Your dirham salary and your pound account, side by side. Each stays in its own currency &mdash; every total converts into whichever home currency you pick, at a rate locked per month so last month never shifts.</p>
+          </div>
+          <LpCurrencyDemo />
+        </div>
 
         <div className="lp-step lp-step-flip reveal">
           <div className="lp-step-copy">
@@ -2112,14 +2121,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <LpInsightsDemo />
         </div>
 
-        <div className="lp-step lp-step-flip reveal">
-          <div className="lp-step-copy">
-            <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
-            <h3>Two countries, one clear picture</h3>
-            <p>Bank in pounds and dirhams? Keep both. Each account stays in its own currency &mdash; your totals convert into whichever home currency you choose, at a rate locked per month.</p>
-          </div>
-          <LpCurrencyDemo />
-        </div>
+
       </div>
 
       <div className="lp-section lp-wrap">
@@ -2187,19 +2189,45 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       </div>
 
       <div className="lp-section lp-wrap">
+        <div className="section-head reveal"><h2>Made for money that lives in two places</h2><p>The everyday expat things other budgeting apps quietly ignore.</p></div>
+        <div className="lp-expat-grid">
+          <div className="lp-expat-card reveal">
+            <div className="lp-expat-ico">🏠</div>
+            <h4>Money sent home, tracked</h4>
+            <p>See what you send back each month, in both currencies, without a separate spreadsheet.</p>
+          </div>
+          <div className="lp-expat-card reveal">
+            <div className="lp-expat-ico">🏦</div>
+            <h4>Both banks, no logins</h4>
+            <p>Your UAE bank and your home-country bank in one view &mdash; just statements, never passwords.</p>
+          </div>
+          <div className="lp-expat-card reveal">
+            <div className="lp-expat-ico">🔒</div>
+            <h4>Rates locked per month</h4>
+            <p>Past months stay put. A June total in pounds still reads the same in December.</p>
+          </div>
+          <div className="lp-expat-card reveal">
+            <div className="lp-expat-ico">✈️</div>
+            <h4>Wherever &ldquo;home&rdquo; is</h4>
+            <p>Pounds today, more currencies soon. Pick the home currency that fits your life.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="lp-section lp-wrap">
         <div className="section-head reveal"><h2>Simple pricing</h2><p>Start free. Upgrade whenever you're ready.</p></div>
         <div className="pricing">
           <div className="price-card reveal">
             <div className="price-tag">Free trial</div>
             <div className="price-amount">£0</div>
-            <div className="price-period">for 28 days</div>
+            <div className="price-period">for 28 days &middot; both countries</div>
             <ul className="price-features"><li>3 statement uploads</li><li>10 &ldquo;Ask about your money&rdquo; questions</li><li>Full dashboard access</li></ul>
             <button className="btn btn-ghost" style={{ width: "100%" }} onClick={onSignup}>Start free trial</button>
           </div>
           <div className="price-card highlight reveal">
             <div className="price-tag">Pro</div>
-            <div className="price-amount">£4.99</div>
-            <div className="price-period">per month &middot; approx AED 23</div>
+            <div className="price-amount">AED 23</div>
+            <div className="price-period">per month &middot; approx &pound;4.99</div>
             <ul className="price-features"><li>Unlimited uploads</li><li>Unlimited &ldquo;Ask about your money&rdquo; questions</li><li>Full dashboard access</li><li>Priority support</li></ul>
             <button className="btn btn-primary" style={{ width: "100%" }} onClick={onSignup}>Start free trial</button>
           </div>
@@ -2207,8 +2235,8 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       </div>
 
       <div className="lp-final-cta lp-wrap reveal">
-        <h2>Ready to see where your money goes?</h2>
-        <p>No bank login required. Cancel anytime.</p>
+        <h2>Ready to see your whole picture &mdash; here and back home?</h2>
+        <p>No bank login required, in either country. Cancel anytime.</p>
         <button className="btn btn-primary btn-large" onClick={onSignup}>Start your free trial</button>
       </div>
 
@@ -11646,6 +11674,13 @@ function App() {
   .cur-seg { border: none; background: transparent; font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-3); padding: 10px 26px; border-radius: 9px; cursor: pointer; transition: all .15s ease; }
   .cur-seg:hover { color: var(--ink); }
   .cur-seg-active, .cur-seg-active:hover { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(46,91,255,0.35); }
+  .lp-expat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; max-width: 1080px; margin: 8px auto 0; }
+  .lp-expat-card { background: var(--card, #fff); border: 1px solid var(--line, #e6e8ee); border-radius: 18px; padding: 24px 20px; text-align: left; box-shadow: 0 8px 24px rgba(16,24,40,0.04); }
+  .lp-expat-ico { font-size: 26px; line-height: 1; margin-bottom: 12px; }
+  .lp-expat-card h4 { color: var(--ink); font-size: 16px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lp-expat-card p { color: var(--ink-2); font-size: 14px; line-height: 1.55; margin: 0; }
+  @media (max-width: 900px) { .lp-expat-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .lp-expat-grid { grid-template-columns: 1fr; gap: 14px; } }
 </style>
 </body>
 </html>
