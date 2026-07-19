@@ -1,6 +1,6 @@
 {
-  "name": "MyBudgetPal",
-  "short_name": "MyBudgetPal",
+  "name": "TwoPockets",
+  "short_name": "TwoPockets",
   "description": "Upload your bank statements, track spending by category, and hit your savings goals.",
   "start_url": "/",
   "scope": "/",
