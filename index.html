@@ -1958,6 +1958,7 @@ function LpCurrencyDemo() {
           {["GBP", "AED"].map((c) => (
             <button key={c} className={"lpd-cur-opt" + (home === c ? " lpd-cur-opt-on" : "")} onClick={() => setHome(c)}>{c}</button>
           ))}
+          <span className="lpd-cur-soon">EUR &middot; USD soon</span>
         </div>
       </div>
       <div className="lpd-cur-accounts">
@@ -1977,7 +1978,7 @@ function LpCurrencyDemo() {
         <span>Combined, in {home}</span>
         <b className={total >= 0 ? "lpd-cur-pos" : ""}>{fmt(total, home)}</b>
       </div>
-      <div className="lpd-views-hint">Switch your home currency — every account converts at a rate locked per month.</div>
+      <div className="lpd-views-hint">Switch your home currency — every account converts at a rate locked per month. More currencies coming soon.</div>
     </div>
   );
 }
@@ -2040,7 +2041,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
         <div className="lp-hero-copy">
           <span className="hero-eyebrow">Built in Dubai for UAE expats</span>
           <h1>Your money here <em style={{fontStyle:"normal", color:"var(--accent)"}}>and</em> back home. One clear picture.</h1>
-          <p>One salary, two countries. Upload statements from your UAE and home-country banks &mdash; dirhams and pounds together, converted properly, with one honest total across both. No bank login, no spreadsheets.</p>
+          <p>One salary, two countries. Upload statements from your UAE and home-country banks &mdash; dirhams and your home currency together, converted properly, with one honest total across both. GBP today, more currencies coming soon. No bank login, no spreadsheets.</p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
@@ -2098,7 +2099,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <div className="lp-step-copy">
             <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
             <h3>Two currencies. One life. One total.</h3>
-            <p>Your dirham salary and your pound account, side by side. Each stays in its own currency &mdash; every total converts into whichever home currency you pick, at a rate locked per month so last month never shifts.</p>
+            <p>Your dirham salary and your home-country account, side by side. Each stays in its own currency &mdash; every total converts into whichever home currency you pick, at a rate locked per month so last month never shifts. GBP today, more on the way.</p>
           </div>
           <LpCurrencyDemo />
         </div>
@@ -2209,7 +2210,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <div className="lp-expat-card reveal">
             <div className="lp-expat-ico">✈️</div>
             <h4>Wherever &ldquo;home&rdquo; is</h4>
-            <p>Pounds today, more currencies soon. Pick the home currency that fits your life.</p>
+            <p>GBP today, with more currencies coming soon. Pick the home currency that fits your life.</p>
           </div>
         </div>
       </div>
@@ -11681,6 +11682,7 @@ function App() {
   .lp-expat-card p { color: var(--ink-2); font-size: 14px; line-height: 1.55; margin: 0; }
   @media (max-width: 900px) { .lp-expat-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) { .lp-expat-grid { grid-template-columns: 1fr; gap: 14px; } }
+  .lpd-cur-soon { font-size: 10px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.02em; margin-left: 8px; opacity: 0.75; white-space: nowrap; }
 </style>
 </body>
 </html>
