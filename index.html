@@ -550,7 +550,7 @@ const GOALS = [
   "Save more each month", "Pay off debt", "Build an investment portfolio", "Track my spending",
   "Build my credit", "Plan for a big purchase", "Grow my business", "Just stay organised",
 ];
-const ONBOARD_STEPS = 3;
+const ONBOARD_STEPS = 5;
 const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "size-sm", 5: "size-md" };
 
 const VIEWS = [
@@ -746,7 +746,7 @@ const TERMS_SECTIONS = [
 ];
 
 /* ---------------- Multi-currency (FX) ---------------- */
-const CURRENCIES = ["GBP", "AED", "USD", "EUR"];
+const CURRENCIES = ["AED", "GBP", "USD", "EUR"];
 const CURRENCY_SYMBOLS = { GBP: "£", AED: "AED ", USD: "$", EUR: "€" };
 const UAE_BANKS = ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK"];
 const CURRENCY_META = {
@@ -761,6 +761,19 @@ const CURRENCY_BANKS = {
   USD: ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citibank", "HSBC", "Revolut", "Wise"],
   EUR: ["Deutsche Bank", "BNP Paribas", "N26", "Santander", "Revolut", "Wise"],
 };
+/* UAE-first onboarding: where you live (local currency) + where home is (second currency) */
+const LIVE_COUNTRIES = [
+  { key: "UAE", cur: "AED", label: "United Arab Emirates", flag: "\uD83C\uDDE6\uD83C\uDDEA" },
+  { key: "UK",  cur: "GBP", label: "United Kingdom",        flag: "\uD83C\uDDEC\uD83C\uDDE7" },
+  { key: "US",  cur: "USD", label: "United States",         flag: "\uD83C\uDDFA\uD83C\uDDF8" },
+  { key: "EU",  cur: "EUR", label: "Europe",                flag: "\uD83C\uDDEA\uD83C\uDDFA" },
+];
+const HOME_COUNTRIES = [
+  { key: "UK", cur: "GBP", label: "United Kingdom", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
+  { key: "US", cur: "USD", label: "United States",  flag: "\uD83C\uDDFA\uD83C\uDDF8" },
+  { key: "EU", cur: "EUR", label: "Europe",         flag: "\uD83C\uDDEA\uD83C\uDDFA" },
+];
+const countryByKey = (list, k) => list.find((c) => c.key === k) || null;
 const FX_FALLBACK = { "GBP>AED": 4.65, "AED>GBP": 0.215, "GBP>USD": 1.27, "USD>GBP": 0.787, "GBP>EUR": 1.17, "EUR>GBP": 0.855, "USD>AED": 3.6725, "AED>USD": 0.2723, "EUR>AED": 3.97, "AED>EUR": 0.252, "USD>EUR": 0.92, "EUR>USD": 1.09 };
 /* Module-level FX state: home currency, per-bank currency, locked monthly rates */
 const FX = { ready: false, userId: null, home: "GBP", bankCurrency: {}, rates: {} };
@@ -2541,62 +2554,98 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
 function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, initialBanks }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(initialName || "");
-  const [currencies, setCurrencies] = useState(["GBP"]);
-  const [multiCurrency, setMultiCurrency] = useState(false);
+  const [baseKey, setBaseKey] = useState("UAE");
+  const [homeKey, setHomeKey] = useState("UK");
+  const [singleCurrency, setSingleCurrency] = useState(false);
+  const [displayCur, setDisplayCur] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const base = countryByKey(LIVE_COUNTRIES, baseKey);
+  const localCur = base ? base.cur : "AED";
+  const home = countryByKey(HOME_COUNTRIES, homeKey);
+  const homeCur = home ? home.cur : "GBP";
+  const isDual = !singleCurrency && homeCur !== localCur;
+  const effectiveDisplay = isDual ? (displayCur || localCur) : localCur;
+
+  // currencies the user actually banks in (local first)
+  const activeCurrencies = isDual ? [localCur, homeCur] : [localCur];
+
   const [bankCurrency, setBankCurrency] = useState(() => {
     const m = {}; (initialBanks || []).forEach((b) => { m[b] = UAE_BANKS.includes(b) ? "AED" : "GBP"; }); return m;
   });
   const banks = Object.keys(bankCurrency);
-  const [submitting, setSubmitting] = useState(false);
 
-  const currencyStepOk = currencies.length >= 1 && (!multiCurrency || currencies.length === 2);
-  const canContinue = [
-    name.trim().length > 0, currencyStepOk, banks.length > 0,
-  ][step];
-
-  const setPrimary = (c) => setCurrencies((prev) => (prev[1] === c ? [c] : (prev[1] ? [c, prev[1]] : [c])));
-  const setSecondary = (c) => setCurrencies((prev) => [prev[0], c]);
-  const onToggleMulti = (on) => { setMultiCurrency(on); if (!on) setCurrencies((prev) => [prev[0]]); };
   const toggleBankCur = (b, cur) => setBankCurrency((prev) => {
     const next = { ...prev };
     if (next[b] === cur) delete next[b]; else next[b] = cur;
     return next;
   });
+
+  // drop any selected banks whose currency is no longer active
   React.useEffect(() => {
     setBankCurrency((prev) => {
       const next = {}; let changed = false;
-      Object.entries(prev).forEach(([b, c]) => { if (currencies.includes(c)) next[b] = c; else changed = true; });
+      Object.entries(prev).forEach(([b, c]) => { if (activeCurrencies.includes(c)) next[b] = c; else changed = true; });
       return changed ? next : prev;
     });
-  }, [currencies]);
-  const next = async () => {
-    if (step === ONBOARD_STEPS - 1) {
-      setSubmitting(true);
-      const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim(), home_currency: currencies[0] });
-      const existingBanks = await fetchBanks(userId);
-      const existingNames = existingBanks.map((r) => r.bank_name);
-      const toAdd = banks.filter((b) => !existingNames.includes(b));
-      const toRemove = existingNames.filter((n) => !banks.includes(n));
-      let bErr = null;
-      if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: bankCurrency[b] || "GBP" }))); bErr = error; }
-      if (toRemove.length) { try { await supabaseClient.from("banks").delete().eq("user_id", userId).in("bank_name", toRemove); } catch (e) {} }
-      const check = await fetchProfile(userId);
-      const savedBanks = await fetchBanks(userId);
-      const banksOk = banks.every((b) => savedBanks.some((r) => r.bank_name === b));
-      if (pErr || bErr || !check?.name || !banksOk) {
-        const msg = (pErr || bErr)?.message
-          || (!check?.name ? "your profile didn't save (profiles table permissions)"
-          : "your banks didn't save (banks table permissions)");
-        pushToast("Couldn't save: " + msg, "error");
-        setSubmitting(false);
-        return;
-      }
-      setSubmitting(false);
-      onDone({ name: name.trim(), banks, currencies });
-    }
-    else setStep((s) => s + 1);
+  }, [baseKey, homeKey, singleCurrency]);
+
+  // reset chosen display currency whenever the currency pair changes
+  React.useEffect(() => { setDisplayCur(null); }, [baseKey, homeKey, singleCurrency]);
+
+  const canContinue = [
+    name.trim().length > 0,
+    !!baseKey,
+    singleCurrency || !!homeKey,
+    !!effectiveDisplay,
+    banks.length > 0,
+  ][step];
+
+  const goNext = () => {
+    let n = step + 1;
+    if (n === 3 && !isDual) n = 4; // skip dashboard-currency choice when single-currency
+    setStep(n);
   };
-  const back = () => setStep((s) => Math.max(s - 1, 0));
+  const goBack = () => {
+    let n = step - 1;
+    if (n === 3 && !isDual) n = 2;
+    setStep(Math.max(n, 0));
+  };
+
+  const finish = async () => {
+    setSubmitting(true);
+    const homeCurrencyToSave = effectiveDisplay;
+    const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim(), home_currency: homeCurrencyToSave });
+    const existingBanks = await fetchBanks(userId);
+    const existingNames = existingBanks.map((r) => r.bank_name);
+    const toAdd = banks.filter((b) => !existingNames.includes(b));
+    const toRemove = existingNames.filter((n) => !banks.includes(n));
+    let bErr = null;
+    if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: bankCurrency[b] || localCur }))); bErr = error; }
+    if (toRemove.length) { try { await supabaseClient.from("banks").delete().eq("user_id", userId).in("bank_name", toRemove); } catch (e) {} }
+    const check = await fetchProfile(userId);
+    const savedBanks = await fetchBanks(userId);
+    const banksOk = banks.every((b) => savedBanks.some((r) => r.bank_name === b));
+    if (pErr || bErr || !check?.name || !banksOk) {
+      const msg = (pErr || bErr)?.message
+        || (!check?.name ? "your profile didn't save (profiles table permissions)"
+        : "your banks didn't save (banks table permissions)");
+      pushToast("Couldn't save: " + msg, "error");
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+    onDone({ name: name.trim(), banks, currencies: activeCurrencies });
+  };
+
+  const next = async () => {
+    if (step === ONBOARD_STEPS - 1) { await finish(); }
+    else goNext();
+  };
+  const back = () => goBack();
+
+  const bankGroups = [{ cur: localCur, label: (base ? base.label : "Local") + " bank", flag: base ? base.flag : "" }];
+  if (isDual) bankGroups.push({ cur: homeCur, label: (home ? home.label : "Home") + " bank", flag: home ? home.flag : "" });
 
   return (
     <div className="page stage-fade">
@@ -2615,50 +2664,74 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
             <input className="glass-input" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
         )}
+
         {step === 1 && (
           <div className="step">
-            <h1 className="title">Which currency do you bank in?</h1>
-            <p className="subtitle">Pick your main currency — your totals and budgets will show in this.</p>
+            <h1 className="title">Where do you live right now?</h1>
+            <p className="subtitle">Where your day-to-day life is based today. If you've got money in another country too, we'll ask about that next.</p>
             <div className="segmented">
-              {CURRENCIES.map((c) => (
-                <button key={c} className={"segment " + (currencies[0] === c ? "segment-active" : "")} onClick={() => setPrimary(c)}>
-                  <span>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</span>
-                  {currencies[0] === c && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              {LIVE_COUNTRIES.map((c) => (
+                <button key={c.key} className={"segment " + (baseKey === c.key ? "segment-active" : "")} onClick={() => setBaseKey(c.key)}>
+                  <span>{c.flag} {c.label}<span className="segment-sub">Local currency: {c.cur}</span></span>
+                  {baseKey === c.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="step">
+            <h1 className="title">And where's home?</h1>
+            <p className="subtitle">Most people here still have money in another country — a salary, savings, or family back home. We'll track both currencies for you.</p>
+            <div className="segmented">
+              {HOME_COUNTRIES.map((c) => (
+                <button key={c.key} className={"segment " + (!singleCurrency && homeKey === c.key ? "segment-active" : "")}
+                  style={singleCurrency ? { opacity: 0.45, pointerEvents: "none" } : null}
+                  onClick={() => setHomeKey(c.key)}>
+                  <span>{c.flag} {c.label}<span className="segment-sub">{c.cur}</span></span>
+                  {!singleCurrency && homeKey === c.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
             <label className="currency-multi">
-              <input type="checkbox" checked={multiCurrency} onChange={(e) => onToggleMulti(e.target.checked)} />
-              <span>I use more than one currency</span>
+              <input type="checkbox" checked={singleCurrency} onChange={(e) => setSingleCurrency(e.target.checked)} />
+              <span>I only bank in {base ? base.label : localCur}</span>
             </label>
-            {multiCurrency && (
-              <div className="currency-second">
-                <p className="subtitle" style={{ marginBottom: 8 }}>And your second currency:</p>
-                <div className="segmented">
-                  {CURRENCIES.filter((c) => c !== currencies[0]).map((c) => (
-                    <button key={c} className={"segment " + (currencies[1] === c ? "segment-active" : "")} onClick={() => setSecondary(c)}>
-                      <span>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</span>
-                      {currencies[1] === c && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                    </button>
-                  ))}
-                </div>
-                <p className="currency-note">We support two currencies while we build out the rest — you can add more later in Settings.</p>
-              </div>
-            )}
+            <p className="currency-note">You can add or change this any time in Settings.</p>
           </div>
         )}
-        {step === 2 && (
+
+        {step === 3 && (
           <div className="step">
-            <h1 className="title">{currencies.length > 1 ? "Which banks do you use?" : "Who's your bank?"}</h1>
-            <p className="subtitle">{currencies.length > 1 ? "Pick your bank(s) under each currency." : "Select all that apply. Don't see yours? Add more later in Settings."}</p>
-            {currencies.map((cur) => (
-              <div className="currency-bank-group" key={cur}>
-                {currencies.length > 1 && <div className="currency-bank-head">{CURRENCY_META[cur].flag} {cur} accounts</div>}
+            <h1 className="title">Which currency should your dashboard show in?</h1>
+            <p className="subtitle">Your totals, budgets and charts all display in this one currency.</p>
+            <div className="segmented">
+              <button className={"segment " + (effectiveDisplay === localCur ? "segment-active" : "")} onClick={() => setDisplayCur(localCur)}>
+                <span>{localCur} — where you live<span className="segment-sub">Your local currency</span></span>
+                {effectiveDisplay === localCur && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              </button>
+              <button className={"segment " + (effectiveDisplay === homeCur ? "segment-active" : "")} onClick={() => setDisplayCur(homeCur)}>
+                <span>{homeCur} — where you're from<span className="segment-sub">Your home currency</span></span>
+                {effectiveDisplay === homeCur && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              </button>
+            </div>
+            <p className="currency-note">Spending in your other currency is automatically converted in — so everything adds up in one place, using a rate locked for each month.</p>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="step">
+            <h1 className="title">{isDual ? "Which banks do you use?" : "Who's your bank?"}</h1>
+            <p className="subtitle">{isDual ? "Pick your bank in each country. No bank login needed — just your statements later." : "Select all that apply. Don't see yours? Add more later in Settings."}</p>
+            {bankGroups.map((g) => (
+              <div className="currency-bank-group" key={g.cur}>
+                {isDual && <div className="currency-bank-head">{g.flag} Your {g.label}</div>}
                 <div className="bank-grid">
-                  {(CURRENCY_BANKS[cur] || BANKS).map((b) => {
-                    const sel = bankCurrency[b] === cur;
+                  {(CURRENCY_BANKS[g.cur] || BANKS).map((b) => {
+                    const sel = bankCurrency[b] === g.cur;
                     return (
-                      <button key={cur + b} className={"chip bank-chip " + (sel ? "chip-selected" : "")} onClick={() => toggleBankCur(b, cur)}>
+                      <button key={g.cur + b} className={"chip bank-chip " + (sel ? "chip-selected" : "")} onClick={() => toggleBankCur(b, g.cur)}>
                         <span>{b}</span>
                         {sel && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                       </button>
@@ -9754,6 +9827,8 @@ function App() {
     box-shadow: none;
     font-weight: 700;
   }
+  .segment-sub { display: block; font-size: 12px; font-weight: 400; color: var(--ink-3); margin-top: 2px; }
+  .segment-active .segment-sub { color: var(--accent); opacity: 0.8; }
 
   .nav-row { display: flex; gap: 12px; margin-top: 24px; }
   .glass-btn { flex: 1; font-family: inherit; font-size: 16px; font-weight: 600; padding: 15px; border-radius: 16px; cursor: pointer; border: 1px solid var(--line); transition: all 0.18s ease; }
