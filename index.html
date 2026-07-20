@@ -5905,16 +5905,25 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
       setCardPlace("bottom");
     } else {
       // Free vertical space above a bottom-pinned card vs below a top-pinned card.
-      const spaceIfCardBottom = vh - (cardH + 20) - HEADER - MARGIN;
       const targetH = el.getBoundingClientRect().height;
-      if (targetH <= spaceIfCardBottom) {
-        // Fits above the bottom card — keep card at bottom, scroll target just under header.
+      const spaceAboveBottomCard = vh - (cardH + 20) - HEADER - MARGIN;   // gap under header, above bottom card
+      const spaceBelowTopCard    = vh - (HEADER + 12 + cardH) - MARGIN;   // gap under a top card
+      if (targetH <= spaceAboveBottomCard) {
+        // Fits fully in the gap above a bottom card — the common case. Card stays at the
+        // bottom (its normal home) and the target sits just under the header.
         setCardPlace("bottom");
         scrollTourTargetIntoView(el, HEADER + MARGIN);
-      } else {
-        // Too tall for the top gap — put the card at the TOP, target below it.
+      } else if (targetH <= spaceBelowTopCard) {
+        // Doesn't fit above a bottom card, but does fit below a top card — flip up.
         setCardPlace("top");
-        scrollTourTargetIntoView(el, cardH + 20 + MARGIN);
+        scrollTourTargetIntoView(el, HEADER + 12 + cardH + MARGIN);
+      } else {
+        // Taller than either gap (short viewport + tall widget). Keep the card at the
+        // bottom and align the target's TOP just under the header, so its most important
+        // part (headline number / first row) is always visible; the tail tucks behind
+        // the card rather than the whole thing being pushed off-screen.
+        setCardPlace("bottom");
+        scrollTourTargetIntoView(el, HEADER + MARGIN);
       }
     }
 
