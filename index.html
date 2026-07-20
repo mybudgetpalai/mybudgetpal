@@ -5880,7 +5880,7 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   const PAD = 8, GAP = 14, HEADER = 72;
   // Spot steps (top bar + menu) live at the top → card goes BOTTOM.
   // Content steps → card goes TOP, and we scroll the target into the lower zone.
-  const cardAtBottom = !!spot;
+  const cardAtBottom = spot !== "menu";
 
   const measure = React.useCallback(() => {
     const el = document.querySelector('[data-tour-active="1"]');
@@ -5905,10 +5905,10 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const doScroll = () => {
       const el = document.querySelector('[data-tour-active="1"]');
       if (!el) return;
-      // Reserve space for the card: content steps have the card at the top (~360px),
-      // spot steps have it at the bottom (just clear the header).
-      el.style.scrollMarginTop = (cardAtBottom ? 90 : 360) + "px";
-      el.style.scrollMarginBottom = (cardAtBottom ? 260 : 40) + "px";
+      // Card is at the bottom (or right for menu). Pull the highlighted element up near
+      // the top of the screen so it sits ABOVE the card, fully visible.
+      el.style.scrollMarginTop = "84px";
+      el.style.scrollMarginBottom = "300px";
       const block = "start";
       try { el.scrollIntoView({ behavior: "smooth", block, inline: "nearest" }); }
       catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
