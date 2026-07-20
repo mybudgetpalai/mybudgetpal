@@ -5817,30 +5817,31 @@ function overviewTour({ hasTargets, monthLabel }) {
    directly; fall back to scrollIntoView if none is found (mobile: page scrolls). */
 function scrollTourTargetIntoView(el) {
   if (!el) return;
-  let sc = el.parentElement;
-  while (sc && sc !== document.body) {
-    const st = window.getComputedStyle(sc);
-    const oy = st.overflowY;
-    if ((oy === "auto" || oy === "scroll") && sc.scrollHeight > sc.clientHeight + 4) break;
-    sc = sc.parentElement;
-  }
-  if (!sc || sc === document.body) {
-    /* Mobile / window scroll: the tour card sits at the bottom ~55% of the screen, so
-       the highlighted section must sit in the top ~40% to stay visible. Pin it near
-       the top, just below the header. */
+  // Brute-force: scroll every scrollable ancestor AND the window so the target sits
+  // near the top, clear of the bottom tour card. Belt-and-braces because on mobile the
+  // real scroller varies (window vs .main-content-wide).
+  const HEADER = 70;
+  try {
+    let node = el.parentElement;
+    while (node && node !== document.body) {
+      const st = window.getComputedStyle(node);
+      const oy = st.overflowY;
+      if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 4) {
+        const er = el.getBoundingClientRect();
+        const nr = node.getBoundingClientRect();
+        const top = node.scrollTop + (er.top - nr.top) - HEADER;
+        try { node.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); } catch (e) { node.scrollTop = Math.max(0, top); }
+      }
+      node = node.parentElement;
+    }
+  } catch (e) {}
+  try {
     const er = el.getBoundingClientRect();
-    const targetTop = window.scrollY + er.top - Math.max(96, window.innerHeight * 0.12);
-    try { window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" }); }
-    catch (e) { try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e2) {} }
-    return;
+    const top = window.scrollY + er.top - Math.max(HEADER + 20, window.innerHeight * 0.10);
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  } catch (e) {
+    try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e2) {}
   }
-  const er = el.getBoundingClientRect();
-  const sr = sc.getBoundingClientRect();
-  /* Tour card sits bottom-centre ~220px tall, so aim the section into the upper half. */
-  const pad = Math.max(20, (sc.clientHeight - 240 - er.height) / 2);
-  const top = sc.scrollTop + (er.top - sr.top) - Math.max(20, Math.min(pad, 140));
-  try { sc.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); }
-  catch (e) { sc.scrollTop = Math.max(0, top); }
 }
 
 function TourTarget({ active, className, children }) {
@@ -8068,6 +8069,16 @@ function normalizeTheme(t) { return t === "dark" ? "dark" : "light"; }
 function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, name, banks, bankRows, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabaseClient.auth.getUser();
+        if (alive && data?.user?.email) setEmail(data.user.email);
+      } catch (e) {}
+    })();
+    return () => { alive = false; };
+  }, []);
   const [notifBudget, setNotifBudget] = useState(true);
   const [notifWeekly, setNotifWeekly] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -8162,7 +8173,8 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
           </div>
           <div className="field-group">
             <label className="field-label">Email</label>
-            <input className="glass-input" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className="glass-input" type="email" placeholder="you@example.com" value={email} readOnly style={{ opacity: 0.75, cursor: "default" }} />
+            <p className="subtitle" style={{ margin: "6px 0 0", fontSize: 12 }}>This is the email you signed in with.</p>
           </div>
           <button className="link-btn inline" style={{ marginTop: 4, padding: "10px 2px", display: "inline-block" }}>Change password</button>
           <button className="glass-btn primary" style={{ marginTop: 14, marginLeft: 14, flex: "none" }} disabled={!profileDirty || savingProfile} onClick={saveProfile}>
@@ -9961,7 +9973,7 @@ function App() {
   .brand-clickable { cursor: pointer; }
   .side-accounts-wrap { margin-top: auto; }
   .side-divider { height: 1px; background: var(--surface-2); margin: 10px 4px; }
-  .side-item-accounts { display: flex; align-items: center; gap: 9px; font-weight: 600; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
+  .side-item-accounts { display: flex; align-items: center; justify-content: center; gap: 9px; font-weight: 600; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
   .side-item-accounts:hover { background: var(--surface-2); }
   .side-item-accounts.side-item-active { background: var(--grad-nav); border-color: transparent; }
   .side-accounts-icon { font-size: 14px; line-height: 1; }
