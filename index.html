@@ -1989,11 +1989,13 @@ function LpCurrencyDemo() {
     <div className="lp-demo-card lpd-cur">
       <div className="lpd-cur-head">
         <span className="lpd-cur-label">Home currency</span>
+        <span className="lpd-cur-soon"><span className="lpd-cur-soon-dot" />EUR &amp; USD coming soon</span>
+      </div>
+      <div className="lpd-cur-toggle-row">
         <div className="lpd-cur-toggle">
           {["GBP", "AED"].map((c) => (
             <button key={c} className={"lpd-cur-opt" + (home === c ? " lpd-cur-opt-on" : "")} onClick={() => setHome(c)}>{c}</button>
           ))}
-          <span className="lpd-cur-soon">EUR &middot; USD soon</span>
         </div>
       </div>
       <div className="lpd-cur-accounts">
@@ -2090,7 +2092,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <span className="lp-trust-dot" />
           <span className="lp-trust-fact"><Icon name="income" size={16} /> AED + your home currency</span>
           <span className="lp-trust-dot" />
-          <span className="lp-trust-fact"><Icon name="sparkles" size={16} /> UAE &amp; UK banks supported</span>
+          <span className="lp-trust-fact"><Icon name="sparkles" size={16} /> UAE &amp; UK banks &middot; more currencies soon</span>
         </div>
         <p className="lp-trust-note">No bank login, ever &mdash; not here, not back home.</p>
       </div>
@@ -10542,7 +10544,7 @@ function App() {
   .lpd-goal-note { color: var(--ink-2); font-size: 12px; }
   .lpd-views-hint { color: var(--ink-3); font-size: 12px; margin-top: 16px; text-align: center; }
   .lpd-cur-num { font-size: 20px; letter-spacing: -1px; }
-  .lpd-cur-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .lpd-cur-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .lpd-cur-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
   .lpd-cur-toggle { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
   .lpd-cur-opt { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink-2); background: none; border: none; border-radius: 999px; padding: 6px 16px; cursor: pointer; transition: all .15s; }
@@ -11970,7 +11972,9 @@ function App() {
   .lp-expat-card p { color: var(--ink-2); font-size: 14px; line-height: 1.55; margin: 0; }
   @media (max-width: 900px) { .lp-expat-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) { .lp-expat-grid { grid-template-columns: 1fr; gap: 14px; } }
-  .lpd-cur-soon { font-size: 10px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.02em; margin-left: 8px; opacity: 0.75; white-space: nowrap; }
+  .lpd-cur-soon { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; letter-spacing: 0.01em; white-space: nowrap; }
+  .lpd-cur-soon-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .lpd-cur-toggle-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
   /* Long AED amounts ("AED 26,100") overflow fixed 52px heroes on narrow phones —
      scale the big persona numbers to the viewport so they fit on one line. */
   @media (max-width: 560px) {
