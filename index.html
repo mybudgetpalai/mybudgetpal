@@ -2635,6 +2635,14 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
       return;
     }
     setSubmitting(false);
+    // Re-initialise FX with the freshly-saved profile so the chosen display currency
+    // takes effect immediately — otherwise FX.home stays on the boot default (e.g. AED)
+    // and the breakdown summary + dashboard render in the wrong currency.
+    try {
+      const freshProfile = await fetchProfile(userId);
+      const freshBanks = await fetchBanks(userId);
+      await initFx(userId, freshProfile, freshBanks);
+    } catch (e) { console.error("FX init after onboarding failed (non-fatal):", e); }
     onDone({ name: name.trim(), banks, currencies: activeCurrencies });
   };
 
@@ -8095,7 +8103,10 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
     try {
       await onSaveCurrency(homeCur, bankCurs);
       pushToast("Currency settings saved", "success");
-    } catch (e) { pushToast("Couldn't save currency settings", "error"); }
+    } catch (e) {
+      console.error("Currency save failed:", e);
+      pushToast("Couldn't save currency settings: " + ((e && e.message) || "unknown error"), "error");
+    }
     setSavingCur(false);
   };
   const fxEntries = Object.keys(FX.rates).map((k) => { const parts = k.split("|"); return { key: k, month: parts[0], from: parts[1], to: parts[2], rate: FX.rates[k] }; }).sort((a, b) => b.month.localeCompare(a.month) || a.from.localeCompare(b.from));
@@ -8976,13 +8987,11 @@ function App() {
     if (!userId) return;
     const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, home_currency: homeCur });
     if (pErr) throw pErr;
-    const bankResults = await Promise.all(Object.entries(bankCurs).map(([bank, cur]) =>
-      supabaseClient.from("banks").update({ currency: cur }).eq("user_id", userId).eq("bank_name", bank)
-    ));
-    const bankErr = bankResults.find((r) => r && r.error);
-    if (bankErr) throw bankErr.error;
-    // Keep FX state in sync locally so the save reflects immediately, without letting a
-    // network hiccup on rate-fetch surface as "couldn't save" — the DB writes already succeeded.
+    for (const [bank, cur] of Object.entries(bankCurs)) {
+      const { error } = await supabaseClient.from("banks").update({ currency: cur }).eq("user_id", userId).eq("bank_name", bank);
+      if (error) throw error;
+    }
+    // DB writes have succeeded — from here nothing may report the save as failed.
     FX.home = homeCur;
     Object.entries(bankCurs).forEach(([bank, cur]) => { FX.bankCurrency[bank] = cur; });
     try { await reloadFxData(); } catch (e) { console.error("FX reload after currency save failed (non-fatal):", e); }
@@ -11577,7 +11586,9 @@ function App() {
   .v2-total b.v2-total-pos { color: var(--pos); }
   .v2-total b.v2-total-neg { color: var(--neg); }
   @media (max-width: 560px) {
-    .v2-big, .v2-ptile-big, .v2-gg-togo { font-size: 44px; }
+    .v2-big, .v2-ptile-big, .v2-gg-togo { font-size: clamp(30px, 10.5vw, 44px); }
+    .v2-big em, .v2-gg-togo em, .v2-ptile-big .v2-of { font-size: 15px; margin-left: 6px; }
+    .v2-pvk-v { font-size: clamp(24px, 8vw, 34px); }
     .v2-pv { grid-template-columns: 1fr; }
   }
   /* ===== v2 . Where it's gone (Composition card) ===== */
@@ -11585,9 +11596,9 @@ function App() {
   .v2wg-ctx { font-size:11px; color:var(--ink-3); }
   .v2wg-cap { font-size:11px; color:var(--ink-3); margin:-8px 0 12px; }
   .v2wg-donut { width:120px; height:120px; border-radius:999px; display:flex; align-items:center; justify-content:center; }
-  .v2wg-hole { width:80px; height:80px; border-radius:999px; background:var(--card); display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .v2wg-amt { font-size:19px; font-weight:700; color:var(--ink); }
-  .v2wg-lb { font-size:9px; letter-spacing:0.08em; color:var(--ink-3); }
+  .v2wg-hole { width:80px; height:80px; border-radius:999px; background:var(--card); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 4px; box-sizing:border-box; }
+  .v2wg-amt { font-size:16px; font-weight:700; color:var(--ink); line-height:1.05; text-align:center; max-width:100%; word-break:break-word; }
+  .v2wg-lb { font-size:9px; letter-spacing:0.08em; color:var(--ink-3); margin-top:2px; }
   .v2wg-leg { display:grid; grid-template-columns:1fr auto auto; gap:9px 12px; align-items:center; }
   .v2wg-leg .v2wg-nm { display:flex; align-items:center; gap:7px; font-size:13px; color:var(--ink); }
   .v2wg-leg .v2wg-v { font-size:13px; font-weight:600; text-align:right; white-space:nowrap; color:var(--ink); }
@@ -11769,7 +11780,16 @@ function App() {
   @media (max-width: 900px) { .lp-expat-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) { .lp-expat-grid { grid-template-columns: 1fr; gap: 14px; } }
   .lpd-cur-soon { font-size: 10px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.02em; margin-left: 8px; opacity: 0.75; white-space: nowrap; }
+  /* Long AED amounts ("AED 26,100") overflow fixed 52px heroes on narrow phones —
+     scale the big persona numbers to the viewport so they fit on one line. */
+  @media (max-width: 560px) {
+    .fsr-num, .bh2-num, .gg2-togo, .v2-gg-togo { font-size: clamp(30px, 10.5vw, 52px) !important; }
+    .nw2-big, .mep2-big { font-size: clamp(26px, 9vw, 40px) !important; }
+    .sr2-num { font-size: clamp(28px, 9.5vw, 44px) !important; }
+    .oh-big { font-size: clamp(20px, 6.5vw, 26px) !important; }
+  }
 </style>
+
 </body>
 </html>
 
