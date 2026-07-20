@@ -446,7 +446,9 @@ function buildProportionalPlan(txs, monthKeys, monthlySave, incomeOverride) {
   const totalAvg = TX_CATEGORIES.reduce((s, c) => s + (avg[c] || 0), 0);
   /* monthlySave may be a single number (same every month) or a per-month array that sums to the exact goal */
   const saves = Array.isArray(monthlySave) ? monthlySave : monthKeys.map(() => Math.round(monthlySave));
+  const targetTotalSave = saves.reduce((s, v) => s + Math.round(v || 0), 0);
   const out = {};
+  const actualNet = {};
   monthKeys.forEach((k, mi) => {
     const spendBudget = Math.max(0, income - Math.round(saves[mi] || 0));
     const month = {};
@@ -458,8 +460,18 @@ function buildProportionalPlan(txs, monthKeys, monthlySave, incomeOverride) {
       month[c] = v;
     });
     month["Income"] = income;
+    actualNet[k] = income - TX_CATEGORIES.reduce((s, c) => s + month[c], 0);
     out[k] = month;
   });
+  /* Force the whole plan to net exactly to the goal: if per-month clamping/rounding lost
+     a few pounds, absorb the difference into the last month's most flexible category. */
+  const gotTotal = monthKeys.reduce((s, k) => s + actualNet[k], 0);
+  const drift = targetTotalSave - gotTotal; // >0 means we under-saved; trim spend to save more
+  if (drift !== 0 && monthKeys.length) {
+    const lastK = monthKeys[monthKeys.length - 1];
+    const flex = FLEX_CATEGORIES.find((c) => (out[lastK][c] || 0) - drift >= 0) || TX_CATEGORIES[TX_CATEGORIES.length - 1];
+    out[lastK][flex] = Math.max(0, (out[lastK][flex] || 0) - drift);
+  }
   return out;
 }
 /* Suggest how to trim `perMonth` out of the flexible categories, in proportion to their current targets. */
