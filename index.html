@@ -781,6 +781,12 @@ const LIVE_COUNTRIES = [
   { key: "US",  cur: "USD", label: "United States",         flag: "\uD83C\uDDFA\uD83C\uDDF8" },
   { key: "EU",  cur: "EUR", label: "Europe",                flag: "\uD83C\uDDEA\uD83C\uDDFA" },
 ];
+// Currencies offered to non-UAE ("just want to use the app") users — single-currency mode
+const SINGLE_CURRENCIES = [
+  { key: "UK", cur: "GBP", label: "British Pound", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
+  { key: "US", cur: "USD", label: "US Dollar",     flag: "\uD83C\uDDFA\uD83C\uDDF8" },
+  { key: "EU", cur: "EUR", label: "Euro",          flag: "\uD83C\uDDEA\uD83C\uDDFA" },
+];
 const HOME_COUNTRIES = [
   { key: "UK", cur: "GBP", label: "United Kingdom", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
   { key: "US", cur: "USD", label: "United States",  flag: "\uD83C\uDDFA\uD83C\uDDF8" },
@@ -2577,17 +2583,30 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   const [otherBankName, setOtherBankName] = useState({});
   const banks = Object.keys(bankCurrency);
 
-  const toggleBankCur = (b, cur) => setBankCurrency((prev) => {
-    const next = { ...prev };
-    if (next[b] === cur) delete next[b]; else next[b] = cur;
-    return next;
-  });
+  // "Other" is tracked per-currency (independent of bankCurrency, which keys by unique bank name)
+  const [otherCur, setOtherCur] = useState({}); // { AED: true, GBP: true }
+  const toggleBankCur = (b, cur) => {
+    if (b === "Other") {
+      setOtherCur((prev) => { const next = { ...prev }; if (next[cur]) delete next[cur]; else next[cur] = true; return next; });
+      return;
+    }
+    setBankCurrency((prev) => {
+      const next = { ...prev };
+      if (next[b] === cur) delete next[b]; else next[b] = cur;
+      return next;
+    });
+  };
 
-  // drop any selected banks whose currency is no longer active
+  // drop any selected banks / Other flags whose currency is no longer active
   React.useEffect(() => {
     setBankCurrency((prev) => {
       const next = {}; let changed = false;
       Object.entries(prev).forEach(([b, c]) => { if (activeCurrencies.includes(c)) next[b] = c; else changed = true; });
+      return changed ? next : prev;
+    });
+    setOtherCur((prev) => {
+      const next = {}; let changed = false;
+      Object.entries(prev).forEach(([c, v]) => { if (activeCurrencies.includes(c)) next[c] = v; else changed = true; });
       return changed ? next : prev;
     });
   }, [baseKey, homeKey, singleCurrency]);
@@ -2595,25 +2614,25 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   // reset chosen display currency whenever the currency pair changes
   React.useEffect(() => { setDisplayCur(null); }, [baseKey, homeKey, singleCurrency]);
 
-  const otherNeedsName = banks.includes("Other") && !(otherBankName[bankCurrency["Other"]] || "").trim();
+  const activeOtherCurs = Object.keys(otherCur).filter((c) => otherCur[c] && activeCurrencies.includes(c));
+  const otherNeedsName = activeOtherCurs.some((c) => !(otherBankName[c] || "").trim());
+  const totalBankSelections = banks.length + activeOtherCurs.length;
   const canContinue = [
     name.trim().length > 0,
     !!expatChoice,
     singleCurrency || !!homeKey,
     !!effectiveDisplay,
-    banks.length > 0 && !otherNeedsName,
+    totalBankSelections > 0 && !otherNeedsName,
   ][step];
 
   const goNext = () => {
     let n = step + 1;
-    if (n === 2 && singleCurrency) n = 4; // UK-only / single-currency: skip "where's home" + dashboard-currency
-    if (n === 3 && !isDual) n = 4; // skip dashboard-currency choice when single-currency
+    if (n === 3 && !isDual) n = 4; // single-currency: skip the dashboard-currency choice
     setStep(n);
   };
   const goBack = () => {
     let n = step - 1;
     if (n === 3 && !isDual) n = 2;
-    if (n === 2 && singleCurrency) n = 1; // UK-only: step 2 was skipped, go back to step 1
     setStep(Math.max(n, 0));
   };
 
@@ -2621,14 +2640,12 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
     setSubmitting(true);
     const homeCurrencyToSave = effectiveDisplay;
     const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim(), home_currency: homeCurrencyToSave });
-    // Replace any "Other" placeholder with the custom name the user typed for that currency
-    const resolveBank = (b) => {
-      if (b !== "Other") return b;
-      const cur = bankCurrency[b];
-      const typed = (otherBankName[cur] || "").trim();
-      return typed || null;
-    };
-    const bankRows = banks.map((b) => ({ name: resolveBank(b), cur: bankCurrency[b] })).filter((r) => r.name);
+    // Named banks + one custom entry per currency where "Other" was chosen
+    const bankRows = banks.map((b) => ({ name: b, cur: bankCurrency[b] }));
+    activeOtherCurs.forEach((c) => {
+      const typed = (otherBankName[c] || "").trim();
+      if (typed) bankRows.push({ name: typed, cur: c });
+    });
     const banksResolved = bankRows.map((r) => r.name);
     const curForBank = {}; bankRows.forEach((r) => { curForBank[r.name] = r.cur; });
     const existingBanks = await fetchBanks(userId);
@@ -2704,33 +2721,34 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                 <span>{"\uD83C\uDDE6\uD83C\uDDEA"} Yes — I live in the UAE<span className="segment-sub">Track AED, plus your home currency</span></span>
                 {expatChoice === "expat" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
               </button>
-              <button className={"segment " + (expatChoice === "uk_only" ? "segment-active" : "")}
-                onClick={() => { setExpatChoice("uk_only"); setBaseKey("UK"); setSingleCurrency(true); }}>
-                <span>{"\uD83C\uDDEC\uD83C\uDDE7"} No — I'm in the UK, GBP only<span className="segment-sub">Just track my pounds</span></span>
-                {expatChoice === "uk_only" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-              </button>
-              <button className={"segment " + (expatChoice === "other" ? "segment-active" : "")}
-                onClick={() => { setExpatChoice("other"); }}>
-                <span>{"\uD83C\uDF0D"} Somewhere else<span className="segment-sub">Pick your country next</span></span>
-                {expatChoice === "other" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              <button className={"segment " + (expatChoice === "single" ? "segment-active" : "")}
+                onClick={() => { setExpatChoice("single"); setSingleCurrency(true); }}>
+                <span>No — but I want to use the app<span className="segment-sub">Track one currency of your choice</span></span>
+                {expatChoice === "single" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
               </button>
             </div>
-            {expatChoice === "other" && (
-              <div className="segmented" style={{ marginTop: 12 }}>
-                {LIVE_COUNTRIES.map((c) => (
-                  <button key={c.key} className={"segment " + (baseKey === c.key ? "segment-active" : "")}
-                    onClick={() => { setBaseKey(c.key); setSingleCurrency(false); }}>
-                    <span>{c.flag} {c.label}<span className="segment-sub">Local currency: {c.cur}</span></span>
-                    {baseKey === c.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                  </button>
-                ))}
-              </div>
-            )}
             <p className="currency-note" style={{ textAlign: "center", marginTop: 14 }}>Don't worry — you can change any of this later in Settings.</p>
           </div>
         )}
 
-        {step === 2 && (
+        {step === 2 && expatChoice === "single" && (
+          <div className="step">
+            <h1 className="title">Which currency do you want to track?</h1>
+            <p className="subtitle">Pick the currency your everyday spending is in.</p>
+            <div className="segmented">
+              {SINGLE_CURRENCIES.map((c) => (
+                <button key={c.key} className={"segment " + (baseKey === c.key ? "segment-active" : "")}
+                  onClick={() => setBaseKey(c.key)}>
+                  <span>{c.flag} {c.label}<span className="segment-sub">{c.cur}</span></span>
+                  {baseKey === c.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                </button>
+              ))}
+            </div>
+            <p className="currency-note" style={{ textAlign: "center", marginTop: 14 }}>You can change this any time in Settings.</p>
+          </div>
+        )}
+
+        {step === 2 && expatChoice !== "single" && (
           <div className="step">
             <h1 className="title">And where's home?</h1>
             <p className="subtitle">Most people here still have money in another country — a salary, savings, or family back home. We'll track both currencies for you.</p>
@@ -2779,7 +2797,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                 {isDual && <div className="currency-bank-head">{g.flag} Your {g.label}</div>}
                 <div className="bank-grid">
                   {(CURRENCY_BANKS[g.cur] || BANKS).map((b) => {
-                    const sel = bankCurrency[b] === g.cur;
+                    const sel = b === "Other" ? !!otherCur[g.cur] : bankCurrency[b] === g.cur;
                     return (
                       <button key={g.cur + b} className={"chip bank-chip " + (sel ? "chip-selected" : "")} onClick={() => toggleBankCur(b, g.cur)}>
                         <span>{b}</span>
@@ -2788,7 +2806,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                     );
                   })}
                 </div>
-                {bankCurrency["Other"] === g.cur && (
+                {otherCur[g.cur] && (
                   <input className="glass-input other-bank-input" type="text" autoFocus
                     placeholder={"Type your " + g.cur + " bank name"}
                     value={otherBankName[g.cur] || ""}
