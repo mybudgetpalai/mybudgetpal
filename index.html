@@ -5792,8 +5792,8 @@ function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, 
   React.useEffect(() => {
     if (active && slotRef.current) {
       const el = slotRef.current;
-      const t = setTimeout(() => scrollTourTargetIntoView(el), 120);
-      const t2 = setTimeout(() => scrollTourTargetIntoView(el), 420);
+      const t = setTimeout(() => scrollTourTargetIntoView(el, 96), 120);
+      const t2 = setTimeout(() => scrollTourTargetIntoView(el, 96), 420);
       return () => { clearTimeout(t); clearTimeout(t2); };
     }
   }, [active]);
@@ -5838,19 +5838,16 @@ function overviewTour({ hasTargets, monthLabel }) {
 /* The overview scrolls inside .main-content-wide on desktop, not on window, so a
    plain scrollIntoView can no-op. Find the nearest scrollable ancestor and drive it
    directly; fall back to scrollIntoView if none is found (mobile: page scrolls). */
-function scrollTourTargetIntoView(el) {
+/* Scroll the highlighted element so its TOP sits at `desiredTop` px from the top of
+   the viewport, using an instant jump (no smooth animation — smooth scrolling was the
+   source of the ~1s "lag" on mobile, and it also raced the reveal of freshly-mounted
+   widgets). Drives both window scroll (mobile: whole page scrolls) and the nearest
+   inner scroll container (desktop overview). Returns nothing; the overlay re-measures
+   after calling this. */
+function scrollTourTargetIntoView(el, desiredTop) {
   if (!el) return;
-  // Content-step card is pinned to the TOP (~340px tall incl. header). Scroll the
-  // highlighted element so its top sits just BELOW that card, fully visible.
-  const CARD_BOTTOM = Math.min(360, window.innerHeight * 0.46);
-  try {
-    const er = el.getBoundingClientRect();
-    const delta = er.top - CARD_BOTTOM;
-    window.scrollBy({ top: delta, behavior: "smooth" });
-  } catch (e) {
-    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e2) {}
-  }
-  // Fallback for any inner scroll container (desktop overview scrolls inside a div).
+  const want = typeof desiredTop === "number" ? desiredTop : 96;
+  // 1. Inner scroll container first (desktop overview can scroll inside a div).
   try {
     let node = el.parentElement;
     while (node && node !== document.body) {
@@ -5858,12 +5855,20 @@ function scrollTourTargetIntoView(el) {
       if ((st.overflowY === "auto" || st.overflowY === "scroll") && node.scrollHeight > node.clientHeight + 4) {
         const er = el.getBoundingClientRect();
         const nr = node.getBoundingClientRect();
-        node.scrollBy({ top: er.top - nr.top - 24, behavior: "smooth" });
+        node.scrollTop += (er.top - nr.top) - want;
         break;
       }
       node = node.parentElement;
     }
   } catch (e) {}
+  // 2. Window scroll (mobile + desktop where the page itself scrolls). Instant.
+  try {
+    const er = el.getBoundingClientRect();
+    const delta = er.top - want;
+    window.scrollBy({ top: delta, left: 0, behavior: "auto" });
+  } catch (e) {
+    try { el.scrollIntoView(); } catch (e2) {}
+  }
 }
 
 function TourTarget({ active, className, children }) {
@@ -5876,46 +5881,61 @@ function TourTarget({ active, className, children }) {
 function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   const [rect, setRect] = useState(null);
   const cardRef = React.useRef(null);
-  const [cardPos, setCardPos] = useState({ top: null, bottom: 20 });
-  const PAD = 8, GAP = 14, HEADER = 72;
-  // Spot steps (top bar + menu) live at the top → card goes BOTTOM.
-  // Content steps → card goes TOP, and we scroll the target into the lower zone.
-  const cardAtBottom = true;
+  // cardPlace: "bottom" (default) or "top". Content steps flip it based on where the
+  // target sits; chrome steps (upload/inbox/menu) always stay at the bottom.
+  const [cardPlace, setCardPlace] = useState("bottom");
+  const PAD = 8;
+  const HEADER = 64;      // sticky top bar height to stay clear of
+  const MARGIN = 16;      // gap between card and the highlighted element
+  const isChromeStep = !!spot; // upload / inbox / menu — target is in the fixed chrome
 
-  const measure = React.useCallback(() => {
+  // Position the card and the spotlight so they never overlap. For content steps we
+  // decide, from the card's measured height, whether the target fits ABOVE the card
+  // (card stays bottom) or needs the card at the TOP (target sits below it). Then we
+  // scroll the target into the free zone and read back its final rect — one instant
+  // pass, no smooth-scroll lag.
+  const place = React.useCallback(() => {
     const el = document.querySelector('[data-tour-active="1"]');
     if (!el) { setRect(null); return; }
-    const r = el.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
+    const cardH = cardRef.current ? cardRef.current.offsetHeight : 240;
+
+    if (isChromeStep) {
+      // Chrome target is fixed near the top; card stays at the bottom. No page scroll.
+      setCardPlace("bottom");
+    } else {
+      // Free vertical space above a bottom-pinned card vs below a top-pinned card.
+      const spaceIfCardBottom = vh - (cardH + 20) - HEADER - MARGIN;
+      const targetH = el.getBoundingClientRect().height;
+      if (targetH <= spaceIfCardBottom) {
+        // Fits above the bottom card — keep card at bottom, scroll target just under header.
+        setCardPlace("bottom");
+        scrollTourTargetIntoView(el, HEADER + MARGIN);
+      } else {
+        // Too tall for the top gap — put the card at the TOP, target below it.
+        setCardPlace("top");
+        scrollTourTargetIntoView(el, cardH + 20 + MARGIN);
+      }
+    }
+
+    // Read back the final position for the ring + dim panels.
+    const r = el.getBoundingClientRect();
     const x = Math.max(0, r.left - PAD), y = Math.max(0, r.top - PAD);
     const w = Math.min(vw - x, r.width + PAD * 2), h = r.height + PAD * 2;
     setRect({ x, y, w, h, vw, vh });
-    const ch = cardRef.current ? cardRef.current.offsetHeight : 260;
-    setCardPos({ top: null, bottom: 20, side: null });
-  }, [cardAtBottom]);
+  }, [isChromeStep, spot]);
 
-  // Scroll the target into view using the element's own scrollIntoView — this works on
-  // iOS regardless of which element actually scrolls. scroll-margin (set in CSS) keeps it
-  // clear of the header and the tour card.
   React.useEffect(() => {
-    const doScroll = (smooth) => {
-      const el = document.querySelector('[data-tour-active="1"]');
-      if (!el) return;
-      el.style.scrollMarginTop = "80px";
-      el.style.scrollMarginBottom = "20px";
-      try { el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start", inline: "nearest" }); }
-      catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
-    };
-    doScroll(true);
-    const t0 = setTimeout(() => doScroll(false), 160);
-    const t1 = setTimeout(() => { doScroll(false); measure(); }, 380);
-    const t2 = setTimeout(() => { doScroll(false); measure(); }, 660);
-    const t3 = setTimeout(() => { doScroll(false); measure(); }, 1000);
-    const onWin = () => measure();
+    // Two instant passes: one after the step's widgets mount, one after layout settles.
+    // No smooth scrolling anywhere — that was the mobile "lag".
+    const t0 = setTimeout(place, 60);
+    const t1 = setTimeout(place, 240);
+    const t2 = setTimeout(place, 520);
+    const onWin = () => place();
     window.addEventListener("resize", onWin);
     window.addEventListener("scroll", onWin, true);
-    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
-  }, [stepIndex, measure, cardAtBottom]);
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
+  }, [stepIndex, place]);
 
   const dim = "rgba(16,24,40,0.60)";
   const panels = rect ? [
@@ -5924,6 +5944,8 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     { left: 0, top: rect.y, width: rect.x, height: rect.h },
     { left: rect.x + rect.w, top: rect.y, width: Math.max(0, rect.vw - (rect.x + rect.w)), height: rect.h },
   ] : [{ left: 0, top: 0, width: "100%", height: "100%" }];
+
+  const cardStyleTop = cardPlace === "top";
 
   return (
     <div className="tour-root">
@@ -5935,8 +5957,8 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
       )}
       <div ref={cardRef} className="tour-card-v2" style={{ position: "fixed", zIndex: 2147483002,
         left: 14, right: 14,
-        top: cardPos.top != null ? cardPos.top : "auto",
-        bottom: cardPos.bottom != null ? cardPos.bottom : "auto" }}>
+        top: cardStyleTop ? (HEADER + 12) : "auto",
+        bottom: cardStyleTop ? "auto" : 20 }}>
         <button className="tour-skip-x" onClick={onSkip} aria-label="Skip tour"
           style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "var(--ink-3)", fontSize: 16, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
         <div className="tour-step-count">Step {stepIndex + 1} of {total}</div>
@@ -7589,7 +7611,9 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
       </TourTarget>
 
       {(!runTour || tourStep >= 1) && (
-        <ThisMonthV2 persona={persona} transactions={transactions} targets={targets} billExcludes={billExcludes} onResumeSetup={onResumeSetup} />
+        <TourTarget active={runTour && tourStep === 1}>
+          <ThisMonthV2 persona={persona} transactions={transactions} targets={targets} billExcludes={billExcludes} onResumeSetup={onResumeSetup} />
+        </TourTarget>
       )}
 
       {(!runTour || tourStep >= 2) && (
