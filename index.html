@@ -5847,27 +5847,44 @@ function overviewTour({ hasTargets, monthLabel }) {
 function scrollTourTargetIntoView(el, desiredTop) {
   if (!el) return;
   const want = typeof desiredTop === "number" ? desiredTop : 96;
-  // 1. Inner scroll container first (desktop overview can scroll inside a div).
+  // The whole app has `scroll-behavior: smooth` set globally on html/body, which
+  // OVERRIDES a JS `behavior:"auto"` and makes every programmatic scroll animate
+  // slowly (this was the 4–5s crawl between tour steps). Force instant scrolling by
+  // flipping scroll-behavior to auto on the scrolling roots for the duration of the
+  // jump, then restore whatever was there.
+  const roots = [document.documentElement, document.body];
+  const prev = roots.map((r) => (r && r.style ? r.style.scrollBehavior : ""));
+  roots.forEach((r) => { if (r && r.style) r.style.scrollBehavior = "auto"; });
   try {
-    let node = el.parentElement;
-    while (node && node !== document.body) {
-      const st = window.getComputedStyle(node);
-      if ((st.overflowY === "auto" || st.overflowY === "scroll") && node.scrollHeight > node.clientHeight + 4) {
-        const er = el.getBoundingClientRect();
-        const nr = node.getBoundingClientRect();
-        node.scrollTop += (er.top - nr.top) - want;
-        break;
+    // 1. Inner scroll container first (desktop overview can scroll inside a div).
+    try {
+      let node = el.parentElement;
+      while (node && node !== document.body) {
+        const st = window.getComputedStyle(node);
+        if ((st.overflowY === "auto" || st.overflowY === "scroll") && node.scrollHeight > node.clientHeight + 4) {
+          const prevNb = node.style.scrollBehavior;
+          node.style.scrollBehavior = "auto";
+          const er = el.getBoundingClientRect();
+          const nr = node.getBoundingClientRect();
+          node.scrollTop += (er.top - nr.top) - want;
+          node.style.scrollBehavior = prevNb;
+          break;
+        }
+        node = node.parentElement;
       }
-      node = node.parentElement;
+    } catch (e) {}
+    // 2. Window scroll (mobile + desktop where the page itself scrolls). Set the exact
+    // target scrollTop instead of scrollBy — instant, no interpolation.
+    try {
+      const er = el.getBoundingClientRect();
+      const cur = window.pageYOffset || document.documentElement.scrollTop || 0;
+      const target = cur + (er.top - want);
+      window.scrollTo(0, target);
+    } catch (e) {
+      try { el.scrollIntoView(); } catch (e2) {}
     }
-  } catch (e) {}
-  // 2. Window scroll (mobile + desktop where the page itself scrolls). Instant.
-  try {
-    const er = el.getBoundingClientRect();
-    const delta = er.top - want;
-    window.scrollBy({ top: delta, left: 0, behavior: "auto" });
-  } catch (e) {
-    try { el.scrollIntoView(); } catch (e2) {}
+  } finally {
+    roots.forEach((r, i) => { if (r && r.style) r.style.scrollBehavior = prev[i]; });
   }
 }
 
