@@ -1989,14 +1989,12 @@ function LpCurrencyDemo() {
     <div className="lp-demo-card lpd-cur">
       <div className="lpd-cur-head">
         <span className="lpd-cur-label">Home currency</span>
-        <span className="lpd-cur-soon"><span className="lpd-cur-soon-dot" />EUR &amp; USD coming soon</span>
-      </div>
-      <div className="lpd-cur-toggle-row">
         <div className="lpd-cur-toggle">
           {["GBP", "AED"].map((c) => (
             <button key={c} className={"lpd-cur-opt" + (home === c ? " lpd-cur-opt-on" : "")} onClick={() => setHome(c)}>{c}</button>
           ))}
         </div>
+        <span className="lpd-cur-soon"><span className="lpd-cur-soon-dot" />EUR &amp; USD coming soon</span>
       </div>
       <div className="lpd-cur-accounts">
         <span className="lpd-cur-acc">🇬🇧 HSBC · GBP</span>
@@ -2083,6 +2081,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
           </div>
+          <p className="hero-try-note"><Icon name="sparkles" size={14} /> Want a look first? Try it with sample data &mdash; no statements needed.</p>
         </div>
       </div>
 
@@ -2171,7 +2170,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <p>Ask a plain-English question and get an answer from your own transactions.</p>
             <div className="fc-viz fc-viz-ask">
               <span className="fc-q">How much on coffee?</span>
-              <span className="fc-a">&pound;68 &middot; 19 visits</span>
+              <span className="fc-a">AED 318 &middot; 19 visits</span>
             </div>
           </div>
           <div className="feature-card reveal">
@@ -2189,9 +2188,9 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <h4>Long-term plan</h4>
             <p>Plan months ahead and reconcile your actual spending against the plan.</p>
             <div className="fc-viz fc-viz-roll">
-              <span className="fc-roll-from">Today &middot; &pound;1,800</span>
+              <span className="fc-roll-from">Today &middot; AED 8,400</span>
               <span className="fc-roll-arrow">&rarr;</span>
-              <span className="fc-roll-to">Dec &middot; &pound;4,200</span>
+              <span className="fc-roll-to">Dec &middot; AED 19,600</span>
             </div>
           </div>
           <div className="feature-card reveal">
@@ -10463,6 +10462,8 @@ function App() {
   .lp-hero h1 { font-size: 56px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; line-height: 1.15; color: var(--ink); }
   .lp-hero p { font-size: 18px; color: var(--ink-2); max-width: 520px; margin: 0 auto 32px; line-height: 1.5; }
   .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .hero-try-note { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-3); margin: 16px auto 0; font-weight: 500; }
+  .hero-try-note .ic { color: var(--accent); }
 
   .lp-section { padding: 60px 24px; position: relative; z-index: 1; }
   .section-head { text-align: center; max-width: 560px; margin: 0 auto 36px; }
@@ -10543,8 +10544,9 @@ function App() {
   .lpd-goal-top { display: flex; justify-content: space-between; color: var(--ink); font-size: 13px; font-weight: 600; }
   .lpd-goal-note { color: var(--ink-2); font-size: 12px; }
   .lpd-views-hint { color: var(--ink-3); font-size: 12px; margin-top: 16px; text-align: center; }
-  .lpd-cur-num { font-size: 20px; letter-spacing: -1px; }
-  .lpd-cur-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .lpd-cur-num { font-size: 18px; letter-spacing: 0; line-height: 1; text-indent: -1px; }
+  .lpd-cur-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .lpd-cur-head .lpd-cur-soon { margin-left: auto; }
   .lpd-cur-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
   .lpd-cur-toggle { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
   .lpd-cur-opt { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink-2); background: none; border: none; border-radius: 999px; padding: 6px 16px; cursor: pointer; transition: all .15s; }
@@ -11974,7 +11976,7 @@ function App() {
   @media (max-width: 560px) { .lp-expat-grid { grid-template-columns: 1fr; gap: 14px; } }
   .lpd-cur-soon { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; letter-spacing: 0.01em; white-space: nowrap; }
   .lpd-cur-soon-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-  .lpd-cur-toggle-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
   /* Long AED amounts ("AED 26,100") overflow fixed 52px heroes on narrow phones —
      scale the big persona numbers to the viewport so they fit on one line. */
   @media (max-width: 560px) {
