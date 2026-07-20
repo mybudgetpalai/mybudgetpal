@@ -5880,7 +5880,7 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   const PAD = 8, GAP = 14, HEADER = 72;
   // Spot steps (top bar + menu) live at the top → card goes BOTTOM.
   // Content steps → card goes TOP, and we scroll the target into the lower zone.
-  const cardAtBottom = spot !== "menu";
+  const cardAtBottom = true;
 
   const measure = React.useCallback(() => {
     const el = document.querySelector('[data-tour-active="1"]');
@@ -5891,33 +5891,26 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const w = Math.min(vw - x, r.width + PAD * 2), h = r.height + PAD * 2;
     setRect({ x, y, w, h, vw, vh });
     const ch = cardRef.current ? cardRef.current.offsetHeight : 260;
-    if (spot === "menu") {
-      // Menu panel fills the left; float the card on the right, vertically centered-ish.
-      setCardPos({ top: Math.max(HEADER, (vh - ch) / 2), bottom: null, side: "right" });
-    } else if (cardAtBottom) setCardPos({ top: null, bottom: 20, side: null });
-    else setCardPos({ top: HEADER, bottom: null, side: null, _ch: ch });
+    setCardPos({ top: null, bottom: 20, side: null });
   }, [cardAtBottom]);
 
   // Scroll the target into view using the element's own scrollIntoView — this works on
   // iOS regardless of which element actually scrolls. scroll-margin (set in CSS) keeps it
   // clear of the header and the tour card.
   React.useEffect(() => {
-    const doScroll = () => {
+    const doScroll = (smooth) => {
       const el = document.querySelector('[data-tour-active="1"]');
       if (!el) return;
-      // Card is at the bottom (or right for menu). Pull the highlighted element up near
-      // the top of the screen so it sits ABOVE the card, fully visible.
-      el.style.scrollMarginTop = "84px";
-      el.style.scrollMarginBottom = "300px";
-      const block = "start";
-      try { el.scrollIntoView({ behavior: "smooth", block, inline: "nearest" }); }
+      el.style.scrollMarginTop = "80px";
+      el.style.scrollMarginBottom = "20px";
+      try { el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start", inline: "nearest" }); }
       catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
     };
-    doScroll();
-    const t0 = setTimeout(doScroll, 140);
-    const t1 = setTimeout(measure, 380);
-    const t2 = setTimeout(measure, 640);
-    const t3 = setTimeout(measure, 1000);
+    doScroll(true);
+    const t0 = setTimeout(() => doScroll(false), 160);
+    const t1 = setTimeout(() => { doScroll(false); measure(); }, 380);
+    const t2 = setTimeout(() => { doScroll(false); measure(); }, 660);
+    const t3 = setTimeout(() => { doScroll(false); measure(); }, 1000);
     const onWin = () => measure();
     window.addEventListener("resize", onWin);
     window.addEventListener("scroll", onWin, true);
@@ -5941,9 +5934,7 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
         <div className="tour-ring" style={{ position: "fixed", zIndex: 2147483001, left: rect.x, top: rect.y, width: rect.w, height: rect.h, border: "2px solid rgba(46,91,255,0.55)", borderRadius: 16, boxShadow: "0 0 0 3px rgba(46,91,255,0.10)", pointerEvents: "none" }} />
       )}
       <div ref={cardRef} className="tour-card-v2" style={{ position: "fixed", zIndex: 2147483002,
-        left: cardPos.side === "right" ? "auto" : 14,
-        right: 14,
-        width: cardPos.side === "right" ? "min(300px, calc(100% - 250px))" : "auto",
+        left: 14, right: 14,
         top: cardPos.top != null ? cardPos.top : "auto",
         bottom: cardPos.bottom != null ? cardPos.bottom : "auto" }}>
         <button className="tour-skip-x" onClick={onSkip} aria-label="Skip tour"
