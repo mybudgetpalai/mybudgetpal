@@ -774,7 +774,7 @@ const HOME_COUNTRIES = [
   { key: "EU", cur: "EUR", label: "Europe",         flag: "\uD83C\uDDEA\uD83C\uDDFA" },
 ];
 const countryByKey = (list, k) => list.find((c) => c.key === k) || null;
-const FX_FALLBACK = { "GBP>AED": 4.65, "AED>GBP": 0.215, "GBP>USD": 1.27, "USD>GBP": 0.787, "GBP>EUR": 1.17, "EUR>GBP": 0.855, "USD>AED": 3.6725, "AED>USD": 0.2723, "EUR>AED": 3.97, "AED>EUR": 0.252, "USD>EUR": 0.92, "EUR>USD": 1.09 };
+const FX_FALLBACK = { "GBP>AED": 4.9372, "AED>GBP": 0.202542, "GBP>USD": 1.35, "USD>GBP": 0.7407, "GBP>EUR": 1.17, "EUR>GBP": 0.8547, "USD>AED": 3.6725, "AED>USD": 0.2723, "EUR>AED": 4.22, "AED>EUR": 0.2370, "USD>EUR": 0.8667, "EUR>USD": 1.1538 };
 /* Module-level FX state: home currency, per-bank currency, locked monthly rates */
 const FX = { ready: false, userId: null, home: "GBP", bankCurrency: {}, rates: {} };
 function fxKey(m, f, t) { return m + "|" + f + "|" + t; }
@@ -3793,7 +3793,6 @@ function SetupQuestionsScreen({ userId, pushToast, onDone, onBack }) {
               {GOALS.map((g) => (
                 <button key={g} className={"chip goal-chip " + (goals.includes(g) ? "chip-selected" : "")} onClick={() => toggleGoal(g)}>
                   <span>{g}</span>
-                  {goals.includes(g) && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
                 </button>
               ))}
             </div>
@@ -5770,8 +5769,9 @@ function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, 
   React.useEffect(() => {
     if (active && slotRef.current) {
       const el = slotRef.current;
-      const t = setTimeout(() => { try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 120);
-      return () => clearTimeout(t);
+      const t = setTimeout(() => scrollTourTargetIntoView(el), 120);
+      const t2 = setTimeout(() => scrollTourTargetIntoView(el), 420);
+      return () => { clearTimeout(t); clearTimeout(t2); };
     }
   }, [active]);
   if (runTour && !revealed) {
@@ -5825,10 +5825,11 @@ function scrollTourTargetIntoView(el) {
     sc = sc.parentElement;
   }
   if (!sc || sc === document.body) {
-    /* Mobile / window scroll: the tour card sits at the bottom ~half the screen, so
-       centring hides the target behind it. Aim the section into the upper third. */
+    /* Mobile / window scroll: the tour card sits at the bottom ~55% of the screen, so
+       the highlighted section must sit in the top ~40% to stay visible. Pin it near
+       the top, just below the header. */
     const er = el.getBoundingClientRect();
-    const targetTop = window.scrollY + er.top - Math.max(90, window.innerHeight * 0.16);
+    const targetTop = window.scrollY + er.top - Math.max(96, window.innerHeight * 0.12);
     try { window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" }); }
     catch (e) { try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e2) {} }
     return;
@@ -10813,13 +10814,12 @@ function App() {
   .tour-card-spot-menu { bottom: auto; top: 120px; left: auto; right: 24px; transform: none; animation: tourCardInPlain 0.3s ease; }
   @keyframes tourCardInPlain { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @media (max-width: 560px) {
-    /* Keep the card near the top-right icons it's pointing at (not at the bottom of
-       the screen, where the connection to the highlighted icon is easy to miss). */
+    /* Sit the card BELOW the top bar so the highlighted icon stays visible above it,
+       with the arrow bridging the gap up to the icon. */
     .tour-card-spot-upload, .tour-card-spot-inbox, .tour-card-spot-menu {
-      top: 74px; bottom: auto; left: 16px; right: 16px; width: auto; max-width: none;
+      top: 118px; bottom: auto; left: 16px; right: 16px; width: auto; max-width: none;
       transform: none; animation: tourCardInPlain 0.3s ease;
     }
-    /* Little arrow on the card pointing up at the highlighted top-bar icon. */
     .tour-card-spot-upload::before, .tour-card-spot-inbox::before, .tour-card-spot-menu::before {
       content: ""; position: absolute; top: -9px; width: 18px; height: 18px;
       background: var(--card); border-left: 1px solid var(--line); border-top: 1px solid var(--line);
@@ -10827,7 +10827,12 @@ function App() {
     }
     .tour-card-spot-upload::before { right: 76px; }
     .tour-card-spot-inbox::before { right: 132px; }
-    .tour-card-spot-menu::before { left: 22px; }
+    /* Menu (step 7): the side panel fills the left half, so drop the card to the
+       bottom-right and point the arrow at the top-left hamburger instead. */
+    .tour-card-spot-menu {
+      top: auto; bottom: 24px; left: auto; right: 12px; width: auto; max-width: 300px;
+    }
+    .tour-card-spot-menu::before { display: none; }
   }
 
   /* ---- budget ring (monthly summary) ---- */
