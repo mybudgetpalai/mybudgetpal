@@ -5898,33 +5898,26 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     else setCardPos({ top: HEADER, bottom: null, side: null, _ch: ch });
   }, [cardAtBottom]);
 
-  // Scroll the target into the zone the card ISN'T occupying, then measure.
+  // Scroll the target into view using the element's own scrollIntoView — this works on
+  // iOS regardless of which element actually scrolls. scroll-margin (set in CSS) keeps it
+  // clear of the header and the tour card.
   React.useEffect(() => {
     const doScroll = () => {
       const el = document.querySelector('[data-tour-active="1"]');
       if (!el) return;
-      const vh = window.innerHeight;
-      const ch = cardRef.current ? cardRef.current.offsetHeight : 300;
-      const r = el.getBoundingClientRect();
-      let desiredTop;
-      if (cardAtBottom) {
-        // card at bottom (~ch+40 tall) → put target near the top, under the header
-        desiredTop = HEADER + 12;
-      } else {
-        // card at top (HEADER + ch) → put target just below the card
-        desiredTop = HEADER + ch + GAP + 8;
-        // if target is taller than the remaining space, just top-align it there
-      }
-      const delta = r.top - desiredTop;
-      try { window.scrollBy({ top: delta, behavior: "smooth" }); } catch (e) {
-        try { el.scrollIntoView(); } catch (e2) {}
-      }
+      // Reserve space for the card: content steps have the card at the top (~360px),
+      // spot steps have it at the bottom (just clear the header).
+      el.style.scrollMarginTop = (cardAtBottom ? 90 : 360) + "px";
+      el.style.scrollMarginBottom = (cardAtBottom ? 260 : 40) + "px";
+      const block = "start";
+      try { el.scrollIntoView({ behavior: "smooth", block, inline: "nearest" }); }
+      catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
     };
     doScroll();
-    const t0 = setTimeout(doScroll, 120);
-    const t1 = setTimeout(measure, 320);
-    const t2 = setTimeout(measure, 560);
-    const t3 = setTimeout(measure, 900);
+    const t0 = setTimeout(doScroll, 140);
+    const t1 = setTimeout(measure, 380);
+    const t2 = setTimeout(measure, 640);
+    const t3 = setTimeout(measure, 1000);
     const onWin = () => measure();
     window.addEventListener("resize", onWin);
     window.addEventListener("scroll", onWin, true);
@@ -11312,7 +11305,8 @@ function App() {
   .oh-track { height: 9px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin-top: 12px; }
   .oh-track-fill { height: 100%; background: var(--accent); border-radius: 999px; }
   .oh-track-cap { font-size: 12px; color: var(--ink-3); margin-top: 7px; }
-  .oh-tour-active { position: relative; z-index: 2; box-shadow: 0 0 0 3px var(--accent-shadow); border-radius: 16px; transition: box-shadow 0.2s; scroll-margin-top: 120px; scroll-margin-bottom: 220px; }
+  .oh-tour-active { position: relative; z-index: 2; box-shadow: none; border-radius: 16px; scroll-margin-top: 96px; scroll-margin-bottom: 360px; }
+  [data-tour-active="1"] { scroll-margin-top: 96px; scroll-margin-bottom: 360px; }
   @media (max-width: 640px) { .oh-grid { grid-template-columns: 1fr; } }
   .oh-sec-ctx { text-transform: uppercase; letter-spacing: .06em; }
   .mb2 { display: flex; align-items: center; gap: 22px; margin-top: 12px; }
