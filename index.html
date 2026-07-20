@@ -5825,7 +5825,12 @@ function scrollTourTargetIntoView(el) {
     sc = sc.parentElement;
   }
   if (!sc || sc === document.body) {
-    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+    /* Mobile / window scroll: the tour card sits at the bottom ~half the screen, so
+       centring hides the target behind it. Aim the section into the upper third. */
+    const er = el.getBoundingClientRect();
+    const targetTop = window.scrollY + er.top - Math.max(90, window.innerHeight * 0.16);
+    try { window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" }); }
+    catch (e) { try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e2) {} }
     return;
   }
   const er = el.getBoundingClientRect();
@@ -10808,10 +10813,21 @@ function App() {
   .tour-card-spot-menu { bottom: auto; top: 120px; left: auto; right: 24px; transform: none; animation: tourCardInPlain 0.3s ease; }
   @keyframes tourCardInPlain { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @media (max-width: 560px) {
+    /* Keep the card near the top-right icons it's pointing at (not at the bottom of
+       the screen, where the connection to the highlighted icon is easy to miss). */
     .tour-card-spot-upload, .tour-card-spot-inbox, .tour-card-spot-menu {
-      top: auto; bottom: 24px; left: 50%; right: auto; transform: translateX(-50%);
-      animation: tourCardIn 0.3s ease;
+      top: 74px; bottom: auto; left: 16px; right: 16px; width: auto; max-width: none;
+      transform: none; animation: tourCardInPlain 0.3s ease;
     }
+    /* Little arrow on the card pointing up at the highlighted top-bar icon. */
+    .tour-card-spot-upload::before, .tour-card-spot-inbox::before, .tour-card-spot-menu::before {
+      content: ""; position: absolute; top: -9px; width: 18px; height: 18px;
+      background: var(--card); border-left: 1px solid var(--line); border-top: 1px solid var(--line);
+      transform: rotate(45deg); border-radius: 3px 0 0 0;
+    }
+    .tour-card-spot-upload::before { right: 76px; }
+    .tour-card-spot-inbox::before { right: 132px; }
+    .tour-card-spot-menu::before { left: 22px; }
   }
 
   /* ---- budget ring (monthly summary) ---- */
