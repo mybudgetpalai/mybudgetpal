@@ -8159,7 +8159,9 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
           <div className="field-group">
             <label className="field-label">View everything in</label>
             <div className="cur-toggle">
-              {Array.from(new Set([homeCur, ...Object.values(bankCurs || {})].filter(Boolean))).map((c) => {
+              {Array.from(new Set([...Object.values(bankCurs || {}), homeCur].filter(Boolean)))
+                .sort((a, b) => CURRENCIES.indexOf(a) - CURRENCIES.indexOf(b))
+                .map((c) => {
                 const sym = (CURRENCY_SYMBOLS[c] || "").trim();
                 return (
                   <button key={c} className={"cur-seg" + (homeCur === c ? " cur-seg-active" : "")} onClick={() => setHomeCur(c)}>{c}{sym && sym !== c ? " " + sym : ""}</button>
@@ -8972,11 +8974,18 @@ function App() {
   };
   const handleSaveCurrency = async (homeCur, bankCurs) => {
     if (!userId) return;
-    await supabaseClient.from("profiles").upsert({ id: userId, home_currency: homeCur });
-    await Promise.all(Object.entries(bankCurs).map(([bank, cur]) =>
+    const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, home_currency: homeCur });
+    if (pErr) throw pErr;
+    const bankResults = await Promise.all(Object.entries(bankCurs).map(([bank, cur]) =>
       supabaseClient.from("banks").update({ currency: cur }).eq("user_id", userId).eq("bank_name", bank)
     ));
-    await reloadFxData();
+    const bankErr = bankResults.find((r) => r && r.error);
+    if (bankErr) throw bankErr.error;
+    // Keep FX state in sync locally so the save reflects immediately, without letting a
+    // network hiccup on rate-fetch surface as "couldn't save" — the DB writes already succeeded.
+    FX.home = homeCur;
+    Object.entries(bankCurs).forEach(([bank, cur]) => { FX.bankCurrency[bank] = cur; });
+    try { await reloadFxData(); } catch (e) { console.error("FX reload after currency save failed (non-fatal):", e); }
   };
   const handleSaveFxRate = async (month, from, to, rate) => {
     if (!userId) return;
