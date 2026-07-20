@@ -5027,14 +5027,17 @@ function BankAccountsCard({ banks, transactions, accountData }) {
               </div>
               {bankStmts.length > 0 && (
                 <div className="stmt-list">
-                  {bankStmts.map((s) => (
+                  {bankStmts.map((s) => {
+                    const stmtTxDates = txs.filter((t) => t.bank === b && t.date && (!s.periodStart || t.date >= s.periodStart) && (!s.periodEnd || t.date <= s.periodEnd)).map((t) => t.date).sort();
+                    const endShown = stmtTxDates.length ? stmtTxDates[stmtTxDates.length - 1] : s.periodEnd;
+                    return (
                     <div className="stmt-row" key={s.id}>
-                      <span className="stmt-period">{s.periodStart && s.periodEnd ? isoToShortDate(s.periodStart) + " → " + isoToShortDate(s.periodEnd) : (s.fileName || "Statement")}</span>
+                      <span className="stmt-period">{s.periodStart && endShown ? isoToShortDate(s.periodStart) + " → " + isoToShortDate(endShown) : (s.fileName || "Statement")}</span>
                       {s.status === "reconciled" && <span className="stmt-badge stmt-ok">✓ Balances</span>}
                       {s.status === "mismatch" && <span className="stmt-badge stmt-bad"><Icon name="alert" size={10} /> Off by {formatMoneyNative(Math.abs(s.difference), FX.bankCurrency[b] || "GBP")}</span>}
                       {s.status === "unverified" && <span className="stmt-badge stmt-na">○ Unchecked</span>}
                     </div>
-                  ))}
+                  ); })}
                 </div>
               )}
               {bankIssues.map((iss, i) => (
