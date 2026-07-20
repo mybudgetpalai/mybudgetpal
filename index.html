@@ -9214,6 +9214,7 @@ function App() {
   };
   const handleSaveCurrency = async (homeCur, bankCurs) => {
     if (!userId) return;
+    const prevHome = FX.home;
     const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, home_currency: homeCur });
     if (pErr) throw pErr;
     for (const [bank, cur] of Object.entries(bankCurs)) {
@@ -9221,6 +9222,28 @@ function App() {
       if (error) throw error;
     }
     // DB writes have succeeded — from here nothing may report the save as failed.
+    // Targets are stored as bare numbers in the home currency. When home changes,
+    // convert every stored target by the locked rate so they stay meaningful.
+    if (prevHome && prevHome !== homeCur) {
+      try {
+        const cvRate = fxRate(nowMonth(), prevHome, homeCur);
+        if (cvRate && cvRate !== 1) {
+          const { data: tRows } = await supabaseClient.from("targets").select("*").eq("user_id", userId);
+          const updated = (tRows || []).map((r) => ({ ...r, monthly_target: Math.round((Number(r.monthly_target) || 0) * cvRate) }));
+          if (updated.length) {
+            await supabaseClient.from("targets").upsert(updated);
+            setAllTargets((prev) => {
+              const next = {};
+              Object.entries(prev || {}).forEach(([mk, cats]) => {
+                next[mk] = Object.fromEntries(Object.entries(cats || {}).map(([c, v]) => [c, Math.round((Number(v) || 0) * cvRate)]));
+              });
+              return next;
+            });
+            setTargets((prev) => Object.fromEntries(Object.entries(prev || {}).map(([c, v]) => [c, Math.round((Number(v) || 0) * cvRate)])));
+          }
+        }
+      } catch (e) { console.error("Target currency conversion after home switch failed (non-fatal):", e); }
+    }
     FX.home = homeCur;
     Object.entries(bankCurs).forEach(([bank, cur]) => { FX.bankCurrency[bank] = cur; });
     try { await reloadFxData(); } catch (e) { console.error("FX reload after currency save failed (non-fatal):", e); }
