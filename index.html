@@ -5834,12 +5834,17 @@ function overviewTour({ hasTargets, monthLabel }) {
    directly; fall back to scrollIntoView if none is found (mobile: page scrolls). */
 function scrollTourTargetIntoView(el) {
   if (!el) return;
-  // Reliable across mobile/desktop: scroll-margin-top (set in CSS on .oh-tour-active)
-  // reserves header space, and block:'start' pins the target near the top — clear of
-  // the bottom tour card. Also nudge any inner scroll container as a fallback.
-  try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {
-    try { el.scrollIntoView(); } catch (e2) {}
+  // Content-step card is pinned to the TOP (~340px tall incl. header). Scroll the
+  // highlighted element so its top sits just BELOW that card, fully visible.
+  const CARD_BOTTOM = Math.min(360, window.innerHeight * 0.46);
+  try {
+    const er = el.getBoundingClientRect();
+    const delta = er.top - CARD_BOTTOM;
+    window.scrollBy({ top: delta, behavior: "smooth" });
+  } catch (e) {
+    try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e2) {}
   }
+  // Fallback for any inner scroll container (desktop overview scrolls inside a div).
   try {
     let node = el.parentElement;
     while (node && node !== document.body) {
@@ -5847,7 +5852,7 @@ function scrollTourTargetIntoView(el) {
       if ((st.overflowY === "auto" || st.overflowY === "scroll") && node.scrollHeight > node.clientHeight + 4) {
         const er = el.getBoundingClientRect();
         const nr = node.getBoundingClientRect();
-        node.scrollTo({ top: Math.max(0, node.scrollTop + (er.top - nr.top) - 80), behavior: "smooth" });
+        node.scrollBy({ top: er.top - nr.top - 24, behavior: "smooth" });
         break;
       }
       node = node.parentElement;
@@ -8025,7 +8030,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} bankRows={bankRows} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
       {runTour && (
-        <div className={"tour-card" + (tourSpot ? " tour-card-spot tour-card-spot-" + tourSpot : "")}>
+        <div className={"tour-card" + (tourSpot ? " tour-card-spot tour-card-spot-" + tourSpot : " tour-card-content")}>
           <button className="tour-skip-x" onClick={onFinishTour} aria-label="Skip tour" title="Skip tour"
             style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: "var(--muted)", fontSize: 15, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
           <div className="tour-step-count">Step {tourStep + 1} of {tourCopy.length}</div>
@@ -10837,27 +10842,19 @@ function App() {
   .tour-card-spot-menu { bottom: auto; top: 120px; left: auto; right: 24px; transform: none; animation: tourCardInPlain 0.3s ease; }
   @keyframes tourCardInPlain { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @media (max-width: 560px) {
-    /* Upload (+) and inbox (bell) live top-right. Sit the card just below the bar,
-       full width, with an arrow near the right edge pointing up toward those icons. */
-    .tour-card-spot-upload, .tour-card-spot-inbox {
-      top: 112px; bottom: auto; left: 14px; right: 14px; width: auto; max-width: none;
+    /* Content steps (safe-to-spend, breakdown, big picture, needs): pin the card to the
+       TOP under the header. The highlighted card scrolls into the space below it. */
+    .tour-card-content {
+      top: 82px; bottom: auto; left: 14px; right: 14px; width: auto; max-width: none;
       transform: none; animation: tourCardInPlain 0.3s ease;
     }
-    .tour-card-spot-upload::before, .tour-card-spot-inbox::before {
-      content: ""; position: absolute; top: -10px; width: 20px; height: 20px;
-      background: #F4F7FF; border-left: 1.5px solid var(--accent); border-top: 1.5px solid var(--accent);
-      transform: rotate(45deg); border-radius: 4px 0 0 0;
+    /* Spot steps (+ / inbox / menu) point at the top bar & menu. Pin the card to the
+       BOTTOM so it never covers those icons — the pulsing ring draws the eye up. */
+    .tour-card-spot-upload, .tour-card-spot-inbox, .tour-card-spot-menu {
+      top: auto; bottom: 22px; left: 14px; right: 14px; width: auto; max-width: none;
+      transform: none; animation: tourCardIn 0.3s ease;
     }
-    /* + icon is the 3rd-from-right cluster, bell is 2nd — nudge the arrow under each. */
-    .tour-card-spot-upload::before { right: 118px; }
-    .tour-card-spot-inbox::before { right: 62px; }
-    /* Menu (step 7): the panel fills the LEFT ~220px. Put a compact card at the
-       bottom of the RIGHT side so it never covers the menu list. */
-    .tour-card-spot-menu {
-      top: auto; bottom: 20px; left: auto; right: 12px; width: calc(100% - 232px);
-      min-width: 190px; max-width: 260px; transform: none; animation: tourCardInPlain 0.3s ease;
-    }
-    .tour-card-spot-menu::before { display: none; }
+    .tour-card-spot-upload::before, .tour-card-spot-inbox::before, .tour-card-spot-menu::before { display: none; }
   }
 
   /* ---- budget ring (monthly summary) ---- */
