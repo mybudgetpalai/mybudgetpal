@@ -5834,31 +5834,25 @@ function overviewTour({ hasTargets, monthLabel }) {
    directly; fall back to scrollIntoView if none is found (mobile: page scrolls). */
 function scrollTourTargetIntoView(el) {
   if (!el) return;
-  // Brute-force: scroll every scrollable ancestor AND the window so the target sits
-  // near the top, clear of the bottom tour card. Belt-and-braces because on mobile the
-  // real scroller varies (window vs .main-content-wide).
-  const HEADER = 70;
+  // Reliable across mobile/desktop: scroll-margin-top (set in CSS on .oh-tour-active)
+  // reserves header space, and block:'start' pins the target near the top — clear of
+  // the bottom tour card. Also nudge any inner scroll container as a fallback.
+  try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {
+    try { el.scrollIntoView(); } catch (e2) {}
+  }
   try {
     let node = el.parentElement;
     while (node && node !== document.body) {
       const st = window.getComputedStyle(node);
-      const oy = st.overflowY;
-      if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 4) {
+      if ((st.overflowY === "auto" || st.overflowY === "scroll") && node.scrollHeight > node.clientHeight + 4) {
         const er = el.getBoundingClientRect();
         const nr = node.getBoundingClientRect();
-        const top = node.scrollTop + (er.top - nr.top) - HEADER;
-        try { node.scrollTo({ top: Math.max(0, top), behavior: "smooth" }); } catch (e) { node.scrollTop = Math.max(0, top); }
+        node.scrollTo({ top: Math.max(0, node.scrollTop + (er.top - nr.top) - 80), behavior: "smooth" });
+        break;
       }
       node = node.parentElement;
     }
   } catch (e) {}
-  try {
-    const er = el.getBoundingClientRect();
-    const top = window.scrollY + er.top - Math.max(HEADER + 20, window.innerHeight * 0.10);
-    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-  } catch (e) {
-    try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e2) {}
-  }
 }
 
 function TourTarget({ active, className, children }) {
@@ -10811,7 +10805,7 @@ function App() {
   .overview-slot.tour-active { border-style: solid; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); animation: slotPop 0.4s ease; }
   @keyframes slotPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
   .welcome-banner { position: relative; z-index: 62; text-align: center; color: var(--ink); font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--line); }
-  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 63; width: calc(100% - 40px); max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow-pop); animation: tourCardIn 0.3s ease; }
+  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 63; width: calc(100% - 40px); max-width: 380px; background: linear-gradient(180deg, #F4F7FF 0%, #FFFFFF 55%); border: 1.5px solid var(--accent); border-radius: 16px; padding: 22px; box-shadow: 0 18px 44px rgba(46,91,255,0.22), 0 4px 12px rgba(16,24,40,0.10); animation: tourCardIn 0.3s ease; }
   @keyframes tourCardIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .tour-step-count { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
   .tour-title { color: var(--ink); font-size: 18px; font-weight: 700; margin: 0 0 6px; }
@@ -10843,23 +10837,25 @@ function App() {
   .tour-card-spot-menu { bottom: auto; top: 120px; left: auto; right: 24px; transform: none; animation: tourCardInPlain 0.3s ease; }
   @keyframes tourCardInPlain { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @media (max-width: 560px) {
-    /* Sit the card BELOW the top bar so the highlighted icon stays visible above it,
-       with the arrow bridging the gap up to the icon. */
-    .tour-card-spot-upload, .tour-card-spot-inbox, .tour-card-spot-menu {
-      top: 118px; bottom: auto; left: 16px; right: 16px; width: auto; max-width: none;
+    /* Upload (+) and inbox (bell) live top-right. Sit the card just below the bar,
+       full width, with an arrow near the right edge pointing up toward those icons. */
+    .tour-card-spot-upload, .tour-card-spot-inbox {
+      top: 112px; bottom: auto; left: 14px; right: 14px; width: auto; max-width: none;
       transform: none; animation: tourCardInPlain 0.3s ease;
     }
-    .tour-card-spot-upload::before, .tour-card-spot-inbox::before, .tour-card-spot-menu::before {
-      content: ""; position: absolute; top: -9px; width: 18px; height: 18px;
-      background: var(--card); border-left: 1px solid var(--line); border-top: 1px solid var(--line);
-      transform: rotate(45deg); border-radius: 3px 0 0 0;
+    .tour-card-spot-upload::before, .tour-card-spot-inbox::before {
+      content: ""; position: absolute; top: -10px; width: 20px; height: 20px;
+      background: #F4F7FF; border-left: 1.5px solid var(--accent); border-top: 1.5px solid var(--accent);
+      transform: rotate(45deg); border-radius: 4px 0 0 0;
     }
-    .tour-card-spot-upload::before { right: 76px; }
-    .tour-card-spot-inbox::before { right: 132px; }
-    /* Menu (step 7): the side panel fills the left half, so drop the card to the
-       bottom-right and point the arrow at the top-left hamburger instead. */
+    /* + icon is the 3rd-from-right cluster, bell is 2nd — nudge the arrow under each. */
+    .tour-card-spot-upload::before { right: 118px; }
+    .tour-card-spot-inbox::before { right: 62px; }
+    /* Menu (step 7): the panel fills the LEFT ~220px. Put a compact card at the
+       bottom of the RIGHT side so it never covers the menu list. */
     .tour-card-spot-menu {
-      top: auto; bottom: 24px; left: auto; right: 12px; width: auto; max-width: 300px;
+      top: auto; bottom: 20px; left: auto; right: 12px; width: calc(100% - 232px);
+      min-width: 190px; max-width: 260px; transform: none; animation: tourCardInPlain 0.3s ease;
     }
     .tour-card-spot-menu::before { display: none; }
   }
