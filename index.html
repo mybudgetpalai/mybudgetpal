@@ -3927,11 +3927,11 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
         <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
       </div>
       <div className="topbar-right">
-        <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")}>
+        <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")} data-tour-active={tourSpot === "upload" ? "1" : undefined}>
           <button className="glass-btn primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
-        <div className={"inbox-wrap" + (tourSpot === "inbox" ? " tour-spot" : "")} ref={inboxRef}>
+        <div className={"inbox-wrap" + (tourSpot === "inbox" ? " tour-spot" : "")} ref={inboxRef} data-tour-active={tourSpot === "inbox" ? "1" : undefined}>
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="bell" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
           </button>
@@ -3968,7 +3968,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
 function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose, tourSpot }) {
   const list = views || VIEWS;
   return (
-    <div className={"side-panel " + (open ? "side-panel-open" : "") + (tourSpot === "menu" ? " tour-spot" : "")}>
+    <div className={"side-panel " + (open ? "side-panel-open" : "") + (tourSpot === "menu" ? " tour-spot" : "")} data-tour-active={tourSpot === "menu" ? "1" : undefined}>
       <div className="side-panel-label-row">
         <span className="side-panel-label">Views</span>
         <div className="side-panel-label-actions">
@@ -5861,18 +5861,82 @@ function scrollTourTargetIntoView(el) {
 }
 
 function TourTarget({ active, className, children }) {
-  const ref = React.useRef(null);
+  return <div className={(className || "") + (active ? " oh-tour-active" : "")} data-tour-active={active ? "1" : undefined}>{children}</div>;
+}
+
+/* Guided tour overlay: dims the whole screen, cuts a bright spotlight over the active
+   element (marked data-tour-active), and places the card in whichever half has room so
+   it never covers the thing it's describing. */
+function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
+  const [rect, setRect] = useState(null);
+  const cardRef = React.useRef(null);
+  const [cardPos, setCardPos] = useState({ top: null, bottom: 20 });
+  const PAD = 8, GAP = 14, HEADER = 8;
+
+  const measure = React.useCallback(() => {
+    const el = document.querySelector('[data-tour-active="1"]');
+    if (!el) { setRect(null); return; }
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const x = Math.max(0, r.left - PAD), y = Math.max(0, r.top - PAD);
+    const w = Math.min(vw - x, r.width + PAD * 2), h = r.height + PAD * 2;
+    setRect({ x, y, w, h, vw, vh });
+    const ch = cardRef.current ? cardRef.current.offsetHeight : 260;
+    const spaceBelow = vh - (y + h), spaceAbove = y;
+    if (spaceBelow >= spaceAbove) setCardPos({ top: Math.min(vh - ch - 8, y + h + GAP), bottom: null });
+    else setCardPos({ top: Math.max(HEADER, y - GAP - ch), bottom: null });
+  }, []);
+
+  // Scroll the active element to a sensible spot, then measure. Re-measure a couple of
+  // times as layout settles (revealing a section shifts everything below it).
   React.useEffect(() => {
-    if (active && ref.current) {
-      const el = ref.current;
-      /* Two passes: the first fires once the step's section has mounted, the second
-         after layout settles, since revealing a section changes everything below it. */
-      const t1 = setTimeout(() => scrollTourTargetIntoView(el), 140);
-      const t2 = setTimeout(() => scrollTourTargetIntoView(el), 460);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
-    }
-  }, [active]);
-  return <div ref={ref} className={(className || "") + (active ? " oh-tour-active" : "")}>{children}</div>;
+    let raf1, t1, t2, t3;
+    const run = () => {
+      const el = document.querySelector('[data-tour-active="1"]');
+      if (el) { try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }
+      raf1 = requestAnimationFrame(measure);
+    };
+    run();
+    t1 = setTimeout(measure, 260);
+    t2 = setTimeout(measure, 520);
+    t3 = setTimeout(measure, 820);
+    const onWin = () => measure();
+    window.addEventListener("resize", onWin);
+    window.addEventListener("scroll", onWin, true);
+    return () => { cancelAnimationFrame(raf1); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
+  }, [stepIndex, measure]);
+
+  const dim = "rgba(16,24,40,0.62)";
+  const panels = rect ? [
+    { left: 0, top: 0, width: rect.vw, height: rect.y },
+    { left: 0, top: rect.y + rect.h, width: rect.vw, height: Math.max(0, rect.vh - (rect.y + rect.h)) },
+    { left: 0, top: rect.y, width: rect.x, height: rect.h },
+    { left: rect.x + rect.w, top: rect.y, width: Math.max(0, rect.vw - (rect.x + rect.w)), height: rect.h },
+  ] : [{ left: 0, top: 0, width: "100%", height: "100%" }];
+
+  return (
+    <div className="tour-root">
+      {panels.map((p, i) => (
+        <div key={i} className="tour-dim" style={{ position: "fixed", background: dim, zIndex: 2147483000, left: p.left, top: p.top, width: p.width, height: p.height }} />
+      ))}
+      {rect && (
+        <div className="tour-ring" style={{ position: "fixed", zIndex: 2147483001, left: rect.x, top: rect.y, width: rect.w, height: rect.h, border: "2.5px solid var(--accent)", borderRadius: 16, boxShadow: "0 0 0 4px rgba(46,91,255,0.25)", pointerEvents: "none" }} />
+      )}
+      <div ref={cardRef} className="tour-card-v2" style={{ position: "fixed", zIndex: 2147483002, left: 14, right: 14, top: cardPos.top != null ? cardPos.top : "auto", bottom: cardPos.bottom != null ? cardPos.bottom : "auto" }}>
+        <button className="tour-skip-x" onClick={onSkip} aria-label="Skip tour"
+          style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "var(--ink-3)", fontSize: 16, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
+        <div className="tour-step-count">Step {stepIndex + 1} of {total}</div>
+        <h3 className="tour-title">{title}</h3>
+        <p className="tour-body">{body}</p>
+        <div className="tour-dots">
+          {Array.from({ length: total }).map((_, i) => <span key={i} className={"tour-dot " + (i <= stepIndex ? "tour-dot-on" : "")} />)}
+        </div>
+        <button className="glass-btn primary tour-next" onClick={onNext}>{stepIndex >= total - 1 ? "Finish" : "Next"}</button>
+        <button className="tour-skip" onClick={onSkip}
+          style={{ display: "block", width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--ink-3)", fontSize: 13, cursor: "pointer" }}>Skip tour</button>
+      </div>
+    </div>
+  );
 }
 
 function InsightPill({ transactions, targets }) {
@@ -8030,19 +8094,15 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} bankRows={bankRows} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
       {runTour && (
-        <div className={"tour-card" + (tourSpot ? " tour-card-spot tour-card-spot-" + tourSpot : " tour-card-content")}>
-          <button className="tour-skip-x" onClick={onFinishTour} aria-label="Skip tour" title="Skip tour"
-            style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: "var(--muted)", fontSize: 15, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
-          <div className="tour-step-count">Step {tourStep + 1} of {tourCopy.length}</div>
-          <h3 className="tour-title">{copy.title}</h3>
-          <p className="tour-body">{copy.body}</p>
-          <div className="tour-dots">
-            {tourCopy.map((_, i) => <span key={i} className={"tour-dot " + (i <= tourStep ? "tour-dot-on" : "")} />)}
-          </div>
-          <button className="glass-btn primary tour-next" onClick={advanceTour}>{tourStep >= tourCopy.length - 1 ? "Finish" : "Next"}</button>
-          <button className="tour-skip" onClick={onFinishTour}
-            style={{ display: "block", width: "100%", marginTop: 8, background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer" }}>Skip tour</button>
-        </div>
+        <TourOverlay
+          stepIndex={tourStep}
+          total={tourCopy.length}
+          title={copy.title}
+          body={copy.body}
+          spot={tourSpot}
+          onNext={advanceTour}
+          onSkip={onFinishTour}
+        />
       )}
       {customiseOpen && (
         <CustomiseMenuModal current={navKeys} onClose={() => setCustomiseOpen(false)} onSave={onChangeNavViews} />
@@ -10811,6 +10871,8 @@ function App() {
   @keyframes slotPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
   .welcome-banner { position: relative; z-index: 62; text-align: center; color: var(--ink); font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--line); }
   .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 63; width: calc(100% - 40px); max-width: 380px; background: linear-gradient(180deg, #F4F7FF 0%, #FFFFFF 55%); border: 1.5px solid var(--accent); border-radius: 16px; padding: 22px; box-shadow: 0 18px 44px rgba(46,91,255,0.22), 0 4px 12px rgba(16,24,40,0.10); animation: tourCardIn 0.3s ease; }
+  .tour-card-v2 { max-width: 420px; margin: 0 auto; background: linear-gradient(180deg, #F4F7FF 0%, #FFFFFF 60%); border: 1.5px solid var(--accent); border-radius: 18px; padding: 20px; box-shadow: 0 20px 48px rgba(46,91,255,0.28), 0 4px 14px rgba(16,24,40,0.12); animation: tourCardIn 0.28s ease; }
+  .tour-root { position: fixed; inset: 0; z-index: 2147482999; }
   @keyframes tourCardIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .tour-step-count { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
   .tour-title { color: var(--ink); font-size: 18px; font-weight: 700; margin: 0 0 6px; }
