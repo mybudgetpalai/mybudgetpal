@@ -2563,7 +2563,7 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
 
 /* ---------------- Onboarding ---------------- */
 
-function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, initialBanks }) {
+function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, initialBanks, isDev, onSkipToTour }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(initialName || "");
   const [baseKey, setBaseKey] = useState("UAE");
@@ -2682,6 +2682,12 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
             <h1 className="title">Nice to meet you, what's your name?</h1>
             <p className="subtitle">Just so we know what to call you — nothing formal.</p>
             <input className="glass-input" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            {isDev && onSkipToTour && (
+              <button className="glass-btn ghost" style={{ marginTop: 16, width: "100%", flex: "none", fontSize: 14 }}
+                onClick={() => onSkipToTour(name.trim() || "Tester")}>
+                {"\u26A1"} Testing: skip to dashboard tour (loads sample data)
+              </button>
+            )}
           </div>
         )}
 
@@ -8990,6 +8996,30 @@ function App() {
     setStage("processing");
   };
 
+  const skipToTour = (nm) => {
+    setName(nm || "Tester");
+    // Load dual-currency sample data so the tour has real numbers, then jump straight
+    // to the dashboard with the guided tour running. Testing accounts only.
+    const curs = ["AED", "GBP"];
+    FX.home = "AED"; FX.ready = true;
+    const all = [];
+    curs.forEach((c) => {
+      const bank = SAMPLE_BANK_BY_CUR[c] || ("Sample " + c + " Bank");
+      FX.bankCurrency[bank] = c;
+      let parsed = [];
+      try { parsed = parseStatementCSV(demoCsvForCurrency(c)).transactions; } catch (e) { parsed = []; }
+      parsed.forEach((t, i) => {
+        const base = { ...t, id: "sample-" + c + "-" + i, bank, category: demoCategorize(t.name, t.amount) };
+        all.push(applyFxToTx(base));
+      });
+    });
+    devForceUncat(all);
+    setCustomTransactions(all);
+    setUsingDemo(true);
+    setRunTour(true);
+    setStage("dashboard");
+  };
+
   const handleAddTransactions = async (list, bankName, meta, fileName, rawFile) => {
     const base = usingDemo ? [] : customTransactions;
     if (usingDemo) setUsingDemo(false);
@@ -9446,7 +9476,7 @@ function App() {
       />
     );
   } else if (stage === "onboarding") {
-    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} initialName={name} initialBanks={banks} onDone={(d) => { setName(d.name); setBanks(d.banks); setDemoCurrencies((d.currencies && d.currencies.length ? d.currencies : ["GBP"])); setStage("upload"); }} />;
+    content = <OnboardingScreen userId={userId} pushToast={pushToast} onLogout={handleLogout} initialName={name} initialBanks={banks} isDev={isDev} onSkipToTour={skipToTour} onDone={(d) => { setName(d.name); setBanks(d.banks); setDemoCurrencies((d.currencies && d.currencies.length ? d.currencies : ["GBP"])); setStage("upload"); }} />;
   } else if (stage === "upload") {
     content = (
       <UploadScreen
