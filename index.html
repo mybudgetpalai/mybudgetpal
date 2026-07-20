@@ -5871,7 +5871,10 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   const [rect, setRect] = useState(null);
   const cardRef = React.useRef(null);
   const [cardPos, setCardPos] = useState({ top: null, bottom: 20 });
-  const PAD = 8, GAP = 14, HEADER = 8;
+  const PAD = 8, GAP = 14, HEADER = 72;
+  // Spot steps (top bar + menu) live at the top → card goes BOTTOM.
+  // Content steps → card goes TOP, and we scroll the target into the lower zone.
+  const cardAtBottom = !!spot;
 
   const measure = React.useCallback(() => {
     const el = document.querySelector('[data-tour-active="1"]');
@@ -5882,31 +5885,47 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const w = Math.min(vw - x, r.width + PAD * 2), h = r.height + PAD * 2;
     setRect({ x, y, w, h, vw, vh });
     const ch = cardRef.current ? cardRef.current.offsetHeight : 260;
-    const spaceBelow = vh - (y + h), spaceAbove = y;
-    if (spaceBelow >= spaceAbove) setCardPos({ top: Math.min(vh - ch - 8, y + h + GAP), bottom: null });
-    else setCardPos({ top: Math.max(HEADER, y - GAP - ch), bottom: null });
-  }, []);
+    if (spot === "menu") {
+      // Menu panel fills the left; float the card on the right, vertically centered-ish.
+      setCardPos({ top: Math.max(HEADER, (vh - ch) / 2), bottom: null, side: "right" });
+    } else if (cardAtBottom) setCardPos({ top: null, bottom: 20, side: null });
+    else setCardPos({ top: HEADER, bottom: null, side: null, _ch: ch });
+  }, [cardAtBottom]);
 
-  // Scroll the active element to a sensible spot, then measure. Re-measure a couple of
-  // times as layout settles (revealing a section shifts everything below it).
+  // Scroll the target into the zone the card ISN'T occupying, then measure.
   React.useEffect(() => {
-    let raf1, t1, t2, t3;
-    const run = () => {
+    const doScroll = () => {
       const el = document.querySelector('[data-tour-active="1"]');
-      if (el) { try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }
-      raf1 = requestAnimationFrame(measure);
+      if (!el) return;
+      const vh = window.innerHeight;
+      const ch = cardRef.current ? cardRef.current.offsetHeight : 300;
+      const r = el.getBoundingClientRect();
+      let desiredTop;
+      if (cardAtBottom) {
+        // card at bottom (~ch+40 tall) → put target near the top, under the header
+        desiredTop = HEADER + 12;
+      } else {
+        // card at top (HEADER + ch) → put target just below the card
+        desiredTop = HEADER + ch + GAP + 8;
+        // if target is taller than the remaining space, just top-align it there
+      }
+      const delta = r.top - desiredTop;
+      try { window.scrollBy({ top: delta, behavior: "smooth" }); } catch (e) {
+        try { el.scrollIntoView(); } catch (e2) {}
+      }
     };
-    run();
-    t1 = setTimeout(measure, 260);
-    t2 = setTimeout(measure, 520);
-    t3 = setTimeout(measure, 820);
+    doScroll();
+    const t0 = setTimeout(doScroll, 120);
+    const t1 = setTimeout(measure, 320);
+    const t2 = setTimeout(measure, 560);
+    const t3 = setTimeout(measure, 900);
     const onWin = () => measure();
     window.addEventListener("resize", onWin);
     window.addEventListener("scroll", onWin, true);
-    return () => { cancelAnimationFrame(raf1); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
-  }, [stepIndex, measure]);
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
+  }, [stepIndex, measure, cardAtBottom]);
 
-  const dim = "rgba(16,24,40,0.62)";
+  const dim = "rgba(16,24,40,0.60)";
   const panels = rect ? [
     { left: 0, top: 0, width: rect.vw, height: rect.y },
     { left: 0, top: rect.y + rect.h, width: rect.vw, height: Math.max(0, rect.vh - (rect.y + rect.h)) },
@@ -5920,9 +5939,14 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
         <div key={i} className="tour-dim" style={{ position: "fixed", background: dim, zIndex: 2147483000, left: p.left, top: p.top, width: p.width, height: p.height }} />
       ))}
       {rect && (
-        <div className="tour-ring" style={{ position: "fixed", zIndex: 2147483001, left: rect.x, top: rect.y, width: rect.w, height: rect.h, border: "2.5px solid var(--accent)", borderRadius: 16, boxShadow: "0 0 0 4px rgba(46,91,255,0.25)", pointerEvents: "none" }} />
+        <div className="tour-ring" style={{ position: "fixed", zIndex: 2147483001, left: rect.x, top: rect.y, width: rect.w, height: rect.h, border: "2px solid rgba(46,91,255,0.55)", borderRadius: 16, boxShadow: "0 0 0 3px rgba(46,91,255,0.10)", pointerEvents: "none" }} />
       )}
-      <div ref={cardRef} className="tour-card-v2" style={{ position: "fixed", zIndex: 2147483002, left: 14, right: 14, top: cardPos.top != null ? cardPos.top : "auto", bottom: cardPos.bottom != null ? cardPos.bottom : "auto" }}>
+      <div ref={cardRef} className="tour-card-v2" style={{ position: "fixed", zIndex: 2147483002,
+        left: cardPos.side === "right" ? "auto" : 14,
+        right: 14,
+        width: cardPos.side === "right" ? "min(300px, calc(100% - 250px))" : "auto",
+        top: cardPos.top != null ? cardPos.top : "auto",
+        bottom: cardPos.bottom != null ? cardPos.bottom : "auto" }}>
         <button className="tour-skip-x" onClick={onSkip} aria-label="Skip tour"
           style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "var(--ink-3)", fontSize: 16, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
         <div className="tour-step-count">Step {stepIndex + 1} of {total}</div>
@@ -10871,7 +10895,7 @@ function App() {
   @keyframes slotPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
   .welcome-banner { position: relative; z-index: 62; text-align: center; color: var(--ink); font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--line); }
   .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 63; width: calc(100% - 40px); max-width: 380px; background: linear-gradient(180deg, #F4F7FF 0%, #FFFFFF 55%); border: 1.5px solid var(--accent); border-radius: 16px; padding: 22px; box-shadow: 0 18px 44px rgba(46,91,255,0.22), 0 4px 12px rgba(16,24,40,0.10); animation: tourCardIn 0.3s ease; }
-  .tour-card-v2 { max-width: 420px; margin: 0 auto; background: linear-gradient(180deg, #F4F7FF 0%, #FFFFFF 60%); border: 1.5px solid var(--accent); border-radius: 18px; padding: 20px; box-shadow: 0 20px 48px rgba(46,91,255,0.28), 0 4px 14px rgba(16,24,40,0.12); animation: tourCardIn 0.28s ease; }
+  .tour-card-v2 { max-width: 420px; margin: 0 auto; background: linear-gradient(180deg, #F7F9FF 0%, #FFFFFF 60%); border: 1px solid rgba(46,91,255,0.35); border-radius: 18px; padding: 20px; box-shadow: 0 20px 48px rgba(16,24,40,0.20), 0 4px 14px rgba(16,24,40,0.10); animation: tourCardIn 0.28s ease; }
   .tour-root { position: fixed; inset: 0; z-index: 2147482999; }
   @keyframes tourCardIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .tour-step-count { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
