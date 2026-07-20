@@ -5002,7 +5002,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
   }
 
   const totalBal = totalEstimatedBalance(list, accountData, txs);
-  const lastUpd = statements.map((s) => s.periodEnd || "").filter(Boolean).sort().reverse()[0] || "";
+  const lastUpd = txs.map((t) => t.date || "").filter(Boolean).sort().reverse()[0] || statements.map((s) => s.periodEnd || "").filter(Boolean).sort().reverse()[0] || "";
   return (
     <div className="glass-card dash-card">
       <div className="ba-head">
