@@ -3451,7 +3451,12 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
 
   const handleFinish = async () => {
     setSubmitting(true);
-    const plan = { targetBalance: Math.round(projectedEnd), targetMonth: lastKey, method: method || "manual", openingBalance: Number(curBal) || 0 };
+    // The user's stated goal is the anchor. For a balance goal, save the exact figure
+    // they entered — NOT projectedEnd, which re-sums the ±£1-spread monthly budgets and
+    // can drift a few pounds (e.g. £15,000 entered showing as £14,994).
+    const enteredGoal = method === "balance" ? Math.round(Number(goalBalance) || 0) : 0;
+    const targetBalanceToSave = enteredGoal > 0 ? enteredGoal : Math.round(projectedEnd);
+    const plan = { targetBalance: targetBalanceToSave, targetMonth: lastKey, method: method || "manual", openingBalance: Number(curBal) || 0 };
     try {
       const keys = months.map((m) => m.key);
       await supabaseClient.from("targets").delete().eq("user_id", userId).in("month", keys);
