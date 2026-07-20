@@ -10758,8 +10758,8 @@ function App() {
   .coming-soon { color: var(--ink-3); font-size: 13px; font-style: italic; }
   .overview-slot.tour-active { border-style: solid; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); animation: slotPop 0.4s ease; }
   @keyframes slotPop { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-  .welcome-banner { text-align: center; color: var(--ink); font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--line); }
-  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 60; width: calc(100% - 40px); max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow-pop); animation: tourCardIn 0.3s ease; }
+  .welcome-banner { position: relative; z-index: 62; text-align: center; color: var(--ink); font-size: 14px; font-weight: 600; padding: 10px 20px; background: linear-gradient(135deg, var(--accent-soft), var(--accent-soft)); border-bottom: 1px solid var(--line); }
+  .tour-card { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 63; width: calc(100% - 40px); max-width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow-pop); animation: tourCardIn 0.3s ease; }
   @keyframes tourCardIn { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
   .tour-step-count { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
   .tour-title { color: var(--ink); font-size: 18px; font-weight: 700; margin: 0 0 6px; }
