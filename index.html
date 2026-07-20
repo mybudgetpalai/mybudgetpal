@@ -4356,8 +4356,6 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const topCatName = cats.find((c) => (byCat[c] || 0) > 0);
   const daysElapsed = isCurrentMonth ? today().getDate() : new Date(Number(activeKey.slice(0, 4)), Number(activeKey.slice(5, 7)), 0).getDate();
   const heroFacts = [];
-  if (heroTxs.length) heroFacts.push({ label: "Transactions", value: String(heroTxs.length) });
-  if (total > 0 && daysElapsed > 0) heroFacts.push({ label: "A day", value: formatMoney(total / daysElapsed) });
 
   return (
     <div className="bd-page">
@@ -4380,6 +4378,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
             )}
             {!isCurrentMonth && totalDiff === 0 && prevTotal > 0 && <div className="bd-total-delta delta-flat">About the same as {monthLabelFromKey(prevKey)}</div>}
           </div>
+          {heroFacts.length > 0 && (
           <div className="bd-hero-facts">
             {heroFacts.map((f) => (
               <div className="bd-fact" key={f.label}>
@@ -4388,6 +4387,7 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
               </div>
             ))}
           </div>
+          )}
           <div className="bd-hero-right">
             {bdTarget > 0 && <div className="bd-hero-ring"><BudgetRing spent={total} target={bdTarget} /></div>}
           </div>
@@ -9961,7 +9961,7 @@ function App() {
   .catrev-banner-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
   .catrev-banner-later { background: none; border: none; color: var(--ink-3); font-size: 13px; font-family: inherit; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
   .settings-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: rgba(143,180,255,0.1); border: 1px solid rgba(143,180,255,0.3); color: #1d4ed8; font-size: 13px; }
-  .settings-nudge-btn { flex: 0 0 auto; width: auto; align-self: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 999px; white-space: nowrap; }
+  .settings-nudge .settings-nudge-btn.glass-btn { flex: 0 0 auto; width: auto; align-self: center; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 999px; white-space: nowrap; }
   .rollover-note { margin-top: 6px; }
   .rollover-note.rn-up { color: var(--pos); }
   .rollover-note.rn-down { color: #ffb84f; }
