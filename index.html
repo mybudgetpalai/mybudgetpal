@@ -769,10 +769,10 @@ const CURRENCY_META = {
   EUR: { label: "Euro", flag: "\uD83C\uDDEA\uD83C\uDDFA" },
 };
 const CURRENCY_BANKS = {
-  GBP: ["HSBC", "Barclays", "Santander", "Monzo", "Revolut", "Wise", "Standard Chartered", "Citibank"],
-  AED: ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "HSBC", "Standard Chartered", "Wise"],
-  USD: ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citibank", "HSBC", "Revolut", "Wise"],
-  EUR: ["Deutsche Bank", "BNP Paribas", "N26", "Santander", "Revolut", "Wise"],
+  GBP: ["HSBC", "Barclays", "Santander", "Monzo", "Revolut", "Wise", "Standard Chartered", "Citibank", "Other"],
+  AED: ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "HSBC", "Standard Chartered", "Wise", "Other"],
+  USD: ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citibank", "HSBC", "Revolut", "Wise", "Other"],
+  EUR: ["Deutsche Bank", "BNP Paribas", "N26", "Santander", "Revolut", "Wise", "Other"],
 };
 /* UAE-first onboarding: where you live (local currency) + where home is (second currency) */
 const LIVE_COUNTRIES = [
@@ -2554,6 +2554,8 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   const [name, setName] = useState(initialName || "");
   const [baseKey, setBaseKey] = useState("UAE");
   const [homeKey, setHomeKey] = useState("UK");
+  // Step 1 lead question: "expat" | "uk_only" | null. Drives the currency defaults.
+  const [expatChoice, setExpatChoice] = useState(null);
   const [singleCurrency, setSingleCurrency] = useState(false);
   const [displayCur, setDisplayCur] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -2571,6 +2573,8 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   const [bankCurrency, setBankCurrency] = useState(() => {
     const m = {}; (initialBanks || []).forEach((b) => { m[b] = UAE_BANKS.includes(b) ? "AED" : "GBP"; }); return m;
   });
+  // Custom bank names entered via the "Other" chip, keyed by currency (e.g. { AED: "Ajman Bank" })
+  const [otherBankName, setOtherBankName] = useState({});
   const banks = Object.keys(bankCurrency);
 
   const toggleBankCur = (b, cur) => setBankCurrency((prev) => {
@@ -2591,22 +2595,25 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   // reset chosen display currency whenever the currency pair changes
   React.useEffect(() => { setDisplayCur(null); }, [baseKey, homeKey, singleCurrency]);
 
+  const otherNeedsName = banks.includes("Other") && !(otherBankName[bankCurrency["Other"]] || "").trim();
   const canContinue = [
     name.trim().length > 0,
-    !!baseKey,
+    !!expatChoice,
     singleCurrency || !!homeKey,
     !!effectiveDisplay,
-    banks.length > 0,
+    banks.length > 0 && !otherNeedsName,
   ][step];
 
   const goNext = () => {
     let n = step + 1;
+    if (n === 2 && singleCurrency) n = 4; // UK-only / single-currency: skip "where's home" + dashboard-currency
     if (n === 3 && !isDual) n = 4; // skip dashboard-currency choice when single-currency
     setStep(n);
   };
   const goBack = () => {
     let n = step - 1;
     if (n === 3 && !isDual) n = 2;
+    if (n === 2 && singleCurrency) n = 1; // UK-only: step 2 was skipped, go back to step 1
     setStep(Math.max(n, 0));
   };
 
@@ -2614,16 +2621,26 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
     setSubmitting(true);
     const homeCurrencyToSave = effectiveDisplay;
     const { error: pErr } = await supabaseClient.from("profiles").upsert({ id: userId, name: name.trim(), home_currency: homeCurrencyToSave });
+    // Replace any "Other" placeholder with the custom name the user typed for that currency
+    const resolveBank = (b) => {
+      if (b !== "Other") return b;
+      const cur = bankCurrency[b];
+      const typed = (otherBankName[cur] || "").trim();
+      return typed || null;
+    };
+    const bankRows = banks.map((b) => ({ name: resolveBank(b), cur: bankCurrency[b] })).filter((r) => r.name);
+    const banksResolved = bankRows.map((r) => r.name);
+    const curForBank = {}; bankRows.forEach((r) => { curForBank[r.name] = r.cur; });
     const existingBanks = await fetchBanks(userId);
     const existingNames = existingBanks.map((r) => r.bank_name);
-    const toAdd = banks.filter((b) => !existingNames.includes(b));
-    const toRemove = existingNames.filter((n) => !banks.includes(n));
+    const toAdd = banksResolved.filter((b) => !existingNames.includes(b));
+    const toRemove = existingNames.filter((n) => !banksResolved.includes(n));
     let bErr = null;
-    if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: bankCurrency[b] || localCur }))); bErr = error; }
+    if (toAdd.length) { const { error } = await supabaseClient.from("banks").insert(toAdd.map((b) => ({ user_id: userId, bank_name: b, currency: curForBank[b] || localCur }))); bErr = error; }
     if (toRemove.length) { try { await supabaseClient.from("banks").delete().eq("user_id", userId).in("bank_name", toRemove); } catch (e) {} }
     const check = await fetchProfile(userId);
     const savedBanks = await fetchBanks(userId);
-    const banksOk = banks.every((b) => savedBanks.some((r) => r.bank_name === b));
+    const banksOk = banksResolved.every((b) => savedBanks.some((r) => r.bank_name === b));
     if (pErr || bErr || !check?.name || !banksOk) {
       const msg = (pErr || bErr)?.message
         || (!check?.name ? "your profile didn't save (profiles table permissions)"
@@ -2641,7 +2658,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
       const freshBanks = await fetchBanks(userId);
       await initFx(userId, freshProfile, freshBanks);
     } catch (e) { console.error("FX init after onboarding failed (non-fatal):", e); }
-    onDone({ name: name.trim(), banks, currencies: activeCurrencies });
+    onDone({ name: name.trim(), banks: banksResolved, currencies: activeCurrencies });
   };
 
   const next = async () => {
@@ -2679,16 +2696,37 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
 
         {step === 1 && (
           <div className="step">
-            <h1 className="title">Where do you live right now?</h1>
-            <p className="subtitle">Where your day-to-day life is based today. If you've got money in another country too, we'll ask about that next.</p>
+            <h1 className="title">Are you an expat in the UAE?</h1>
+            <p className="subtitle">TwoPockets is built for people living in the UAE with money back home. Pick what fits you best.</p>
             <div className="segmented">
-              {LIVE_COUNTRIES.map((c) => (
-                <button key={c.key} className={"segment " + (baseKey === c.key ? "segment-active" : "")} onClick={() => setBaseKey(c.key)}>
-                  <span>{c.flag} {c.label}<span className="segment-sub">Local currency: {c.cur}</span></span>
-                  {baseKey === c.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
-                </button>
-              ))}
+              <button className={"segment " + (expatChoice === "expat" ? "segment-active" : "")}
+                onClick={() => { setExpatChoice("expat"); setBaseKey("UAE"); setSingleCurrency(false); }}>
+                <span>{"\uD83C\uDDE6\uD83C\uDDEA"} Yes — I live in the UAE<span className="segment-sub">Track AED, plus your home currency</span></span>
+                {expatChoice === "expat" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              </button>
+              <button className={"segment " + (expatChoice === "uk_only" ? "segment-active" : "")}
+                onClick={() => { setExpatChoice("uk_only"); setBaseKey("UK"); setSingleCurrency(true); }}>
+                <span>{"\uD83C\uDDEC\uD83C\uDDE7"} No — I'm in the UK, GBP only<span className="segment-sub">Just track my pounds</span></span>
+                {expatChoice === "uk_only" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              </button>
+              <button className={"segment " + (expatChoice === "other" ? "segment-active" : "")}
+                onClick={() => { setExpatChoice("other"); }}>
+                <span>{"\uD83C\uDF0D"} Somewhere else<span className="segment-sub">Pick your country next</span></span>
+                {expatChoice === "other" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+              </button>
             </div>
+            {expatChoice === "other" && (
+              <div className="segmented" style={{ marginTop: 12 }}>
+                {LIVE_COUNTRIES.map((c) => (
+                  <button key={c.key} className={"segment " + (baseKey === c.key ? "segment-active" : "")}
+                    onClick={() => { setBaseKey(c.key); setSingleCurrency(false); }}>
+                    <span>{c.flag} {c.label}<span className="segment-sub">Local currency: {c.cur}</span></span>
+                    {baseKey === c.key && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="currency-note" style={{ textAlign: "center", marginTop: 14 }}>Don't worry — you can change any of this later in Settings.</p>
           </div>
         )}
 
@@ -2750,6 +2788,12 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
                     );
                   })}
                 </div>
+                {bankCurrency["Other"] === g.cur && (
+                  <input className="glass-input other-bank-input" type="text" autoFocus
+                    placeholder={"Type your " + g.cur + " bank name"}
+                    value={otherBankName[g.cur] || ""}
+                    onChange={(e) => setOtherBankName((p) => ({ ...p, [g.cur]: e.target.value }))} />
+                )}
               </div>
             ))}
           </div>
@@ -3712,10 +3756,10 @@ function SetupIntroModal({ name, onStart, onSkip }) {
   return (
     <div className="modal-overlay setup-intro-overlay">
       <div className="glass-card modal-card" style={{ maxWidth: 480 }}>
-        <h1 className="title" style={{ marginTop: 4 }}>Hi {name || "there"}, welcome to {APP_NAME}</h1>
-        <p className="subtitle">This is your overview {"—"} here's a first look behind this card.</p>
-        <p className="subtitle" style={{ marginTop: 10 }}>Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
-        <div className="nav-row" style={{ marginTop: 22 }}>
+        <h1 className="title" style={{ marginTop: 4, marginBottom: 12 }}>Hi {name || "there"}, welcome to {APP_NAME}</h1>
+        <p className="subtitle" style={{ marginBottom: 12, lineHeight: 1.5 }}>This is your overview {"—"} here's a first look behind this card.</p>
+        <p className="subtitle" style={{ marginBottom: 0, lineHeight: 1.5 }}>Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
+        <div className="nav-row" style={{ marginTop: 24 }}>
           <button className="glass-btn ghost" onClick={onSkip}>I'll fill this in later</button>
           <button className="glass-btn primary" onClick={onStart}>Let's go</button>
         </div>
@@ -11986,6 +12030,7 @@ function App() {
     .sr2-num { font-size: clamp(28px, 9.5vw, 44px) !important; }
     .oh-big { font-size: clamp(20px, 6.5vw, 26px) !important; }
   }
+  .other-bank-input { margin-top: 12px; }
 </style>
 
 </body>
