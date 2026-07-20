@@ -1799,15 +1799,25 @@ function computeBankBalance(bank, statements, transactions, bankRow) {
 function LpUploadDemo() {
   return (
     <div className="lp-demo-card lpd-upload">
-      <div className="lpd-file">
+      <div className="lpd-file lpd-file-1">
         <div className="lpd-file-icon">&#128196;</div>
-        <div className="lpd-file-name">statement_jun.csv</div>
+        <div className="lpd-file-meta">
+          <div className="lpd-file-name">enbd_statement.pdf</div>
+          <div className="lpd-file-bank">&#127462;&#127466; Emirates NBD &middot; AED</div>
+        </div>
+      </div>
+      <div className="lpd-file lpd-file-2">
+        <div className="lpd-file-icon">&#128196;</div>
+        <div className="lpd-file-meta">
+          <div className="lpd-file-name">hsbc_statement.csv</div>
+          <div className="lpd-file-bank">&#127468;&#127463; HSBC &middot; GBP</div>
+        </div>
       </div>
       <div className="lpd-zone">
         <div className="lpd-zone-inner">
-          <span className="lpd-zone-hint">Drop your bank statement here</span>
+          <span className="lpd-zone-hint">Drop statements from both banks here</span>
           <div className="lpd-progress"><div className="lpd-progress-fill" /></div>
-          <div className="lpd-done">&#10003; 32 transactions found</div>
+          <div className="lpd-done">&#10003; 2 banks &middot; 58 transactions found</div>
         </div>
       </div>
     </div>
@@ -2066,7 +2076,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
         <div className="lp-hero-copy">
           <span className="hero-eyebrow">Built in Dubai for UAE expats</span>
           <h1>Your money here <em style={{fontStyle:"normal", color:"var(--accent)"}}>and</em> back home. One clear picture.</h1>
-          <p>One salary, two countries. Upload statements from your UAE and home-country banks &mdash; dirhams and your home currency together, converted properly, with one honest total across both. GBP today, more currencies coming soon. No bank login, no spreadsheets.</p>
+          <p>One salary, two countries &mdash; your UAE and home-country banks in one clear total. No bank login, no spreadsheets.</p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
@@ -2124,7 +2134,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <div className="lp-step-copy">
             <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
             <h3>Two currencies. One life. One total.</h3>
-            <p>Your dirham salary and your home-country account, side by side. Each stays in its own currency &mdash; every total converts into whichever home currency you pick, at a rate locked per month so last month never shifts. GBP today, more on the way.</p>
+            <p>Your dirham salary and home-country account, side by side &mdash; each in its own currency, all converting into whichever home currency you pick, at a rate locked per month. GBP today, more on the way.</p>
           </div>
           <LpCurrencyDemo />
         </div>
@@ -2210,32 +2220,6 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
               <span className="fc-bill">Spotify</span>
               <span className="fc-bill fc-bill-due">DEWA &middot; due</span>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="lp-section lp-wrap">
-        <div className="section-head reveal"><h2>Made for money that lives in two places</h2><p>The everyday expat things other budgeting apps quietly ignore.</p></div>
-        <div className="lp-expat-grid">
-          <div className="lp-expat-card reveal">
-            <div className="lp-expat-ico">🏠</div>
-            <h4>Money sent home, tracked</h4>
-            <p>See what you send back each month, in both currencies, without a separate spreadsheet.</p>
-          </div>
-          <div className="lp-expat-card reveal">
-            <div className="lp-expat-ico">🏦</div>
-            <h4>Both banks, no logins</h4>
-            <p>Your UAE bank and your home-country bank in one view &mdash; just statements, never passwords.</p>
-          </div>
-          <div className="lp-expat-card reveal">
-            <div className="lp-expat-ico">🔒</div>
-            <h4>Rates locked per month</h4>
-            <p>Past months stay put. A June total in pounds still reads the same in December.</p>
-          </div>
-          <div className="lp-expat-card reveal">
-            <div className="lp-expat-ico">✈️</div>
-            <h4>Wherever &ldquo;home&rdquo; is</h4>
-            <p>GBP today, with more currencies coming soon. Pick the home currency that fits your life.</p>
           </div>
         </div>
       </div>
@@ -10499,18 +10483,22 @@ function App() {
   .lpd-zone { width: 100%; border: 2px dashed var(--line); border-radius: 16px; padding: 38px 20px; text-align: center; transition: border-color .3s; }
   .lpd-zone-inner { position: relative; }
   .lpd-zone-hint { color: var(--ink-2); font-size: 14px; display: block; }
-  .lpd-file { position: absolute; top: 18px; left: 24px; z-index: 2; background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; opacity: 0; }
+  .lpd-file { position: absolute; top: 18px; left: 24px; z-index: 2; background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; opacity: 0; }
   .lpd-file-icon { font-size: 18px; }
+  .lpd-file-meta { display: flex; flex-direction: column; gap: 2px; text-align: left; }
   .lpd-file-name { color: var(--ink); font-size: 12px; font-weight: 600; }
+  .lpd-file-bank { color: var(--ink-3); font-size: 10px; font-weight: 600; }
+  .lpd-file-2 { top: 44px; left: 44px; }
   .lpd-progress { height: 6px; border-radius: 3px; background: var(--surface-3); margin: 16px auto 0; max-width: 260px; overflow: hidden; opacity: 0; }
   .lpd-progress-fill { height: 100%; width: 0; border-radius: 3px; background: var(--grad-2, var(--accent)); }
   .lpd-done { color: var(--pos); font-size: 14px; font-weight: 600; margin-top: 12px; opacity: 0; }
-  .in-view .lpd-file { animation: lpdFly 1.5s ease-in-out 0.4s forwards; }
-  .in-view .lpd-zone { animation: lpdZonePulse 0.5s ease 1.7s; }
-  .in-view .lpd-progress { animation: lpdShow 0.3s ease 1.9s forwards; }
-  .in-view .lpd-progress-fill { animation: lpdFill 1s ease 2.1s forwards; }
-  .in-view .lpd-done { animation: lpdPop 0.4s ease 3.2s forwards; }
-  @keyframes lpdFly { 0% { opacity: 0; transform: translate(-30px,-30px) rotate(-6deg); } 15% { opacity: 1; } 70% { opacity: 1; transform: translate(140px, 70px) rotate(3deg) scale(1); } 100% { opacity: 0; transform: translate(150px, 90px) scale(0.55); } }
+  .in-view .lpd-file-1 { animation: lpdFly 1.5s ease-in-out 0.4s forwards; }
+  .in-view .lpd-file-2 { animation: lpdFly 1.5s ease-in-out 0.9s forwards; }
+  .in-view .lpd-zone { animation: lpdZonePulse 0.5s ease 2.2s; }
+  .in-view .lpd-progress { animation: lpdShow 0.3s ease 2.4s forwards; }
+  .in-view .lpd-progress-fill { animation: lpdFill 1s ease 2.6s forwards; }
+  .in-view .lpd-done { animation: lpdPop 0.4s ease 3.7s forwards; }
+  @keyframes lpdFly { 0% { opacity: 0; transform: translate(-30px,-30px) rotate(-6deg); } 15% { opacity: 1; } 70% { opacity: 1; transform: translate(120px, 70px) rotate(3deg) scale(1); } 100% { opacity: 0; transform: translate(130px, 90px) scale(0.55); } }
   @keyframes lpdZonePulse { 0% { border-color: var(--line); } 40% { border-color: var(--pos); box-shadow: 0 0 0 4px rgba(18,161,80,0.15); } 100% { border-color: var(--line); } }
   @keyframes lpdShow { to { opacity: 1; } }
   @keyframes lpdFill { to { width: 100%; } }
@@ -11119,7 +11107,7 @@ function App() {
     .trend-bar, .ltp-bar-col .ltp-bar, .lpd-trend-bar, .bd-pie-svg, .lp-hero-mock, .hm-fill { animation: none; }
   }
 
-  .lp-hero-copy p { margin: 0 0 28px; }
+  .lp-hero-copy p { margin: 0 auto 28px; }
   .lp-hero-copy .hero-actions { justify-content: center; }
   @media (max-width: 900px) { .lp-hero-copy h1 { font-size: 36px; } }
 
@@ -11270,9 +11258,10 @@ function App() {
   .lpd-ask-send { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; flex-shrink: 0; box-shadow: 0 2px 8px rgba(46,91,255,0.3); }
   @keyframes lpdAskPop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
   @keyframes lpdTyping { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+  .lpd-insights { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
   .lpd-ins-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--ink); margin-bottom: 12px; }
   .lpd-ins-spark { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); display: flex; align-items: center; justify-content: center; color: var(--accent); }
-  .lpd-ins-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4; animation: lpdInsIn 0.45s ease; }
+  .lpd-ins-row { display: flex; align-items: center; gap: 10px; padding: 16px 16px; border-radius: 12px; font-size: 15px; line-height: 1.45; animation: lpdInsIn 0.45s ease; }
   .lpd-ins-ico { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; }
   .lpd-ins-warn { background: #FEF3F2; color: #912018; } .lpd-ins-warn .lpd-ins-ico { background: #FEE4E2; color: #D92D20; }
   .lpd-ins-pos { background: #ECFDF3; color: #087443; } .lpd-ins-pos .lpd-ins-ico { background: #D1FADF; color: #12A150; }
