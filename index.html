@@ -9480,6 +9480,14 @@ function App() {
         onSaveAllTargets={handleSaveAllTargets}
         openTargetsEdit={targetsEditReq}
         onConsumeTargetsEdit={() => setTargetsEditReq(false)}
+        userId={userId}
+        onOpenLegal={openLegal}
+        onSaveName={handleSaveName}
+        onRemoveBank={handleRemoveBank}
+        onSaveTargets={handleSaveTargets}
+        onChangeTheme={handleChangeTheme}
+        onSaveCurrency={handleSaveCurrency}
+        onSaveFxRate={handleSaveFxRate}
       />
     );
   }
