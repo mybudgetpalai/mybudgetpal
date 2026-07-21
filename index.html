@@ -273,15 +273,6 @@ const ICON_PATHS = {
 };
 /* Same mark as the login splash and boot screen. Bar heights keep the splash's
    1 : 1.64 : 2.27 ratio (22/36/50) so the logo reads identically at any size. */
-function BrandMark({ size = 20 }) {
-  return (
-    <svg className="brand-mark" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="2.5" y="13.4" width="5" height="8.1" rx="2.5" fill="currentColor" />
-      <rect x="9.5" y="8.2" width="5" height="13.3" rx="2.5" fill="currentColor" />
-      <rect x="16.5" y="3" width="5" height="18.5" rx="2.5" fill="currentColor" />
-    </svg>
-  );
-}
 function Icon({ name, size = 16, strokeWidth = 2, className = "", style }) {
   const d = ICON_PATHS[name] || ICON_PATHS.tag;
   return (
@@ -580,8 +571,6 @@ const GOALS = [
   "Build my credit", "Plan for a big purchase", "Grow my business", "Just stay organised",
 ];
 const ONBOARD_STEPS = 5;
-const CARD_SIZE = { 0: "size-sm", 1: "size-lg", 2: "size-sm", 3: "size-sm", 4: "size-sm", 5: "size-md" };
-
 const VIEWS = [
   { key: "overview", label: "Overview" },
   { key: "breakdown", label: "Spending Breakdown" },
@@ -593,43 +582,6 @@ const VIEWS = [
   { key: "insights", label: "Insights" },
   { key: "categories", label: "Manage Categories" },
   { key: "accounts", label: "Bank Accounts" },
-];
-
-const TREND_MONTHS = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-const TREND_SPEND = [1850, 1920, 1980, 2050, 2100, 2150];
-const TREND_INCOME = [3100, 3100, 3150, 3150, 3200, 3200];
-
-const BILLS = [
-  { name: "Rent", amount: 1200, frequency: "Monthly", due: "1st" },
-  { name: "DEWA", amount: 280, frequency: "Monthly", due: "5th" },
-  { name: "Netflix", amount: 12.99, frequency: "Monthly", due: "12th" },
-  { name: "Spotify", amount: 9.99, frequency: "Monthly", due: "15th" },
-  { name: "Gym Membership", amount: 45, frequency: "Monthly", due: "28th" },
-];
-
-const MERCHANTS = [
-  { name: "Amazon", category: "Shopping", amount: 420 },
-  { name: "Waitrose", category: "Groceries", amount: 380 },
-  { name: "Uber", category: "Transport", amount: 210 },
-  { name: "Costa Coffee", category: "Dining", amount: 95 },
-  { name: "Netflix", category: "Subscriptions", amount: 77 },
-];
-
-const INSIGHTS = [
-  { type: "warning", text: "Dining spend is up 40% compared to last month." },
-  { type: "positive", text: "You're on track to hit your savings goal 2 months early." },
-  { type: "info", text: "Bills increased by 8% since last month, mostly from DEWA." },
-  { type: "positive", text: "Groceries spend has stayed consistent for 3 months running." },
-];
-const TRANSACTIONS = [
-  { name: "Waitrose", category: "Groceries", date: "5 Jul", amount: -84.20 },
-  { name: "Uber", category: "Transport", date: "5 Jul", amount: -18.50 },
-  { name: "Salary", category: "Income", date: "1 Jul", amount: 3200.00 },
-  { name: "Netflix", category: "Subscriptions", date: "1 Jul", amount: -12.99 },
-  { name: "Costa Coffee", category: "Dining", date: "30 Jun", amount: -6.40 },
-  { name: "Amazon", category: "Shopping", date: "29 Jun", amount: -142.00 },
-  { name: "DEWA", category: "Bills", date: "27 Jun", amount: -310.00 },
-  { name: "Gym Membership", category: "Health", date: "28 Jun", amount: -45.00 },
 ];
 
 const MONTH_LABELS = ["Apr", "May", "Jun"];
@@ -648,48 +600,6 @@ const CATEGORY_COLORS = {
   Entertainment: "#D94576",
   Income: "#2FBE7B", Uncategorized: "#98A2B3", Other: "#98A2B3",
 };
-const DEMO_CSV = `Date,Description,Amount
-2026-05-01,SALARY ACME LLC,3200.00
-2026-05-02,DEWA PAYMENT,-305.00
-2026-05-03,WAITROSE DUBAI MALL,-84.20
-2026-05-05,UBER TRIP HELP.UBER.COM,-18.50
-2026-05-08,CARREFOUR MOE,-112.40
-2026-05-10,NETFLIX.COM,-12.99
-2026-05-12,COSTA COFFEE JBR,-6.40
-2026-05-14,AMAZON.AE ORDER,-142.00
-2026-05-15,SPOTIFY AB,-9.99
-2026-05-18,TALABAT DUBAI,-32.75
-2026-05-20,FLOWER SHOP AL BARSHA,-60.00
-2026-05-22,ENOC PETROL 1044,-90.00
-2026-05-28,FITNESS FIRST,-45.00
-2026-06-01,SALARY ACME LLC,3200.00
-2026-06-02,DEWA PAYMENT,-310.00
-2026-06-04,WAITROSE DUBAI MALL,-91.10
-2026-06-06,UBER TRIP HELP.UBER.COM,-22.00
-2026-06-09,CARREFOUR MOE,-98.60
-2026-06-10,NETFLIX.COM,-12.99
-2026-06-12,SHAKE SHACK MOE,-58.00
-2026-06-15,SPOTIFY AB,-9.99
-2026-06-16,NOON.COM ORDER,-210.00
-2026-06-19,TALABAT DUBAI,-41.20
-2026-06-21,FLOWER SHOP AL BARSHA,-55.00
-2026-06-24,ENOC PETROL 1044,-85.00
-2026-06-28,FITNESS FIRST,-45.00
-2026-07-01,SALARY ACME LLC,3200.00
-2026-07-02,DEWA PAYMENT,-308.00
-2026-07-03,WAITROSE DUBAI MALL,-79.90
-2026-07-04,NETFLIX.COM,-12.99
-2026-07-05,UBER TRIP HELP.UBER.COM,-15.25
-2026-07-05,STARBUCKS DIFC,-8.20`;
-const DEMO_CAT_RULES = [
-  [/salary|payroll/i, "Income"],
-  [/dewa|etisalat|\bdu\b|utility|utilities|electric|water/i, "Bills"],
-  [/waitrose|carrefour|spinneys|grocer|supermarket/i, "Groceries"],
-  [/uber|careem|salik|enoc|adnoc|petrol|rta|taxi|metro/i, "Transport"],
-  [/netflix|spotify|fitness first|gym|prime video|subscription/i, "Subscriptions"],
-  [/costa|starbucks|shake shack|talabat|deliveroo|restaurant|coffee|cafe|dining/i, "Dining"],
-  [/amazon|noon|flower|mall|store|shop/i, "Shopping"],
-];
 function demoCategorize(name, amount) {
   /* Use the same full ruleset as real uploads so recognisable merchants never fall through to "Needs review". */
   return categorizeByRules(name, amount);
@@ -755,8 +665,6 @@ const DEMO_CSV_AED = `Date,Description,Amount
 2026-07-05,STARBUCKS DIFC,-34.20`;
 function demoCsvForCurrency(cur) { return cur === "AED" ? DEMO_CSV_AED : DEMO_CSV_GBP; }
 
-const SAVINGS_GOAL = { label: "Emergency fund", target: 10000, current: 4200, months: 6 };
-
 const PRIVACY_SECTIONS = [
   { h: "What we collect", b: "Account details (name, email, password), bank statement files you upload, transaction data extracted from them, and any goals/targets you set." },
   { h: "Why we collect it", b: "To categorize your spending, show summaries and trends, and let you log back in to the same data." },
@@ -778,12 +686,6 @@ const TERMS_SECTIONS = [
 const CURRENCIES = ["AED", "GBP", "USD", "EUR"];
 const CURRENCY_SYMBOLS = { GBP: "£", AED: "AED ", USD: "$", EUR: "€" };
 const UAE_BANKS = ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK"];
-const CURRENCY_META = {
-  GBP: { label: "British Pound", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
-  AED: { label: "UAE Dirham", flag: "\uD83C\uDDE6\uD83C\uDDEA" },
-  USD: { label: "US Dollar", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
-  EUR: { label: "Euro", flag: "\uD83C\uDDEA\uD83C\uDDFA" },
-};
 const CURRENCY_BANKS = {
   GBP: ["HSBC", "Barclays", "Santander", "Monzo", "Revolut", "Wise", "Standard Chartered", "Citibank", "Other"],
   AED: ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "HSBC", "Standard Chartered", "Wise", "Other"],
@@ -1657,10 +1559,6 @@ async function parseStatementFile(file) {
 
 /* Supabase persistence for transactions */
 function rowToTx(r) { return { id: r.id, date: r.tx_date || "", name: r.description, amount: Number(r.amount), category: r.category || "Uncategorized", bank: r.bank_name }; }
-/* Dev-only test hook: forces 2 spend transactions per import into "Needs review" so the categorise flow can be tested. No effect for real accounts. */
-let DEV_MODE = false;
-const DEV_FORCED_NAMES = new Set();
-function devForceUncat(list) { return list; } // disabled: no longer forces test transactions into Uncategorised
 async function fetchTransactions(userId) {
   const { data, error } = await supabaseClient.from("transactions").select("*").eq("user_id", userId).order("tx_date", { ascending: false });
   if (error) return [];
@@ -3026,7 +2924,6 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
       pushToast("None of the files could be read — nothing was imported. Try different files, or Skip for now.", "error");
       return;
     }
-    devForceUncat(allParsed);
     let saved = allParsed;
     if (allParsed.length) {
       try {
@@ -4623,99 +4520,6 @@ function BreakdownCard({ transactions, targets }) {
   );
 }
 
-function GoalModal({ onClose, onSave }) {
-  const [name, setName] = useState("");
-  const [target, setTarget] = useState("");
-  const [saved, setSaved] = useState("");
-  const [targetDate, setTargetDate] = useState("");
-  const [busy, setBusy] = useState(false);
-  const canSave = name.trim().length > 0 && Number(target) > 0;
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="glass-card modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="brand-row" style={{ marginBottom: 12, justifyContent: "space-between" }}>
-          <span className="brand-name">New savings goal</span>
-          <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ color: "var(--ink)" }}>×</button>
-        </div>
-        <div className="field-group">
-          <label className="field-label">What are you saving for?</label>
-          <input className="glass-input" type="text" placeholder="e.g. Emergency fund" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-        </div>
-        <div className="field-group">
-          <label className="field-label">Target amount</label>
-          <div className="target-input-wrap" style={{ width: "100%" }}>
-            <span className="target-currency">{homeSym()}</span>
-            <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="10000" value={target} onChange={(e) => setTarget(e.target.value)} />
-          </div>
-        </div>
-        <div className="field-group">
-          <label className="field-label">Saved so far (optional)</label>
-          <div className="target-input-wrap" style={{ width: "100%" }}>
-            <span className="target-currency">{homeSym()}</span>
-            <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="0" value={saved} onChange={(e) => setSaved(e.target.value)} />
-          </div>
-        </div>
-        <div className="field-group">
-          <label className="field-label">Target date (optional)</label>
-          <input className="glass-input" style={{ padding: "10px 12px", fontSize: 13 }} type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
-        </div>
-        <div className="nav-row">
-          <button className="glass-btn primary" disabled={!canSave || busy} onClick={async () => {
-            setBusy(true);
-            await onSave({ name: name.trim(), target: Number(target), saved: Number(saved) || 0, targetDate: targetDate || null });
-            setBusy(false);
-          }}>
-            {busy ? <span className="btn-spinner" /> : "Add goal"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GoalRow({ goal, onUpdate, onDelete }) {
-  const [adding, setAdding] = useState(false);
-  const [addAmount, setAddAmount] = useState("");
-  const pct = goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
-  const remaining = Math.max(0, goal.target - goal.saved);
-  const months = monthsUntil(goal.targetDate);
-  const perMonth = months && months > 0 ? remaining / months : null;
-  const done = goal.saved >= goal.target && goal.target > 0;
-  return (
-    <div className="goal-row">
-      <div className="goal-row-head">
-        <span className="goal-name">{goal.name}</span>
-        <button className="file-remove" onClick={() => onDelete(goal.id)} aria-label="Delete goal">×</button>
-      </div>
-      <div className="summary-amounts" style={{ margin: "4px 0 10px" }}>
-        <span className="summary-spent" style={{ fontSize: 24 }}>{formatMoney(goal.saved)}</span>
-        <span className="summary-target">of {formatMoney(goal.target)}</span>
-      </div>
-      <div className="progress-track" style={{ marginTop: 8 }}><div className="progress-fill goal-fill" style={{ width: pct + "%" }} /></div>
-      <p className="summary-note" style={{ textAlign: "left" }}>
-        {done ? "Goal reached" : pct + "% there · " + formatMoney(remaining) + " to go" +
-          (months !== null ? " · " + months + " month" + (months !== 1 ? "s" : "") + " left" : "") +
-          (perMonth !== null && !done ? " · save ~" + formatMoney(perMonth) + "/month to hit it" : "")}
-      </p>
-      {adding ? (
-        <div className="goal-add-row">
-          <div className="target-input-wrap" style={{ flex: 1 }}>
-            <span className="target-currency">{homeSym()}</span>
-            <input className="target-input" style={{ width: "100%" }} type="number" min="0" placeholder="Amount" value={addAmount} onChange={(e) => setAddAmount(e.target.value)} autoFocus />
-          </div>
-          <button className="glass-btn primary goal-add-btn" disabled={!(Number(addAmount) > 0)} onClick={() => {
-            onUpdate(goal.id, { saved: goal.saved + Number(addAmount) });
-            setAddAmount(""); setAdding(false);
-          }}>Add</button>
-          <button className="glass-btn ghost goal-add-btn" onClick={() => { setAdding(false); setAddAmount(""); }}>Cancel</button>
-        </div>
-      ) : (
-        !done && <button className="link-btn inline" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={() => setAdding(true)}>+ Add money</button>
-      )}
-    </div>
-  );
-}
-
 function TrendsCard({ transactions, compact }) {
   const txs = transactions || [];
   const [cat, setCat] = useState(TX_CATEGORIES[0]);
@@ -5239,21 +5043,6 @@ function dataGapDays(transactions) {
   const latest = dates.length ? dates[dates.length - 1] : null;
   if (!latest) return null;
   return Math.floor((today().getTime() - new Date(latest + "T00:00:00").getTime()) / 86400000);
-}
-
-function DataGapBanner({ transactions, onOpenUpload }) {
-  const [dismissed, setDismissed] = useState(() => { try { return sessionStorage.getItem("mbp-datagap-dismissed") === "1"; } catch (e) { return false; } });
-  const dismiss = () => { try { sessionStorage.setItem("mbp-datagap-dismissed", "1"); } catch (e) {} setDismissed(true); };
-  const missingDays = dataGapDays(transactions);
-  if (dismissed || missingDays == null || missingDays < 3) return null;
-  return (
-    <div className="data-gap">
-      <span className="data-gap-ic"><Icon name="calendar" size={16} /></span>
-      <span className="data-gap-tx">We’re missing the last <strong>{missingDays} days</strong> of data — upload your latest statement for sharper insights.</span>
-      {onOpenUpload && <button className="data-gap-btn" onClick={onOpenUpload}>Upload</button>}
-      <button className="data-gap-x" onClick={dismiss} aria-label="Dismiss" title="Dismiss">×</button>
-    </div>
-  );
 }
 
 function MonthEndReviewModal({ month, transactions, budgets, goal, onAction, onClose, isManual, plan, allTargets }) {
@@ -5870,19 +5659,6 @@ const OVERVIEW_WIDGETS = [
   { key: "empty", label: "+ Empty slot" },
 ];
 const DEFAULT_OVERVIEW_SLOTS = ["summary", "transactions", "breakdown", "insights"];
-const TOUR_DEFAULT_SLOTS = ["summary", "breakdown", "insights", "empty"];
-const TOUR_COPY = {
-  summary: { title: "Monthly summary", body: "This shows how you're pacing against your budget for this month." },
-  breakdown: { title: "Spending breakdown", body: "This breaks your spending down by category, so you can see where your money goes." },
-  insights: { title: "Insights", body: "We surface notable changes here — a category creeping up, or a goal you're ahead on." },
-  empty: { title: "Make it yours", body: "This slot is all yours. When the tour ends, pick any widget from the menu to build your dashboard your way." },
-  transactions: { title: "Recent transactions", body: "A quick look at your latest activity." },
-  trends: { title: "Spending trend", body: "How your spending moves month to month." },
-  bills: { title: "Bills & subscriptions", body: "Your recurring payments in one place." },
-  accounts: { title: "Bank accounts", body: "Estimated balances across your accounts." },
-  merchants: { title: "Top merchants", body: "Where your money goes most." },
-};
-
 function renderOverviewWidget(key, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers }) {
   switch (key) {
     case "summary": return hasData ? <SummaryCard targets={targets} transactions={transactions} rollovers={rollovers} /> : <EmptyState text="No transactions yet — upload a statement to see your monthly summary." />;
@@ -5897,38 +5673,6 @@ function renderOverviewWidget(key, { targets, banks, hasData, transactions, goal
     default: return null;
   }
 }
-
-function OverviewSlot({ widgetKey, onChange, index, runTour, tourStep, targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers }) {
-  const revealed = !runTour || index <= tourStep;
-  const active = runTour && index === tourStep;
-  const slotRef = React.useRef(null);
-  React.useEffect(() => {
-    if (active && slotRef.current) {
-      const el = slotRef.current;
-      const t = setTimeout(() => scrollTourTargetIntoView(el, 96), 120);
-      const t2 = setTimeout(() => scrollTourTargetIntoView(el, 96), 420);
-      return () => { clearTimeout(t); clearTimeout(t2); };
-    }
-  }, [active]);
-  if (runTour && !revealed) {
-    return <div className="overview-slot overview-slot-coming"><span className="coming-soon">Coming up…</span></div>;
-  }
-  return (
-    <div ref={slotRef} className={"overview-slot" + (active ? " tour-active" : "")}>
-      {!runTour && (
-        <div className="overview-slot-head">
-          <select className="slot-select" value={widgetKey} onChange={(e) => onChange(e.target.value)}>
-            {OVERVIEW_WIDGETS.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
-          </select>
-        </div>
-      )}
-      <div className="overview-slot-body">
-        {renderOverviewWidget(widgetKey, { targets, banks, hasData, transactions, goals, goalsApi, accountData, billExcludes, rollovers })}
-      </div>
-    </div>
-  );
-}
-
 
 /* Tour copy must match what the hero actually renders. The hero is data-driven:
    no targets -> "Spent so far", targets set -> "Safe to spend". The month shown is
@@ -9120,7 +8864,7 @@ function App() {
     if (n > 0) pushToast(n + " transaction" + (n !== 1 ? "s" : "") + " couldn't be auto-categorised — use the tag on your Overview to sort them", "info");
   };
   const runAiFallback = async (txs) => {
-    const uncats = txs.filter((t) => t.category === "Uncategorized" && !DEV_FORCED_NAMES.has(t.name) && !isTransferDesc(t.name));
+    const uncats = txs.filter((t) => t.category === "Uncategorized" && !isTransferDesc(t.name));
     if (!uncats.length) return;
     try {
       const unique = [...new Set(uncats.map((t) => t.name))].slice(0, 200);
@@ -9207,7 +8951,6 @@ function App() {
         all.push(applyFxToTx(base));
       });
     });
-    devForceUncat(all);
     setCustomTransactions(all);
     setUsingDemo(true);
     setStage("processing");
@@ -9230,7 +8973,6 @@ function App() {
         all.push(applyFxToTx(base));
       });
     });
-    devForceUncat(all);
     setCustomTransactions(all);
     setUsingDemo(true);
     setRunTour(true);
@@ -9244,7 +8986,6 @@ function App() {
     base.forEach((t) => { if (!(t.name in overrideMap)) overrideMap[t.name] = t.category; });
     list.forEach((t) => { const o = overrideMap[t.name]; if (o && o !== "Uncategorized") t.category = o; });
     const { kept, skipped } = dedupeTransactions(list, base);
-    devForceUncat(kept);
     let stmtRow = null;
     if (bankName && meta) {
       try {
@@ -9293,7 +9034,6 @@ function App() {
         setUserId(uid);
         setIsDev(TESTING_EMAILS.includes(session.user.email));
         setIsAdmin(session.user.email === ADMIN_EMAIL);
-        DEV_MODE = session.user.email === DEV_EMAIL;
         const profile = await fetchProfile(uid);
         if (profile?.name) {
           const bankRows = await fetchBanks(uid);
@@ -9602,7 +9342,7 @@ function App() {
       const { data, error } = await supabaseClient.auth.signInAnonymously();
       if (error || !data?.user) { pushToast("TEST login failed: " + (error?.message || "no session") + " (enable Anonymous sign-ins in Supabase)", "error"); return; }
       setUserId(data.user.id);
-      setIsDev(false); setIsAdmin(false); DEV_MODE = false; DEV_NOW = null; setDevNow(null);
+      setIsDev(false); setIsAdmin(false); DEV_NOW = null; setDevNow(null);
       setStage("onboarding");
     } catch (e) { pushToast("TEST login error: " + (e?.message || e), "error"); }
   };
@@ -9610,7 +9350,6 @@ function App() {
     await supabaseClient.auth.signOut();
     setIsDev(false);
     setIsAdmin(false);
-    DEV_MODE = false;
     setUserId(null); setName(""); setBanks([]); setBankRows([]); setTargets({}); setUploadedFiles({}); setGoals([]); setCustomTransactions([]); setStatements([]); setPlan(null);
     setOverviewSlots(DEFAULT_OVERVIEW_SLOTS);
     pushToast("Logged out", "info");
@@ -9681,7 +9420,7 @@ function App() {
         onError={(msg, type) => pushToast(msg, type || "error")}
         onDone={async (mode, uid, profile) => {
           setUserId(uid);
-          try { const em = (await supabaseClient.auth.getUser()).data?.user?.email || ""; setIsDev(em === DEV_EMAIL); setIsAdmin(em === ADMIN_EMAIL); DEV_MODE = em === DEV_EMAIL; } catch (e) {}
+          try { const em = (await supabaseClient.auth.getUser()).data?.user?.email || ""; setIsDev(em === DEV_EMAIL); setIsAdmin(em === ADMIN_EMAIL); } catch (e) {}
           if (mode === "login") {
             if (profile?.name) {
               const bankRows = await fetchBanks(uid);
@@ -10330,8 +10069,7 @@ function App() {
   .hamburger::before { top: -5px; } .hamburger::after { top: 5px; }
   /* Mark + wordmark, matching the boot screen and the installed icon. */
   .brand { display: inline-flex; align-items: center; color: var(--ink); font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
-  .brand-mark { color: var(--grad-3); flex-shrink: 0; }
-  /* Two-tone, same as the splash: dark "My", accent "BudgetPal". */
+  /* Header wordmark styling (TwoPockets). */
   .brand-word { font-weight: 800; letter-spacing: -0.7px; color: var(--ink); line-height: 1; }
   .brand-word-2 { color: var(--grad-3); }
   .brand-logo-tile { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(150deg, #2E5BFF 0%, #6A4DFF 60%, #8B5CF6 100%); box-shadow: 0 4px 10px rgba(92,80,255,.3); display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; margin-right: 9px; }
