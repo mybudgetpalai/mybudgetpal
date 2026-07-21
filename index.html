@@ -8195,18 +8195,34 @@ function MobileMenuSheet({ open, onClose, name, views, active, onSelect, onOpenS
     </React.Fragment>
   );
 }
-function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onInsights, onMenu }) {
-  const Tab = ({ view, on, icon, label }) => (
+function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onTargets, onMenu }) {
+  const Tab = ({ view, on, label, children }) => (
     <button className={"mbn-tab" + (active === view ? " mbn-active" : "")} onClick={on} aria-label={label} title={label}>
-      <span className="mbn-hl" /><Icon name={icon} size={24} />
+      <span className="mbn-hl" />{children}
     </button>
+  );
+  /* Home = outline house (V1). Spending = filled pie (V5). Targets = concentric target. */
+  const homeIcon = (
+    <svg className="ic" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 11.5 12 4l8 7.5" /><path d="M6 10v9a1 1 0 0 0 1 1h3v-5a2 2 0 0 1 4 0v5h3a1 1 0 0 0 1-1v-9" />
+    </svg>
+  );
+  const spendIcon = (
+    <svg className="ic" width={24} height={24} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11 3.1A9 9 0 1 0 20.9 13H11z" /><path d="M13 2.1V11h8.9A9 9 0 0 0 13 2.1z" fillOpacity="0.45" />
+    </svg>
+  );
+  const targetIcon = (
+    <svg className="ic" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
   );
   return (
     <div className="mobile-bottom-nav" role="navigation" aria-label="Primary">
-      <Tab view="overview" on={onHome} icon="home" label="Home" />
-      <Tab view="breakdown" on={onBreakdown} icon="pie" label="Spending Breakdown" />
+      <Tab view="overview" on={onHome} label="Home">{homeIcon}</Tab>
+      <Tab view="breakdown" on={onBreakdown} label="Spending Breakdown">{spendIcon}</Tab>
       <div className="mbn-ctr"><button className="mbn-plus" onClick={onUpload} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={25} /></button></div>
-      <Tab view="insights" on={onInsights} icon="bulb" label="Insights" />
+      <Tab view="targets" on={onTargets} label="Targets">{targetIcon}</Tab>
       <button className={"mbn-tab mbn-burger" + (menuOpen ? " mbn-active" : "")} onClick={onMenu} aria-label="Menu" title="Menu"><span className="mbn-hl" /><span className="mbn-burger-lines" /></button>
     </div>
   );
@@ -8317,7 +8333,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         onHome={() => { setMobileMenuOpen(false); setView("overview"); setTInitEdit(false); }}
         onBreakdown={() => { setMobileMenuOpen(false); setView("breakdown"); setTInitEdit(false); }}
         onUpload={() => { setMobileMenuOpen(false); setUploadOpen(true); }}
-        onInsights={() => { setMobileMenuOpen(false); setView("insights"); setTInitEdit(false); }}
+        onTargets={() => { setMobileMenuOpen(false); setView("targets"); setTInitEdit(false); }}
         onMenu={() => setMobileMenuOpen((v) => !v)} />
       <MobileMenuSheet open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} name={name}
         views={visibleViews} active={effectiveView}
