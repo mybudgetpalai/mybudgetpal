@@ -4040,7 +4040,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     <div className={"topbar" + (tourSpot === "upload" || tourSpot === "inbox" ? " topbar-tour-lift" : "")}>
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-logo-tile"><BrandMark size={20} /></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-logo-tile"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="12" width="5.2" height="10" rx="2" fill="#fff"/><rect x="9.4" y="6.5" width="5.2" height="15.5" rx="2" fill="#fff"/><rect x="16.8" y="2" width="5.2" height="20" rx="2" fill="#fff"/></svg></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
       </div>
       <div className="topbar-right">
         <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")} data-tour-active={tourSpot === "upload" ? "1" : undefined}>
@@ -12299,8 +12299,8 @@ function App() {
     }
     [data-theme="dark"] .mobile-bottom-nav { box-shadow: 0 -6px 20px rgba(0,0,0,.4); }
     .mbn-tab { flex: 1; height: 62px; display: flex; align-items: center; justify-content: center;
-      background: none; border: none; cursor: pointer; color: var(--ink-3); position: relative; padding: 0; }
-    .mbn-tab .ic { position: relative; z-index: 1; transition: transform .2s; }
+      background: none; border: none; cursor: pointer; color: var(--ink-2); position: relative; padding: 0; }
+    .mbn-tab .ic { position: relative; z-index: 1; transition: transform .2s; stroke-width: 2.2; }
     .mbn-tab.mbn-active { color: var(--accent); }
     .mbn-active .ic { transform: translateY(-1px); }
     .mbn-hl { position: absolute; width: 46px; height: 36px; border-radius: 13px; background: var(--accent-soft);
