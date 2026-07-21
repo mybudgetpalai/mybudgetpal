@@ -1543,6 +1543,38 @@ async function saveStatementToDb(userId, s) {
   return rowToStmt(data);
 }
 
+/* ---------------- Shared statement-import unit ----------------
+   The single place both import paths (NCJ UploadScreen + dashboard
+   handleAddTransactions) run their common steps: apply the user's manual
+   category overrides, dedupe against what's already there, persist the
+   statement metadata row, and optionally archive the raw file to storage.
+   Transaction saving stays with each caller (NCJ batches at the end,
+   dashboard saves per import) so failure behaviour is unchanged. */
+async function importStatementUnit({ userId, bank, txs, meta, fileName, rawFile, existing, overrideMap, stmtErrorMsg, pushToast }) {
+  if (overrideMap) txs.forEach((t) => { const o = overrideMap[t.name]; if (o && o !== "Uncategorized") t.category = o; });
+  const { kept, skipped } = dedupeTransactions(txs, existing || []);
+  let stmtRow = null;
+  if (bank && meta) {
+    try {
+      stmtRow = await saveStatementToDb(userId, {
+        bank, fileName: fileName || null,
+        periodStart: meta.periodStart, periodEnd: meta.periodEnd,
+        opening: meta.opening, closing: meta.closing,
+      });
+    } catch (e) { if (stmtErrorMsg && pushToast) pushToast(stmtErrorMsg, "error"); }
+  }
+  if (rawFile && bank && userId) {
+    try {
+      const path = userId + "/" + bank + "/" + Date.now() + "_" + (fileName || rawFile.name);
+      await supabaseClient.storage.from("statements").upload(path, rawFile);
+    } catch (e) {}
+  }
+  return { kept, skipped, stmtRow };
+}
+function importToast(imported, skipped) {
+  return imported + " transaction" + (imported !== 1 ? "s" : "") + " imported" + (skipped > 0 ? " · " + skipped + " duplicate" + (skipped !== 1 ? "s" : "") + " skipped" : "");
+}
+
 /*
  * Reconciliation: for every statement of a bank, computed closing =
  * opening + sum of ALL stored transactions for that bank inside the period.
@@ -2807,18 +2839,10 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
         try {
           const { transactions: parsed, meta } = await parseStatementFile(f.rawFile);
           parsed.forEach((t) => { t.bank = bank; });
-          const { kept, skipped } = dedupeTransactions(parsed, allParsed);
-          totalSkipped += skipped;
           if (!parsed.length) { pushToast("No transactions found in " + f.name, "error"); continue; } /* TS5 fix: don't insert an orphan statements row for a file with no transactions */
-          let stmtRow = null;
-          try {
-            stmtRow = await saveStatementToDb(userId, {
-              bank, fileName: f.name,
-              periodStart: meta.periodStart, periodEnd: meta.periodEnd,
-              opening: meta.opening, closing: meta.closing,
-            });
-            savedStatements.push(stmtRow);
-          } catch (e) {}
+          const { kept, skipped, stmtRow } = await importStatementUnit({ userId, bank, txs: parsed, meta, fileName: f.name, existing: allParsed, pushToast });
+          totalSkipped += skipped;
+          if (stmtRow) savedStatements.push(stmtRow);
           kept.forEach((t) => { t._stmtId = stmtRow ? stmtRow.id : null; });
           allParsed.push(...kept);
         } catch (e) {
@@ -2842,7 +2866,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
           saved.push(...rows);
         }
       } catch (e) { saved = allParsed; pushToast("Transactions parsed but couldn't be saved to your account", "error"); }
-      pushToast(allParsed.length + " transaction" + (allParsed.length !== 1 ? "s" : "") + " imported" + (totalSkipped > 0 ? " · " + totalSkipped + " duplicate" + (totalSkipped !== 1 ? "s" : "") + " skipped" : ""), "success");
+      pushToast(importToast(allParsed.length, totalSkipped), "success");
     }
     setSubmitting(false);
     onDone(filesByBank, balanceByBank, saved, savedStatements);
@@ -8891,31 +8915,14 @@ function App() {
     if (usingDemo) setUsingDemo(false);
     const overrideMap = {};
     base.forEach((t) => { if (!(t.name in overrideMap)) overrideMap[t.name] = t.category; });
-    list.forEach((t) => { const o = overrideMap[t.name]; if (o && o !== "Uncategorized") t.category = o; });
-    const { kept, skipped } = dedupeTransactions(list, base);
-    let stmtRow = null;
-    if (bankName && meta) {
-      try {
-        stmtRow = await saveStatementToDb(userId, {
-          bank: bankName, fileName: fileName || null,
-          periodStart: meta.periodStart, periodEnd: meta.periodEnd,
-          opening: meta.opening, closing: meta.closing,
-        });
-      } catch (e) { pushToast("Couldn't record the statement — run the statements SQL setup", "error"); }
-    }
-    if (rawFile && bankName && userId) {
-      try {
-        const path = userId + "/" + bankName + "/" + Date.now() + "_" + (fileName || rawFile.name);
-        await supabaseClient.storage.from("statements").upload(path, rawFile);
-      } catch (e) {}
-    }
+    const { kept, skipped, stmtRow } = await importStatementUnit({ userId, bank: bankName, txs: list, meta, fileName, rawFile, existing: base, overrideMap, stmtErrorMsg: "Couldn't record the statement — run the statements SQL setup", pushToast });
     let saved = kept;
     if (kept.length) {
       try { saved = await saveTransactionsToDb(userId, bankName || null, kept, stmtRow ? stmtRow.id : null); }
       catch (e) { pushToast("Imported, but couldn't save to your account — run the transactions SQL setup", "error"); }
       saved.forEach((t) => { if (!t.bank) t.bank = bankName || null; });
       setCustomTransactions((prev) => [...saved, ...(usingDemo ? [] : prev)]);
-      pushToast(kept.length + " transaction" + (kept.length !== 1 ? "s" : "") + " imported" + (skipped > 0 ? " · " + skipped + " duplicate" + (skipped !== 1 ? "s" : "") + " skipped" : ""), "success");
+      pushToast(importToast(kept.length, skipped), "success");
     } else {
       pushToast("All " + list.length + " transactions were already imported — nothing new added", "info");
     }
