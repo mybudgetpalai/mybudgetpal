@@ -1446,11 +1446,11 @@ function App() {
 
   const openLegal = (tab, from) => { setLegalTab(tab); setReturnStage(from); setStage("legal"); };
 
-  const DEV_EMAIL = "testing@mybudgetpal.com";
-  const QA_EMAIL = "qa@mybudgetpal.com";
+  const DEV_EMAIL = "testing@twopockets.com";
+  const QA_EMAIL = "qa@twopockets.com";
   /* Accounts that get the orange testing bar (persona switcher + view toggle). */
   const TESTING_EMAILS = [DEV_EMAIL, QA_EMAIL];
-  const ADMIN_EMAIL = "admin@mybudgetpal.com";
+  const ADMIN_EMAIL = "admin@twopockets.com";
 
   const reloadFxData = async () => {
     if (!userId) return;
