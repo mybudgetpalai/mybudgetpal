@@ -135,15 +135,17 @@
 
   /* Mobile only (incl. Safari, not just the installed app): identical timings to
      .lsplash-* so opening the app and logging in animate the same way. */
+  /* Animated branded boot only for returning/logged-in visitors (html.has-session).
+     A brand-new logged-out visitor gets a plain static logo that clears instantly. */
   @media (max-width: 760px) {
-    .boot-tile { opacity: 0; transform: scale(0.82); animation: bootIconIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-    .boot-bar-i { transform: scaleY(0); transform-origin: bottom; }
-    .boot-bar-i.b1 { animation: bootBar 0.3s cubic-bezier(0.34,1.4,0.64,1) 0.40s forwards; }
-    .boot-bar-i.b2 { animation: bootBar 0.3s cubic-bezier(0.34,1.4,0.64,1) 0.62s forwards; }
-    .boot-bar-i.b3 { animation: bootBar 0.3s cubic-bezier(0.34,1.4,0.64,1) 0.84s forwards; }
-    .boot-logo { opacity: 0; transform: translateY(8px); animation: bootWord 0.5s ease 1.15s forwards; }
-    .boot-bar { display: block; opacity: 0; animation: bootWord 0.4s ease 1.3s forwards; }
-    .boot-sub { display: block; opacity: 0; animation: bootWord 0.4s ease 1.45s forwards; }
+    html.has-session .boot-tile { opacity: 0; transform: scale(0.82); animation: bootIconIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    html.has-session .boot-bar-i { transform: scaleY(0); transform-origin: bottom; }
+    html.has-session .boot-bar-i.b1 { animation: bootBar 0.3s cubic-bezier(0.34,1.4,0.64,1) 0.40s forwards; }
+    html.has-session .boot-bar-i.b2 { animation: bootBar 0.3s cubic-bezier(0.34,1.4,0.64,1) 0.62s forwards; }
+    html.has-session .boot-bar-i.b3 { animation: bootBar 0.3s cubic-bezier(0.34,1.4,0.64,1) 0.84s forwards; }
+    html.has-session .boot-logo { opacity: 0; transform: translateY(8px); animation: bootWord 0.5s ease 1.15s forwards; }
+    html.has-session .boot-bar { display: block; opacity: 0; animation: bootWord 0.4s ease 1.3s forwards; }
+    html.has-session .boot-sub { display: block; opacity: 0; animation: bootWord 0.4s ease 1.45s forwards; }
   }
   @media (prefers-color-scheme: dark) {
     .boot-shell { background: #0F1218; } .boot-my { color: #F2F5FA; } .boot-bp { color: #6C8CFF; } .boot-bar { background: #232B38; } .boot-sub { color: #8A96AC; }
@@ -199,6 +201,14 @@
   </style>
 <script>
 window.__bootStart = Date.now();
+try {
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf("-auth-token") !== -1 && localStorage.getItem(k)) {
+      document.documentElement.classList.add("has-session"); break;
+    }
+  }
+} catch (e) {}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
@@ -2230,8 +2240,8 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
             <h4>Bills &amp; subscriptions</h4>
             <p>Keep track of recurring payments and due dates in one place.</p>
             <div className="fc-viz fc-viz-bills">
-              <span className="fc-bill">Netflix</span>
-              <span className="fc-bill">Spotify</span>
+              <span className="fc-bill fc-bill-paid">Netflix &middot; paid</span>
+              <span className="fc-bill fc-bill-paid">Spotify &middot; paid</span>
               <span className="fc-bill fc-bill-due">DEWA &middot; due</span>
             </div>
           </div>
@@ -2265,7 +2275,14 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       </div>
 
       <footer className="lp-footer">
-        {APP_NAME}
+        <a className="lp-ig" href="https://instagram.com/twopockets.ae" target="_blank" rel="noopener noreferrer" aria-label="TwoPockets on Instagram">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none" />
+          </svg>
+          <span>@twopockets.ae</span>
+        </a>
       </footer>
     </div>
   );
@@ -9901,7 +9918,18 @@ function App() {
     const started = window.__bootStart || Date.now();
     /* Only mobile plays the animation, so only mobile waits for it to land.
        Desktop shows a static logo and can drop it as soon as React is up. */
-    const animated = window.matchMedia("(max-width: 760px)").matches
+    /* Only returning/logged-in users see the branded loading hold. A brand-new
+       visitor (no Supabase session token in storage) should land straight on the
+       page with no animated splash. */
+    let hasSession = false;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("-auth-token") !== -1 && localStorage.getItem(k)) { hasSession = true; break; }
+      }
+    } catch (e) {}
+    const animated = hasSession
+      && window.matchMedia("(max-width: 760px)").matches
       && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const wait = animated ? Math.max(0, 1500 - (Date.now() - started)) : 0;
     setTimeout(function () {
@@ -10703,6 +10731,11 @@ function App() {
   .step-num .ic { vertical-align: 0; }
   .lpd-cur-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .lpd-cur-head .lpd-cur-soon { margin-left: auto; }
+  @media (max-width: 560px) {
+    /* Stop the "coming soon" pill stranding on a random half-line: give it its
+       own full-width row, left-aligned, under the label + toggle. */
+    .lpd-cur-head .lpd-cur-soon { margin-left: 0; flex-basis: 100%; }
+  }
   .lpd-cur-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
   .lpd-cur-toggle { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
   .lpd-cur-opt { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink-2); background: none; border: none; border-radius: 999px; padding: 6px 16px; cursor: pointer; transition: all .15s; }
@@ -10748,6 +10781,7 @@ function App() {
   .fc-bar-label { font-size: 11px; font-weight: 700; color: var(--ink-2); }
   .fc-bill { font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); padding: 4px 9px; border-radius: 20px; }
   .fc-bill-due { color: var(--accent); background: var(--accent-soft); }
+  .fc-bill-paid { color: #12A85C; background: rgba(18,168,92,0.12); }
 
   .pricing { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 620px; margin: 0 auto; align-items: stretch; }
   .price-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; padding: 28px; text-align: center; display: flex; flex-direction: column; }
@@ -10764,6 +10798,9 @@ function App() {
   .lp-final-cta p { color: var(--ink-2); margin: 0 0 24px; }
 
   .lp-footer { position: relative; z-index: 1; text-align: center; padding: 22px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); }
+  .lp-ig { display: inline-flex; align-items: center; gap: 9px; color: var(--ink-2); font-weight: 600; text-decoration: none; padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px; transition: color .15s ease, border-color .15s ease, background .15s ease; }
+  .lp-ig:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .lp-ig svg { flex-shrink: 0; }
 
   @media (max-width: 720px) {
     .lp-hero h1 { font-size: 36px; }
