@@ -12319,11 +12319,11 @@ function App() {
       background: none; border: none; cursor: pointer; color: var(--ink-2); position: relative; padding: 0; }
     .mbn-tab .ic { position: relative; z-index: 1; transition: transform .2s; stroke-width: 2.2; }
     .mbn-tab.mbn-active { color: var(--accent); }
-    .mbn-active .ic { transform: translateY(-1px); }
+    /* no vertical shift on active — keeps icons steady on tap */
     .mbn-hl { position: absolute; width: 46px; height: 36px; border-radius: 13px; background: var(--accent-soft);
       opacity: 0; transform: scale(.6); transition: .22s cubic-bezier(.34,1.56,.64,1); }
     .mbn-active .mbn-hl { opacity: 1; transform: scale(1); }
-    .mbn-ctr { flex: 0 0 60px; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .mbn-ctr { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; }
     .mbn-plus { width: 42px; height: 42px; border-radius: 14px; border: none; cursor: pointer;
       background: var(--grad-2, var(--grad-3)); color: var(--on-accent, #fff);
       display: flex; align-items: center; justify-content: center;
