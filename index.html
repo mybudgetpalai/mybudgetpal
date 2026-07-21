@@ -902,7 +902,11 @@ function avgSpendByCategory(transactions) {
 /* Deduplication: key = date + description + amount. Handles genuine same-day
    identical transactions by only skipping as many copies as already exist. */
 function txKey(t) {
-  return (t.date || "") + "|" + (t.name || "").toLowerCase().replace(/\s+/g, " ").trim() + "|" + (Number(t.amount) || 0).toFixed(2);
+  /* Dedupe on the NATIVE (statement) amount. After FX conversion, t.amount holds the
+     home-currency value while a re-uploaded file carries the original — comparing the
+     converted figure to the native one made cross-currency duplicates invisible. */
+  const amt = t.amountNative !== undefined ? t.amountNative : t.amount;
+  return (t.date || "") + "|" + (t.name || "").toLowerCase().replace(/\s+/g, " ").trim() + "|" + (Number(amt) || 0).toFixed(2);
 }
 function dedupeTransactions(incoming, existing) {
   const existingCounts = {};
