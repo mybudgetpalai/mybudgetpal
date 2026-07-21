@@ -4040,7 +4040,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     <div className={"topbar" + (tourSpot === "upload" || tourSpot === "inbox" ? " topbar-tour-lift" : "")}>
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-logo-tile"><BrandMark size={17} /></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-logo-tile"><BrandMark size={19} /></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
       </div>
       <div className="topbar-right">
         <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")} data-tour-active={tourSpot === "upload" ? "1" : undefined}>
@@ -10318,7 +10318,7 @@ function App() {
   /* Two-tone, same as the splash: dark "My", accent "BudgetPal". */
   .brand-word { font-weight: 800; letter-spacing: -0.7px; color: var(--ink); line-height: 1; }
   .brand-word-2 { color: var(--grad-3); }
-  .brand-logo-tile { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(150deg, #2E5BFF 0%, #6A4DFF 60%, #8B5CF6 100%); box-shadow: 0 4px 10px rgba(92,80,255,.3); display: inline-flex; align-items: flex-end; justify-content: center; color: #fff; flex-shrink: 0; margin-right: 9px; padding: 5px; }
+  .brand-logo-tile { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(150deg, #2E5BFF 0%, #6A4DFF 60%, #8B5CF6 100%); box-shadow: 0 4px 10px rgba(92,80,255,.3); display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; margin-right: 9px; }
   .brand-logo-tile svg { display: block; }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
   .upload-statement-btn { flex: 0 0 auto; width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -12289,16 +12289,16 @@ function App() {
     .topbar-right .avatar-wrap { display: none; }           /* avatar -> bottom "Menu" sheet */
 
     .mobile-bottom-nav {
-      display: flex; align-items: center;
+      display: flex; align-items: stretch;
       position: fixed; left: 0; right: 0; bottom: 0;
-      height: 60px; padding-bottom: env(safe-area-inset-bottom); z-index: 62;
-      padding-left: 6px; padding-right: 6px;
+      height: calc(62px + env(safe-area-inset-bottom));
+      padding: 0 6px env(safe-area-inset-bottom); z-index: 62;
       background: var(--card);
       border-top: 1px solid var(--line);
       box-shadow: 0 -6px 20px rgba(11,18,32,.06);
     }
     [data-theme="dark"] .mobile-bottom-nav { box-shadow: 0 -6px 20px rgba(0,0,0,.4); }
-    .mbn-tab { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center;
+    .mbn-tab { flex: 1; height: 62px; display: flex; align-items: center; justify-content: center;
       background: none; border: none; cursor: pointer; color: var(--ink-3); position: relative; padding: 0; }
     .mbn-tab .ic { position: relative; z-index: 1; transition: transform .2s; }
     .mbn-tab.mbn-active { color: var(--accent); }
@@ -12306,7 +12306,7 @@ function App() {
     .mbn-hl { position: absolute; width: 46px; height: 36px; border-radius: 13px; background: var(--accent-soft);
       opacity: 0; transform: scale(.6); transition: .22s cubic-bezier(.34,1.56,.64,1); }
     .mbn-active .mbn-hl { opacity: 1; transform: scale(1); }
-    .mbn-ctr { flex: 0 0 60px; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .mbn-ctr { flex: 0 0 60px; height: 62px; display: flex; align-items: center; justify-content: center; }
     .mbn-plus { width: 48px; height: 48px; border-radius: 16px; border: none; cursor: pointer;
       background: var(--grad-2, var(--grad-3)); color: var(--on-accent, #fff);
       display: flex; align-items: center; justify-content: center;
@@ -12318,16 +12318,16 @@ function App() {
     .mbn-burger .mbn-burger-lines::before { top: -6px; } .mbn-burger .mbn-burger-lines::after { top: 6px; }
 
     /* clear the docked bar so content isn't hidden behind it */
-    .main-content { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+    .main-content { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
   }
   /* ===== Mobile menu bottom sheet (added) ===== */
   .mms-scrim { display: none; }
   .mms-sheet { display: none; }
   @media (max-width: 640px) {
-    .mms-scrim { display: block; position: fixed; left: 0; right: 0; top: 0; bottom: calc(60px + env(safe-area-inset-bottom)); z-index: 60; background: rgba(8,10,16,.5);
+    .mms-scrim { display: block; position: fixed; left: 0; right: 0; top: 0; bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 60; background: rgba(8,10,16,.5);
       opacity: 0; pointer-events: none; transition: opacity .24s; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
     .mms-scrim-open { opacity: 1; pointer-events: auto; }
-    .mms-sheet { display: block; position: fixed; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom)); z-index: 61;
+    .mms-sheet { display: block; position: fixed; left: 0; right: 0; bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 61;
       background: var(--card); border-radius: 26px 26px 0 0; max-height: 74%; overflow-y: auto;
       transform: translateY(120%); transition: transform .3s cubic-bezier(.32,.72,0,1);
       padding: 8px 0 16px; box-shadow: 0 -20px 60px rgba(0,0,0,.22); }
