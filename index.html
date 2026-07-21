@@ -2017,7 +2017,6 @@ function LpCurrencyDemo() {
             <button key={c} className={"lpd-cur-opt" + (home === c ? " lpd-cur-opt-on" : "")} onClick={() => setHome(c)}>{c}</button>
           ))}
         </div>
-        <span className="lpd-cur-soon"><span className="lpd-cur-soon-dot" />EUR &amp; USD coming soon</span>
       </div>
       <div className="lpd-cur-accounts">
         <span className="lpd-cur-acc">🇬🇧 HSBC · GBP</span>
@@ -2158,7 +2157,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
           <div className="lp-step-copy">
             <div className="step-num lpd-cur-num">&pound;/&#65284;</div>
             <h3>Two currencies. One life. One total.</h3>
-            <p>Your dirham salary and home-country account, side by side &mdash; each in its own currency, all converting into whichever home currency you pick, at a rate locked per month. GBP today, more on the way.</p>
+            <p>Your dirham salary and home-country account, side by side &mdash; each in its own currency, all converting into whichever home currency you pick, at a rate locked per month. <b>GBP today, USD &amp; EUR on the way.</b></p>
           </div>
           <LpCurrencyDemo />
         </div>
@@ -10731,11 +10730,6 @@ function App() {
   .step-num .ic { vertical-align: 0; }
   .lpd-cur-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .lpd-cur-head .lpd-cur-soon { margin-left: auto; }
-  @media (max-width: 560px) {
-    /* Stop the "coming soon" pill stranding on a random half-line: give it its
-       own full-width row, left-aligned, under the label + toggle. */
-    .lpd-cur-head .lpd-cur-soon { margin-left: 0; flex-basis: 100%; }
-  }
   .lpd-cur-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
   .lpd-cur-toggle { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
   .lpd-cur-opt { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink-2); background: none; border: none; border-radius: 999px; padding: 6px 16px; cursor: pointer; transition: all .15s; }
