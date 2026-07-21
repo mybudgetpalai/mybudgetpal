@@ -48,7 +48,7 @@ fs.writeFileSync(path.join(DIST, "app.js"), code);
 
 // Copy the static assets across untouched. Explicit allowlist so nothing
 // unexpected in the working directory ever ends up published.
-const ASSETS = ["manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "og-image.png"];
+const ASSETS = ["styles.css", "manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "og-image.png"];
 for (const f of ASSETS) {
   const src = path.join(ROOT, f);
   if (!fs.existsSync(src)) { console.error("BUILD FAILED: missing asset " + f); process.exit(1); }
