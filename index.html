@@ -1934,9 +1934,22 @@ function LpViewsDemo() {
     { name: "Shopping", plan: 400, act: 202 },
     { name: "Bills", plan: 450, act: 350 },
   ];
-  const trend = [62, 48, 71, 55, 80, 43];
+  const bdTotal = bars.reduce((s, b) => s + b.val, 0);
+  const bdMax = Math.max(...bars.map((b) => b.val));
+  // Donut segments (each category's share of the total), drawn as stroke-dasharray on a 100-length circle.
+  let acc = 0;
+  const bdSlices = bars.map((b) => { const len = (b.val / bdTotal) * 100; const seg = { len, off: -acc, color: catColor(b.cat) }; acc += len; return seg; });
+  const trendData = [
+    { m: "Jan", v: 1240 }, { m: "Feb", v: 960 }, { m: "Mar", v: 1420 },
+    { m: "Apr", v: 1100 }, { m: "May", v: 1600 }, { m: "Jun", v: 860 },
+  ];
+  const trMax = Math.max(...trendData.map((d) => d.v));
+  const goals = [
+    { icon: "\uD83C\uDFDD\uFE0F", name: "Holiday fund", have: 2400, target: 4000, pct: 60, color: "#2FBE7B", note: <React.Fragment>on pace for <b>November</b></React.Fragment> },
+    { icon: "\uD83D\uDEE1\uFE0F", name: "Emergency fund", have: 4200, target: 10000, pct: 42, color: "var(--accent)", note: <React.Fragment>&pound;300/month &rarr; done by <b>next summer</b></React.Fragment> },
+  ];
   return (
-    <div className="lp-demo-card lpd-views">
+    <div className="lp-demo-card lpd-views lpd-views2">
       <div className="lpd-tabs">
         {tabs.map((t) => (
           <button key={t.key} className={"lpd-tab" + (tab === t.key ? " lpd-tab-active" : "")} onClick={() => setTab(t.key)}>{t.label}</button>
@@ -1944,53 +1957,80 @@ function LpViewsDemo() {
       </div>
       {tab === "breakdown" && (
         <div className="lpd-pane">
-          {bars.map((b) => (
-            <div className="lpd-bar-row" key={b.name}>
-              <span className="lpd-bar-label"><span className="cat-dot" style={{ background: catColor(b.cat) }} />{b.name}</span>
-              <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: b.pct + "%", background: catColor(b.cat) }} /></div>
-              <span className="lpd-bar-amt">&pound;{b.val}</span>
+          <div className="lpd2-bd">
+            <div className="lpd2-donut">
+              <svg viewBox="0 0 42 42">
+                <circle className="lpd2-donut-bg" cx="21" cy="21" r="15.915" fill="none" strokeWidth="6" />
+                {bdSlices.map((s, i) => (
+                  <circle key={i} cx="21" cy="21" r="15.915" fill="none" stroke={s.color} strokeWidth="6"
+                    strokeDasharray={s.len.toFixed(2) + " " + (100 - s.len).toFixed(2)} strokeDashoffset={s.off.toFixed(2)}
+                    transform="rotate(-90 21 21)" />
+                ))}
+              </svg>
+              <div className="lpd2-donut-mid"><span className="lpd2-donut-t">Spent</span><span className="lpd2-donut-v">&pound;{bdTotal}</span></div>
             </div>
-          ))}
+            <div className="lpd2-legend">
+              {bars.map((b) => (
+                <div className="lpd2-lg" key={b.name}>
+                  <span className="lpd2-lg-nm"><span className="cat-dot" style={{ background: catColor(b.cat) }} />{b.name}</span>
+                  <span className="lpd2-lg-amt">&pound;{b.val}</span>
+                  <span className="lpd2-lg-track"><i style={{ width: Math.round((b.val / bdMax) * 100) + "%", background: catColor(b.cat) }} /></span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
       {tab === "review" && (
         <div className="lpd-pane">
-          <div className="lpd-review-row lpd-review-head"><span>Category</span><span>Planned</span><span>Actual</span><span></span></div>
-          {review.map((r) => (
-            <div className="lpd-review-row" key={r.name}>
-              <span className="lpd-bar-label"><span className="cat-dot" style={{ background: catColor(r.name) }} />{r.name}</span>
-              <span>&pound;{r.plan}</span>
-              <span>&pound;{r.act}</span>
-              <span className="lpd-under">&pound;{r.plan - r.act} under</span>
+          <div className="lpd2-revh"><span>Category</span><span className="r">Planned</span><span className="r">Actual</span><span /></div>
+          {review.map((r) => { const diff = r.plan - r.act; const over = diff < 0; return (
+            <div className="lpd2-rrow" key={r.name}>
+              <span className="lpd2-rnm"><span className="cat-dot" style={{ background: catColor(r.name) }} />{r.name}</span>
+              <span className="lpd2-rval">&pound;{r.plan}</span>
+              <span className="lpd2-rval"><b>&pound;{r.act}</b></span>
+              <span className={"lpd2-pill " + (over ? "over" : "under")}>&pound;{Math.abs(diff)} {over ? "over" : "under"}</span>
             </div>
-          ))}
+          ); })}
         </div>
       )}
       {tab === "trends" && (
-        <div className="lpd-pane lpd-trend">
-          {trend.map((h, i) => (
-            <div className="lpd-trend-col" key={i}>
-              <div className="lpd-trend-bar" style={{ height: h + "%" }} />
-              <span className="lpd-trend-label">{["Jan","Feb","Mar","Apr","May","Jun"][i]}</span>
+        <div className="lpd-pane">
+          <div className="lpd2-trend">
+            <div className="lpd2-tgrid"><span>&pound;2k</span><span>&pound;1.5k</span><span>&pound;1k</span><span>&pound;0.5k</span><span /></div>
+            <div className="lpd2-tbars">
+              {trendData.map((d) => (
+                <div className="lpd2-tcol" key={d.m}>
+                  <span className="lpd2-tval">&pound;{d.v.toLocaleString("en-GB")}</span>
+                  <div className={"lpd2-tbar" + (d.v === trMax ? " hi" : "")} style={{ height: Math.round((d.v / 2000) * 100) + "%" }} />
+                  <span className="lpd2-tlab">{d.m}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
       {tab === "goals" && (
         <div className="lpd-pane">
-          <div className="lpd-goal">
-            <div className="lpd-goal-top"><span>&#127958;&#65039; Holiday fund</span><span>&pound;2,400 / &pound;4,000</span></div>
-            <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: "60%", background: catColor("Income") }} /></div>
-            <span className="lpd-goal-note">60% there &mdash; on pace for November</span>
-          </div>
-          <div className="lpd-goal">
-            <div className="lpd-goal-top"><span>&#128737;&#65039; Emergency fund</span><span>&pound;4,200 / &pound;10,000</span></div>
-            <div className="lpd-bar-track"><div className="lpd-bar-fill" style={{ width: "42%", background: "var(--accent)" }} /></div>
-            <span className="lpd-goal-note">42% there &mdash; &pound;300/month gets you done by next summer</span>
-          </div>
+          {goals.map((g) => (
+            <div className="lpd2-goal" key={g.name}>
+              <div className="lpd2-ring">
+                <svg viewBox="0 0 42 42">
+                  <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-3)" strokeWidth="5" />
+                  <circle cx="21" cy="21" r="15.915" fill="none" stroke={g.color} strokeWidth="5" strokeLinecap="round"
+                    strokeDasharray={g.pct + " " + (100 - g.pct)} transform="rotate(-90 21 21)" />
+                </svg>
+                <span className="lpd2-ring-p" style={{ color: g.color }}>{g.pct}%</span>
+              </div>
+              <div className="lpd2-gmeta">
+                <div className="lpd2-gtop"><span className="lpd2-gname">{g.icon} {g.name}</span><span className="lpd2-gamt">&pound;{g.have.toLocaleString("en-GB")} / &pound;{g.target.toLocaleString("en-GB")}</span></div>
+                <div className="lpd2-gnote">{g.note}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
-      <div className="lpd-views-hint">&#128070; Click the tabs &mdash; this is a taste of the real dashboard.</div>
+      <div className="lpd-views-hint">&#128070; Tap the tabs &mdash; this is a taste of the real dashboard.</div>
     </div>
   );
 }
@@ -10726,6 +10766,63 @@ function App() {
   .lpd-goal-top { display: flex; justify-content: space-between; color: var(--ink); font-size: 13px; font-weight: 600; }
   .lpd-goal-note { color: var(--ink-2); font-size: 12px; }
   .lpd-views-hint { color: var(--ink-3); font-size: 12px; margin-top: 16px; text-align: center; }
+
+  /* --- Step-3 preview upgrade (lpd-views2) --- */
+  .lpd-views2 { background: var(--card); }
+  .lpd-views2 .lpd-tab-active { background: linear-gradient(135deg, #2E5BFF, #6A4DFF); border-color: transparent; box-shadow: 0 6px 16px rgba(46,91,255,0.26); }
+  /* Breakdown: donut + legend */
+  .lpd2-bd { display: flex; gap: 22px; align-items: center; min-height: 170px; }
+  .lpd2-donut { width: 132px; height: 132px; flex-shrink: 0; position: relative; }
+  .lpd2-donut svg { width: 132px; height: 132px; display: block; }
+  .lpd2-donut-bg { stroke: var(--surface-2); }
+  .lpd2-donut-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .lpd2-donut-t { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .lpd2-donut-v { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; color: var(--ink); }
+  .lpd2-legend { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .lpd2-lg { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+  .lpd2-lg-nm { font-size: 13.5px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 9px; }
+  .lpd2-lg-amt { font-size: 13.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .lpd2-lg-track { grid-column: 1 / -1; height: 7px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-top: -3px; }
+  .lpd2-lg-track i { display: block; height: 100%; border-radius: 4px; }
+  /* Review: aligned columns + over/under pill */
+  .lpd2-revh, .lpd2-rrow { display: grid; grid-template-columns: 1.5fr 74px 74px 96px; gap: 10px; align-items: center; }
+  .lpd2-revh { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--ink-3); padding: 0 14px 4px; }
+  .lpd2-revh .r { text-align: right; }
+  .lpd2-rrow { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .lpd2-rnm { font-size: 13.5px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 9px; }
+  .lpd2-rval { font-size: 13px; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .lpd2-rval b { color: var(--ink); font-weight: 700; }
+  .lpd2-pill { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; text-align: center; }
+  .lpd2-pill.under { color: var(--pos, #12A85C); background: rgba(18,168,92,0.12); }
+  .lpd2-pill.over { color: #E23B4E; background: rgba(226,59,78,0.12); }
+  /* Trends: gridlines + value labels + gradient bars */
+  .lpd2-trend { position: relative; height: 200px; padding: 4px 2px 0; }
+  .lpd2-tgrid { position: absolute; left: 0; right: 0; top: 4px; bottom: 26px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+  .lpd2-tgrid span { border-top: 1px dashed var(--line); font-size: 10px; color: var(--ink-3); padding-left: 2px; }
+  .lpd2-tbars { position: relative; height: 100%; display: flex; align-items: flex-end; gap: 12px; padding-bottom: 26px; }
+  .lpd2-tcol { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; }
+  .lpd2-tval { font-size: 10.5px; font-weight: 700; color: var(--ink); margin-bottom: 5px; white-space: nowrap; }
+  .lpd2-tbar { width: 100%; max-width: 38px; border-radius: 7px 7px 3px 3px; background: linear-gradient(180deg, #6A4DFF, #2E5BFF); }
+  .lpd2-tbar.hi { background: linear-gradient(180deg, #8B5CF6, #6A4DFF); box-shadow: 0 6px 16px rgba(106,77,255,0.3); }
+  .lpd2-tlab { position: absolute; bottom: 0; font-size: 11px; color: var(--ink-3); }
+  /* Goals: progress rings */
+  .lpd2-goal { display: flex; gap: 16px; align-items: center; background: var(--surface-2); border-radius: 16px; padding: 15px 16px; margin-bottom: 12px; }
+  .lpd2-ring { width: 64px; height: 64px; flex-shrink: 0; position: relative; }
+  .lpd2-ring svg { width: 64px; height: 64px; display: block; }
+  .lpd2-ring-p { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
+  .lpd2-gmeta { flex: 1; min-width: 0; }
+  .lpd2-gtop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .lpd2-gname { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .lpd2-gamt { font-size: 13px; font-weight: 600; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .lpd2-gnote { font-size: 12.5px; color: var(--ink-2); }
+  .lpd2-gnote b { color: var(--pos, #12A85C); }
+  @media (max-width: 560px) {
+    .lpd2-bd { gap: 16px; }
+    .lpd2-donut, .lpd2-donut svg { width: 108px; height: 108px; }
+    .lpd2-revh, .lpd2-rrow { grid-template-columns: 1.3fr 60px 60px 84px; gap: 8px; }
+    .lpd2-rrow { padding: 11px 12px; }
+    .lpd2-tval { font-size: 9.5px; }
+  }
   .lpd-cur-num { font-size: 17px; letter-spacing: 0; line-height: 1; }
   .step-num .ic { vertical-align: 0; }
   .lpd-cur-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
