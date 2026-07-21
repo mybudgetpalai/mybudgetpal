@@ -234,11 +234,11 @@ const APP_NAME = "TwoPockets";
 const ICON_PATHS = {
   refresh: "M23 4v6h-6|M1 20v-6h6|M3.51 9a9 9 0 0 1 14.85-3.36L23 10|M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
   home: "M4 11.5 12 4l8 7.5|M6 10v9a1 1 0 0 0 1 1h3v-5a2 2 0 0 1 4 0v5h3a1 1 0 0 0 1-1v-9",
-  pie: "M12 3a9 9 0 1 0 9 9h-9Z|M12 3v9l7.5-4.5A9 9 0 0 0 12 3Z",
-  bulb: "M9 21h6|M10 18h4|M12 3a6 6 0 0 0-3.8 10.6c.5.4.8 1 .8 1.7V16h6v-.7c0-.7.3-1.3.8-1.7A6 6 0 0 0 12 3Z",
+  pie: "M3 3v18h18|M7.5 12v6|M13 7v11|M18.5 9v9",
+  bulb: "M3 12h4l3-8 4 16 3-8h4",
   home: "M4 11.5 12 4l8 7.5|M6 10v9a1 1 0 0 0 1 1h3v-5a2 2 0 0 1 4 0v5h3a1 1 0 0 0 1-1v-9",
-  pie: "M12 3a9 9 0 1 0 9 9h-9Z|M12 3v9l7.5-4.5A9 9 0 0 0 12 3Z",
-  bulb: "M9 21h6|M10 18h4|M12 3a6 6 0 0 0-3.8 10.6c.5.4.8 1 .8 1.7V16h6v-.7c0-.7.3-1.3.8-1.7A6 6 0 0 0 12 3Z",
+  pie: "M3 3v18h18|M7.5 12v6|M13 7v11|M18.5 9v9",
+  bulb: "M3 12h4l3-8 4 16 3-8h4",
   groceries: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z|M3 6h18|M16 10a4 4 0 0 1-8 0",
   dining: "M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2|M7 2v20|M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3|M21 15v7",
   transport: "M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L17 10l-2.2-3.5c-.4-.6-1-.9-1.7-.9H9c-.6 0-1.2.3-1.6.8L4.8 10l-2.3 1.1C1.6 11.5 1 12.3 1 13.2V16c0 .6.4 1 1 1h2|M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0|M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
@@ -4040,7 +4040,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     <div className={"topbar" + (tourSpot === "upload" || tourSpot === "inbox" ? " topbar-tour-lift" : "")}>
       <div className="topbar-left">
         <button className="icon-btn" onClick={onToggleMenu} aria-label="Toggle menu"><span className="hamburger" /></button>
-        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
+        <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-logo-tile"><BrandMark size={17} /></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
       </div>
       <div className="topbar-right">
         <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")} data-tour-active={tourSpot === "upload" ? "1" : undefined}>
@@ -4065,7 +4065,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
             </div>
           )}
         </div>
-        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={18} /></button>
+        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={15} /><span className="topbar-ask-label">Ask</span></button>
         <div className="avatar-wrap" ref={menuRef}>
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
@@ -8195,7 +8195,7 @@ function MobileMenuSheet({ open, onClose, name, views, active, onSelect, onOpenS
     </React.Fragment>
   );
 }
-function MobileBottomNav({ active, onHome, onBreakdown, onUpload, onInsights, onMenu }) {
+function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onInsights, onMenu }) {
   const Tab = ({ view, on, icon, label }) => (
     <button className={"mbn-tab" + (active === view ? " mbn-active" : "")} onClick={on} aria-label={label} title={label}>
       <span className="mbn-hl" /><Icon name={icon} size={24} />
@@ -8207,7 +8207,7 @@ function MobileBottomNav({ active, onHome, onBreakdown, onUpload, onInsights, on
       <Tab view="breakdown" on={onBreakdown} icon="pie" label="Spending Breakdown" />
       <div className="mbn-ctr"><button className="mbn-plus" onClick={onUpload} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={25} /></button></div>
       <Tab view="insights" on={onInsights} icon="bulb" label="Insights" />
-      <button className="mbn-tab mbn-burger" onClick={onMenu} aria-label="Menu" title="Menu"><span className="mbn-hl" /><span className="mbn-burger-lines" /></button>
+      <button className={"mbn-tab mbn-burger" + (menuOpen ? " mbn-active" : "")} onClick={onMenu} aria-label="Menu" title="Menu"><span className="mbn-hl" /><span className="mbn-burger-lines" /></button>
     </div>
   );
 }
@@ -8313,12 +8313,12 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} />
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} bankRows={bankRows} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
-      <MobileBottomNav active={effectiveView}
-        onHome={() => { setView("overview"); setTInitEdit(false); }}
-        onBreakdown={() => { setView("breakdown"); setTInitEdit(false); }}
-        onUpload={() => setUploadOpen(true)}
-        onInsights={() => { setView("insights"); setTInitEdit(false); }}
-        onMenu={() => setMobileMenuOpen(true)} />
+      <MobileBottomNav active={effectiveView} menuOpen={mobileMenuOpen}
+        onHome={() => { setMobileMenuOpen(false); setView("overview"); setTInitEdit(false); }}
+        onBreakdown={() => { setMobileMenuOpen(false); setView("breakdown"); setTInitEdit(false); }}
+        onUpload={() => { setMobileMenuOpen(false); setUploadOpen(true); }}
+        onInsights={() => { setMobileMenuOpen(false); setView("insights"); setTInitEdit(false); }}
+        onMenu={() => setMobileMenuOpen((v) => !v)} />
       <MobileMenuSheet open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} name={name}
         views={visibleViews} active={effectiveView}
         onSelect={(v) => { setView(v); setTInitEdit(false); }}
@@ -10318,6 +10318,8 @@ function App() {
   /* Two-tone, same as the splash: dark "My", accent "BudgetPal". */
   .brand-word { font-weight: 800; letter-spacing: -0.7px; color: var(--ink); line-height: 1; }
   .brand-word-2 { color: var(--grad-3); }
+  .brand-logo-tile { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(150deg, #2E5BFF 0%, #6A4DFF 60%, #8B5CF6 100%); box-shadow: 0 4px 10px rgba(92,80,255,.3); display: inline-flex; align-items: flex-end; justify-content: center; color: #fff; flex-shrink: 0; margin-right: 9px; padding: 5px; }
+  .brand-logo-tile svg { display: block; }
   .topbar-right { display: flex; align-items: center; gap: 12px; }
   .upload-statement-btn { flex: 0 0 auto; width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .upload-btn-icon { display: block; flex-shrink: 0; }
@@ -11013,9 +11015,10 @@ function App() {
   /* Top-bar Ask button — mobile only (Ask lives in the sidebar on desktop) */
   .topbar-ask-btn { display: none; }
   @media (max-width: 640px) {
-    .topbar-ask-btn { flex: 0 0 auto; position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; min-width: 36px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; color: var(--ink-2); }
-    .topbar-ask-btn:hover { background: var(--surface-3); }
+    .topbar-ask-btn { flex: 0 0 auto; position: relative; background: linear-gradient(135deg, #2E5BFF, #6A4DFF); border: none; border-radius: 100px; height: 36px; min-width: 0; padding: 0 15px; gap: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; color: #fff; font-family: inherit; font-weight: 700; font-size: 13px; box-shadow: 0 6px 14px rgba(46,91,255,.34); }
+    .topbar-ask-btn:hover { filter: brightness(1.05); }
     .topbar-ask-btn svg { display: block; }
+    .topbar-ask-label { line-height: 1; }
   }
   .inbox-badge { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #ff5e7a; color: var(--ink); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #141428; }
   .inbox-menu { position: absolute; top: 46px; right: 0; width: 300px; max-width: 82vw; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 3px; box-shadow: var(--shadow-pop); z-index: 40; }
@@ -12287,14 +12290,14 @@ function App() {
 
     .mobile-bottom-nav {
       display: flex; align-items: center;
-      position: fixed; left: 16px; right: 16px; bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
-      height: 58px; z-index: 45; padding: 0 8px;
-      background: color-mix(in srgb, var(--card) 82%, transparent);
-      -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
-      border: 1px solid var(--line); border-radius: 24px;
-      box-shadow: 0 12px 32px rgba(11,18,32,.16), 0 4px 10px rgba(11,18,32,.07);
+      position: fixed; left: 0; right: 0; bottom: 0;
+      height: 60px; padding-bottom: env(safe-area-inset-bottom); z-index: 62;
+      padding-left: 6px; padding-right: 6px;
+      background: var(--card);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -6px 20px rgba(11,18,32,.06);
     }
-    [data-theme="dark"] .mobile-bottom-nav { box-shadow: 0 12px 34px rgba(0,0,0,.6), 0 4px 10px rgba(0,0,0,.45); }
+    [data-theme="dark"] .mobile-bottom-nav { box-shadow: 0 -6px 20px rgba(0,0,0,.4); }
     .mbn-tab { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center;
       background: none; border: none; cursor: pointer; color: var(--ink-3); position: relative; padding: 0; }
     .mbn-tab .ic { position: relative; z-index: 1; transition: transform .2s; }
@@ -12314,20 +12317,20 @@ function App() {
     .mbn-burger .mbn-burger-lines::before, .mbn-burger .mbn-burger-lines::after { content: ""; position: absolute; left: 0; }
     .mbn-burger .mbn-burger-lines::before { top: -6px; } .mbn-burger .mbn-burger-lines::after { top: 6px; }
 
-    /* clear the floating bar so content isn't hidden behind it */
-    .main-content { padding-bottom: 96px; }
+    /* clear the docked bar so content isn't hidden behind it */
+    .main-content { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
   }
   /* ===== Mobile menu bottom sheet (added) ===== */
   .mms-scrim { display: none; }
   .mms-sheet { display: none; }
   @media (max-width: 640px) {
-    .mms-scrim { display: block; position: fixed; inset: 0; z-index: 60; background: rgba(8,10,16,.5);
+    .mms-scrim { display: block; position: fixed; left: 0; right: 0; top: 0; bottom: calc(60px + env(safe-area-inset-bottom)); z-index: 60; background: rgba(8,10,16,.5);
       opacity: 0; pointer-events: none; transition: opacity .24s; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
     .mms-scrim-open { opacity: 1; pointer-events: auto; }
-    .mms-sheet { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 61;
-      background: var(--card); border-radius: 26px 26px 0 0; max-height: 84%; overflow-y: auto;
-      transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1);
-      padding: 8px 0 calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -20px 60px rgba(0,0,0,.22); }
+    .mms-sheet { display: block; position: fixed; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom)); z-index: 61;
+      background: var(--card); border-radius: 26px 26px 0 0; max-height: 74%; overflow-y: auto;
+      transform: translateY(120%); transition: transform .3s cubic-bezier(.32,.72,0,1);
+      padding: 8px 0 16px; box-shadow: 0 -20px 60px rgba(0,0,0,.22); }
     .mms-sheet-open { transform: translateY(0); }
     .mms-sheet::-webkit-scrollbar { display: none; }
     .mms-grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-strong); margin: 10px auto 8px; }
