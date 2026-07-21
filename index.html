@@ -226,6 +226,9 @@ const ICON_PATHS = {
   home: "M4 11.5 12 4l8 7.5|M6 10v9a1 1 0 0 0 1 1h3v-5a2 2 0 0 1 4 0v5h3a1 1 0 0 0 1-1v-9",
   pie: "M12 3a9 9 0 1 0 9 9h-9Z|M12 3v9l7.5-4.5A9 9 0 0 0 12 3Z",
   bulb: "M9 21h6|M10 18h4|M12 3a6 6 0 0 0-3.8 10.6c.5.4.8 1 .8 1.7V16h6v-.7c0-.7.3-1.3.8-1.7A6 6 0 0 0 12 3Z",
+  home: "M4 11.5 12 4l8 7.5|M6 10v9a1 1 0 0 0 1 1h3v-5a2 2 0 0 1 4 0v5h3a1 1 0 0 0 1-1v-9",
+  pie: "M12 3a9 9 0 1 0 9 9h-9Z|M12 3v9l7.5-4.5A9 9 0 0 0 12 3Z",
+  bulb: "M9 21h6|M10 18h4|M12 3a6 6 0 0 0-3.8 10.6c.5.4.8 1 .8 1.7V16h6v-.7c0-.7.3-1.3.8-1.7A6 6 0 0 0 12 3Z",
   groceries: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z|M3 6h18|M16 10a4 4 0 0 1-8 0",
   dining: "M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2|M7 2v20|M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3|M21 15v7",
   transport: "M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L17 10l-2.2-3.5c-.4-.6-1-.9-1.7-.9H9c-.6 0-1.2.3-1.6.8L4.8 10l-2.3 1.1C1.6 11.5 1 12.3 1 13.2V16c0 .6.4 1 1 1h2|M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0|M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
@@ -8110,6 +8113,22 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
   );
 }
 
+function MobileBottomNav({ active, onHome, onBreakdown, onUpload, onInsights, onMenu }) {
+  const Tab = ({ view, on, icon, label }) => (
+    <button className={"mbn-tab" + (active === view ? " mbn-active" : "")} onClick={on} aria-label={label} title={label}>
+      <span className="mbn-hl" /><Icon name={icon} size={24} />
+    </button>
+  );
+  return (
+    <div className="mobile-bottom-nav" role="navigation" aria-label="Primary">
+      <Tab view="overview" on={onHome} icon="home" label="Home" />
+      <Tab view="breakdown" on={onBreakdown} icon="pie" label="Spending Breakdown" />
+      <div className="mbn-ctr"><button className="mbn-plus" onClick={onUpload} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={25} /></button></div>
+      <Tab view="insights" on={onInsights} icon="bulb" label="Insights" />
+      <button className="mbn-tab mbn-burger" onClick={onMenu} aria-label="Menu" title="Menu"><span className="mbn-hl" /><span className="mbn-burger-lines" /></button>
+    </div>
+  );
+}
 function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, onSetPersona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billRejects, onRejectBill, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
   const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
   const [view, setView] = useHashView(openTargetsEdit ? "targets" : "overview");
