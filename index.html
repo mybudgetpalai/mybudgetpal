@@ -223,6 +223,9 @@ const APP_NAME = "TwoPockets";
 /* ---------------- Icons (inline SVG, stroke = currentColor) ---------------- */
 const ICON_PATHS = {
   refresh: "M23 4v6h-6|M1 20v-6h6|M3.51 9a9 9 0 0 1 14.85-3.36L23 10|M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
+  home: "M4 11.5 12 4l8 7.5|M6 10v9a1 1 0 0 0 1 1h3v-5a2 2 0 0 1 4 0v5h3a1 1 0 0 0 1-1v-9",
+  pie: "M12 3a9 9 0 1 0 9 9h-9Z|M12 3v9l7.5-4.5A9 9 0 0 0 12 3Z",
+  bulb: "M9 21h6|M10 18h4|M12 3a6 6 0 0 0-3.8 10.6c.5.4.8 1 .8 1.7V16h6v-.7c0-.7.3-1.3.8-1.7A6 6 0 0 0 12 3Z",
   groceries: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z|M3 6h18|M16 10a4 4 0 0 1-8 0",
   dining: "M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2|M7 2v20|M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3|M21 15v7",
   transport: "M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L17 10l-2.2-3.5c-.4-.6-1-.9-1.7-.9H9c-.6 0-1.2.3-1.6.8L4.8 10l-2.3 1.1C1.6 11.5 1 12.3 1 13.2V16c0 .6.4 1 1 1h2|M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0|M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0",
@@ -8208,6 +8211,12 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} />
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} bankRows={bankRows} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
+      <MobileBottomNav active={effectiveView}
+        onHome={() => { setView("overview"); setTInitEdit(false); }}
+        onBreakdown={() => { setView("breakdown"); setTInitEdit(false); }}
+        onUpload={() => setUploadOpen(true)}
+        onInsights={() => { setView("insights"); setTInitEdit(false); }}
+        onMenu={() => setPanelOpen(true)} />
       {runTour && (
         <TourOverlay
           stepIndex={tourStep}
@@ -12089,6 +12098,46 @@ function App() {
     .oh-big { font-size: clamp(20px, 6.5vw, 26px) !important; }
   }
   .other-bank-input { margin-top: 12px; }
+  /* ===== Mobile bottom nav (added) ===== */
+  .mobile-bottom-nav { display: none; }
+  @media (max-width: 640px) {
+    /* strip top bar down to logo + bell + ask; nav moves to the bottom */
+    .topbar-left .icon-btn { display: none; }               /* hamburger -> bottom "Menu" */
+    .topbar-right .upload-statement-wrap { display: none; } /* + -> bottom centre */
+    .topbar-right .avatar-wrap { display: none; }           /* avatar -> bottom "Menu" sheet */
+
+    .mobile-bottom-nav {
+      display: flex; align-items: center;
+      position: fixed; left: 16px; right: 16px; bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+      height: 58px; z-index: 45; padding: 0 8px;
+      background: color-mix(in srgb, var(--card) 82%, transparent);
+      -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
+      border: 1px solid var(--line); border-radius: 24px;
+      box-shadow: 0 12px 32px rgba(11,18,32,.16), 0 4px 10px rgba(11,18,32,.07);
+    }
+    [data-theme="dark"] .mobile-bottom-nav { box-shadow: 0 12px 34px rgba(0,0,0,.6), 0 4px 10px rgba(0,0,0,.45); }
+    .mbn-tab { flex: 1; height: 100%; display: flex; align-items: center; justify-content: center;
+      background: none; border: none; cursor: pointer; color: var(--ink-3); position: relative; padding: 0; }
+    .mbn-tab .ic { position: relative; z-index: 1; transition: transform .2s; }
+    .mbn-tab.mbn-active { color: var(--accent); }
+    .mbn-active .ic { transform: translateY(-1px); }
+    .mbn-hl { position: absolute; width: 46px; height: 36px; border-radius: 13px; background: var(--accent-soft);
+      opacity: 0; transform: scale(.6); transition: .22s cubic-bezier(.34,1.56,.64,1); }
+    .mbn-active .mbn-hl { opacity: 1; transform: scale(1); }
+    .mbn-ctr { flex: 0 0 60px; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .mbn-plus { width: 48px; height: 48px; border-radius: 16px; border: none; cursor: pointer;
+      background: var(--grad-2, var(--grad-3)); color: var(--on-accent, #fff);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 18px var(--accent-shadow, rgba(46,91,255,.5)); transition: transform .14s; }
+    .mbn-plus:active { transform: scale(.9); }
+    .mbn-burger .mbn-burger-lines, .mbn-burger .mbn-burger-lines::before, .mbn-burger .mbn-burger-lines::after {
+      display: block; width: 22px; height: 2px; background: currentColor; border-radius: 2px; position: relative; z-index: 1; }
+    .mbn-burger .mbn-burger-lines::before, .mbn-burger .mbn-burger-lines::after { content: ""; position: absolute; left: 0; }
+    .mbn-burger .mbn-burger-lines::before { top: -6px; } .mbn-burger .mbn-burger-lines::after { top: 6px; }
+
+    /* clear the floating bar so content isn't hidden behind it */
+    .main-content { padding-bottom: 96px; }
+  }
 </style>
 
 </body>
