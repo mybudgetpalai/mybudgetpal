@@ -4003,7 +4003,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
             </div>
           )}
         </div>
-        <button className="ask-btn ask-btn-mobile" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={18} /></button>
+        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={18} /></button>
         <div className="avatar-wrap" ref={menuRef}>
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
@@ -10822,12 +10822,13 @@ function App() {
   .inbox-wrap { position: relative; }
   .inbox-btn { position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .inbox-btn:hover { background: var(--surface-3); }
-  .ask-btn { position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; color: var(--ink-2); }
-  .ask-btn:hover { background: var(--surface-3); }
-  .ask-btn svg { display: block; }
-  /* Ask lives in the sidebar on desktop; the top-bar Ask button is mobile-only */
-  .ask-btn-mobile { display: none; }
-  @media (max-width: 640px) { .ask-btn-mobile { display: flex; } }
+  /* Top-bar Ask button — mobile only (Ask lives in the sidebar on desktop) */
+  .topbar-ask-btn { display: none; }
+  @media (max-width: 640px) {
+    .topbar-ask-btn { flex: 0 0 auto; position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; min-width: 36px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; color: var(--ink-2); }
+    .topbar-ask-btn:hover { background: var(--surface-3); }
+    .topbar-ask-btn svg { display: block; }
+  }
   .inbox-badge { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #ff5e7a; color: var(--ink); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #141428; }
   .inbox-menu { position: absolute; top: 46px; right: 0; width: 300px; max-width: 82vw; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 3px; box-shadow: var(--shadow-pop); z-index: 40; }
   .inbox-menu-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); padding: 6px 10px 4px; }
