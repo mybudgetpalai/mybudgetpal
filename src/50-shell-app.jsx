@@ -333,7 +333,7 @@ function MobileMenuSheet({ open, onClose, name, views, active, onSelect, onOpenS
     </React.Fragment>
   );
 }
-function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onTargets, onMenu }) {
+function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onTargets, onMenu, tourSpot }) {
   const Tab = ({ view, on, label, children }) => (
     <button className={"mbn-tab" + (active === view ? " mbn-active" : "")} onClick={on} aria-label={label} title={label}>
       <span className="mbn-hl" />{children}
@@ -359,9 +359,9 @@ function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onTa
     <div className="mobile-bottom-nav" role="navigation" aria-label="Primary">
       <Tab view="overview" on={onHome} label="Home">{homeIcon}</Tab>
       <Tab view="breakdown" on={onBreakdown} label="Spending Breakdown">{spendIcon}</Tab>
-      <div className="mbn-ctr"><button className="mbn-plus" onClick={onUpload} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={25} /></button></div>
+      <div className="mbn-ctr" data-tour-active={tourSpot === "upload" ? "1" : undefined}><button className="mbn-plus" onClick={onUpload} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={25} /></button></div>
       <Tab view="targets" on={onTargets} label="Targets">{targetIcon}</Tab>
-      <button className={"mbn-tab mbn-burger" + (menuOpen ? " mbn-active" : "")} onClick={onMenu} aria-label="Menu" title="Menu"><span className="mbn-hl" /><span className="mbn-burger-lines" /></button>
+      <button className={"mbn-tab mbn-burger" + (menuOpen ? " mbn-active" : "")} data-tour-active={tourSpot === "menu" ? "1" : undefined} onClick={onMenu} aria-label="Menu" title="Menu"><span className="mbn-hl" /><span className="mbn-burger-lines" /></button>
     </div>
   );
 }
@@ -424,7 +424,8 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
      The side menu also has to be open for the menu step to mean anything. */
   React.useEffect(() => {
     if (!tourSpot) return;
-    if (tourSpot === "menu") setPanelOpen(true);
+    const mob = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+    if (tourSpot === "menu" && !mob) setPanelOpen(true);
     const sc = document.querySelector(".main-content-wide");
     const t = setTimeout(() => {
       try { if (sc) sc.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
@@ -467,7 +468,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} />
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} bankRows={bankRows} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onAddBank={onAddBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
-      <MobileBottomNav active={effectiveView} menuOpen={mobileMenuOpen}
+      <MobileBottomNav active={effectiveView} menuOpen={mobileMenuOpen} tourSpot={tourSpot}
         onHome={() => { setMobileMenuOpen(false); setView("overview"); setTInitEdit(false); }}
         onBreakdown={() => { setMobileMenuOpen(false); setView("breakdown"); setTInitEdit(false); }}
         onUpload={() => { setMobileMenuOpen(false); setUploadOpen(true); }}
@@ -767,44 +768,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
             ))}
           </div>
         </div>
-        <div className="dash-card settings-section">
-          <div className="settings-section-head">
-            <span className="card-label">Monthly targets</span>
-            {categories.length > 0 && (
-              <button className="link-btn inline" onClick={onEditTargetsPage}>Edit</button>
-            )}
-          </div>
-          <div className="settings-bank-list">
-            {categories.length > 0 ? categories.map((c) => (
-              <div className="settings-bank-row" key={c}>
-                <span><span className="cat-dot" style={{ background: CATEGORY_COLORS[c], marginRight: 8, display: "inline-block", verticalAlign: "middle" }} />{c}</span>
-                {editingTargets ? (
-                  <div className="target-input-wrap">
-                    <span className="target-currency">{homeSym()}</span>
-                    <input
-                      className="target-input"
-                      type="number"
-                      min="0"
-                      value={targetDrafts[c]}
-                      onChange={(e) => setTargetDrafts((prev) => ({ ...prev, [c]: e.target.value }))}
-                    />
-                  </div>
-                ) : (
-                  <span>{formatMoney(targets[c])}</span>
-                )}
-              </div>
-            )) : <p className="subtitle" style={{ margin: 0 }}>No targets set yet.</p>}
-          </div>
-          {editingTargets && (
-            <div className="nav-row" style={{ marginTop: 14 }}>
-              <button className="glass-btn ghost" disabled={savingTargets} onClick={cancelEditTargets}>Cancel</button>
-              <button className="glass-btn primary" disabled={savingTargets} onClick={saveTargets}>
-                {savingTargets ? <span className="btn-spinner" /> : "Save"}
-              </button>
-            </div>
-          )}
-        </div>
-
         <button className="glass-btn danger" onClick={onLogout}>Log out</button>
 
         {pwOpen && (
@@ -1553,20 +1516,21 @@ function App() {
     // convert every stored target by the locked rate so they stay meaningful.
     if (prevHome && prevHome !== homeCur) {
       try {
-        const cvRate = fxRate(nowMonth(), prevHome, homeCur);
+        const cvRate = fxRateStable(nowMonth(), prevHome, homeCur);
+        const cv = (v) => Math.round((Number(v) || 0) * cvRate * 100) / 100;
         if (cvRate && cvRate !== 1) {
           const { data: tRows } = await supabaseClient.from("targets").select("*").eq("user_id", userId);
-          const updated = (tRows || []).map((r) => ({ ...r, monthly_target: Math.round((Number(r.monthly_target) || 0) * cvRate) }));
+          const updated = (tRows || []).map((r) => ({ ...r, monthly_target: cv(r.monthly_target) }));
           if (updated.length) {
             await supabaseClient.from("targets").upsert(updated);
             setAllTargets((prev) => {
               const next = {};
               Object.entries(prev || {}).forEach(([mk, cats]) => {
-                next[mk] = Object.fromEntries(Object.entries(cats || {}).map(([c, v]) => [c, Math.round((Number(v) || 0) * cvRate)]));
+                next[mk] = Object.fromEntries(Object.entries(cats || {}).map(([c, v]) => [c, cv(v)]));
               });
               return next;
             });
-            setTargets((prev) => Object.fromEntries(Object.entries(prev || {}).map(([c, v]) => [c, Math.round((Number(v) || 0) * cvRate)])));
+            setTargets((prev) => Object.fromEntries(Object.entries(prev || {}).map(([c, v]) => [c, cv(v)])));
           }
           /* The long-term plan is stored as bare numbers in the home currency too
              (plan_target_balance / plan_opening_balance on profiles). Without this
@@ -1577,8 +1541,8 @@ function App() {
             if (!prev) return prev;
             const nextPlan = {
               ...prev,
-              targetBalance: Math.round((Number(prev.targetBalance) || 0) * cvRate),
-              openingBalance: prev.openingBalance == null ? prev.openingBalance : Math.round((Number(prev.openingBalance) || 0) * cvRate),
+              targetBalance: cv(prev.targetBalance),
+              openingBalance: prev.openingBalance == null ? prev.openingBalance : cv(prev.openingBalance),
             };
             savePlanToDb(userId, nextPlan).catch((e) => console.error("Plan currency conversion save failed (non-fatal):", e));
             return nextPlan;
