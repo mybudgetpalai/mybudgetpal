@@ -296,7 +296,7 @@ function SetupPushBand({ onResumeSetup }) {
 }
 
 function MiniBreakdown({ transactions }) {
-  const k = overviewMonthKey(transactions || []);
+  const k = currentMonthKey();
   const cats = spendByCategoryForMonth(transactions || [], k);
   const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((s, e) => s + e[1], 0);
@@ -1439,7 +1439,7 @@ function GoalGetterHeroV2(props) {
 
 
 function CompositionCardV2({ transactions, depth }) {
-  const k = overviewMonthKey(transactions || []);
+  const k = currentMonthKey();
   const cats = spendByCategoryForMonth(transactions || [], k);
   const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((s, e) => s + e[1], 0);
@@ -1653,7 +1653,7 @@ function BillsV2({ transactions, billExcludes, depth }) {
 }
 
 function TopMerchantsV2({ transactions, depth }) {
-  const key = overviewMonthKey(transactions);
+  const key = currentMonthKey();
   const txs = (transactions || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key);
   const norm = (n) => String(n || "Unknown").toLowerCase().replace(/\d+/g, "").replace(/\s+/g, " ").trim() || "unknown";
   const by = {};
