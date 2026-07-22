@@ -1181,7 +1181,6 @@ function LpViewsDemo() {
   const [tab, setTab] = useState("breakdown");
   const tabs = [
     { key: "breakdown", label: "Breakdown" },
-    { key: "review", label: "Monthly review" },
     { key: "trends", label: "Trends" },
     { key: "goals", label: "Goals" },
   ];
@@ -1190,12 +1189,6 @@ function LpViewsDemo() {
     { name: "Shopping", val: 265, pct: 75, cat: "Shopping" },
     { name: "Groceries", val: 190, pct: 54, cat: "Groceries" },
     { name: "Dining", val: 99, pct: 28, cat: "Dining" },
-  ];
-  const review = [
-    { name: "Groceries", plan: 450, act: 197 },
-    { name: "Dining", plan: 200, act: 39 },
-    { name: "Shopping", plan: 400, act: 202 },
-    { name: "Bills", plan: 450, act: 350 },
   ];
   const bdTotal = bars.reduce((s, b) => s + b.val, 0);
   const bdMax = Math.max(...bars.map((b) => b.val));
@@ -1244,31 +1237,20 @@ function LpViewsDemo() {
           </div>
         </div>
       )}
-      {tab === "review" && (
-        <div className="lpd-pane">
-          <div className="lpd2-revh"><span>Category</span><span className="r">Planned</span><span className="r">Actual</span><span /></div>
-          {review.map((r) => { const diff = r.plan - r.act; const over = diff < 0; return (
-            <div className="lpd2-rrow" key={r.name}>
-              <span className="lpd2-rnm"><span className="cat-dot" style={{ background: catColor(r.name) }} />{r.name}</span>
-              <span className="lpd2-rval">&pound;{r.plan}</span>
-              <span className="lpd2-rval"><b>&pound;{r.act}</b></span>
-              <span className={"lpd2-pill " + (over ? "over" : "under")}>&pound;{Math.abs(diff)} {over ? "over" : "under"}</span>
-            </div>
-          ); })}
-        </div>
-      )}
       {tab === "trends" && (
         <div className="lpd-pane">
           <div className="lpd2-trend">
-            <div className="lpd2-tgrid"><span>&pound;2k</span><span>&pound;1.5k</span><span>&pound;1k</span><span>&pound;0.5k</span><span /></div>
+            <div className="lpd2-tgrid"><span>&pound;2k</span><span>&pound;1.5k</span><span>&pound;1k</span><span>&pound;0.5k</span><span>&pound;0</span></div>
             <div className="lpd2-tbars">
               {trendData.map((d) => (
                 <div className="lpd2-tcol" key={d.m}>
                   <span className="lpd2-tval">&pound;{d.v.toLocaleString("en-GB")}</span>
                   <div className={"lpd2-tbar" + (d.v === trMax ? " hi" : "")} style={{ height: Math.round((d.v / 2000) * 100) + "%" }} />
-                  <span className="lpd2-tlab">{d.m}</span>
                 </div>
               ))}
+            </div>
+            <div className="lpd2-tmonths">
+              {trendData.map((d) => (<span key={d.m}>{d.m}</span>))}
             </div>
           </div>
         </div>
