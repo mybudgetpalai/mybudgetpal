@@ -2483,3 +2483,17 @@
     .settings-bank-row-2 { flex-wrap: wrap; }
     .settings-bank-row-2 .sb-actions { width: 100%; justify-content: space-between; }
   }
+
+  /* --- H5: dual-currency bank step needs room for two full bank lists (2026-07-22) ---
+     Previously both lists rendered at full height in a 460px card, pushing the
+     Finish button ~100px below the fold with no scroll cue. Widening the card and
+     going to three columns fits everything on screen with no scrolling. */
+  .glass-card.onboard-card.onboard-card-wide { max-width: 640px; }
+  .onboard-card-wide .currency-bank-group .bank-grid { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 700px) {
+    .glass-card.onboard-card.onboard-card-wide { max-width: 460px; }
+    .onboard-card-wide .currency-bank-group .bank-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 560px) {
+    .onboard-card-wide .currency-bank-group .bank-grid { grid-template-columns: 1fr; }
+  }
