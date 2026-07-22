@@ -39,7 +39,7 @@ function overviewTour({ hasTargets, monthLabel }) {
     { title: "Needs you", body: "Anything that needs a quick action — like transactions to categorise — shows up here." },
     { title: "Add a statement", body: "Tap the blue plus whenever you want to add a new bank statement. The more you add, the sharper your numbers get.", spot: "upload" },
     { title: "You've got mail", body: "Your inbox is here. We'll pop a note in whenever something needs a look — a month-end review, or a few transactions to tidy up.", spot: "inbox" },
-    { title: "Your views", body: "Every part of your money lives down the side here — spending, targets, bills, insights and more. Ready-made views you can jump into any time.", spot: "menu" },
+    { title: "Your views", body: "Every part of your money lives in the menu — spending, targets, bills, insights and more. Ready-made views you can jump into any time.", spot: "menu" },
   ];
 }
 
@@ -119,15 +119,31 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   // (card stays bottom) or needs the card at the TOP (target sits below it). Then we
   // scroll the target into the free zone and read back its final rect — one instant
   // pass, no smooth-scroll lag.
+  const pickTourEl = () => {
+    const els = Array.from(document.querySelectorAll('[data-tour-active="1"]'));
+    const vis = (n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight; };
+    return els.find(vis) || els[0] || null;
+  };
+  const readRect = React.useCallback(() => {
+    const el = pickTourEl();
+    if (!el) { setRect(null); return; }
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const r = el.getBoundingClientRect();
+    const x = Math.max(0, r.left - PAD), y = Math.max(0, r.top - PAD);
+    const w = Math.min(vw - x, r.width + PAD * 2), h = r.height + PAD * 2;
+    setRect({ x, y, w, h, vw, vh });
+  }, []);
   const place = React.useCallback(() => {
-    const el = document.querySelector('[data-tour-active="1"]');
+    const el = pickTourEl();
     if (!el) { setRect(null); return; }
     const vw = window.innerWidth, vh = window.innerHeight;
     const cardH = cardRef.current ? cardRef.current.offsetHeight : 240;
 
     if (isChromeStep) {
-      // Chrome target is fixed near the top; card stays at the bottom. No page scroll.
-      setCardPlace("bottom");
+      // Chrome target: on phones the target lives in the BOTTOM nav, so the card
+      // flips to the top; on desktop it's in the top bar, card stays at the bottom.
+      const mob = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+      setCardPlace(mob ? "top" : "bottom");
     } else {
       // Free vertical space above a bottom-pinned card vs below a top-pinned card.
       const targetH = el.getBoundingClientRect().height;
@@ -165,11 +181,12 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const t0 = setTimeout(place, 60);
     const t1 = setTimeout(place, 240);
     const t2 = setTimeout(place, 520);
-    const onWin = () => place();
+    const t3 = setTimeout(readRect, 900);
+    const onWin = () => readRect();
     window.addEventListener("resize", onWin);
     window.addEventListener("scroll", onWin, true);
-    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
-  }, [stepIndex, place]);
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
+  }, [stepIndex, place, readRect]);
 
   const dim = "rgba(16,24,40,0.60)";
   const panels = rect ? [
