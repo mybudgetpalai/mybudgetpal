@@ -722,7 +722,6 @@
     .breakdown-screen-card { max-width: 100%; padding: 22px 14px; }
     .month-table th, .month-table td { padding: 8px 8px; font-size: 12px; }
 
-    .balance-row { flex-direction: column; gap: 12px; }
 
     /* dashboard */
     .topbar { padding: 12px 14px; }
@@ -768,7 +767,7 @@
   .trend-bar-wrap { position: relative; }
   .trend-tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--card); box-shadow: var(--shadow-pop); border: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 6; }
   .trend-bar-col:hover .trend-tip { opacity: 1; }
-  .trend-bar { width: 60%; max-width: 120px; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
+  .trend-bar { position: relative; width: 60%; max-width: 120px; border-radius: 6px 6px 0 0; background: var(--accent); transition: height 0.4s ease; }
   .trend-bar-wrap.dual .trend-bar { width: 42%; max-width: 78px; }
   .income-bar { background: linear-gradient(180deg, var(--pos), #2fae90); }
   .spend-bar { background: var(--accent); }
@@ -2420,7 +2419,7 @@
     .mbn-plus { width: 42px; height: 42px; border-radius: 14px; border: none; cursor: pointer;
       background: var(--grad-2, var(--grad-3)); color: var(--on-accent, #fff);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 8px 18px var(--accent-shadow, rgba(46,91,255,.5)); transition: transform .14s; }
+      box-shadow: 0 2px 6px rgba(46,91,255,.30); transition: transform .14s; }
     .mbn-plus:active { transform: scale(.9); }
     .mbn-burger .mbn-burger-lines, .mbn-burger .mbn-burger-lines::before, .mbn-burger .mbn-burger-lines::after {
       display: block; width: 22px; height: 2px; background: currentColor; border-radius: 2px; position: relative; z-index: 1; }
@@ -2585,4 +2584,38 @@
     .lpd2-donut-v { font-size: 19px; letter-spacing: -0.6px; }
     .lpd2-bd { gap: 14px; }
     .lpd2-lg-nm, .lpd2-lg-amt { font-size: 12.5px; }
+  }
+
+  /* --- Mobile sign-up feedback fixes (2026-07-23) --- */
+
+  /* Quick check: amount never wraps to two lines */
+  .confirm-tx-card { gap: 12px; }
+  .confirm-tx-amount { white-space: nowrap; flex-shrink: 0; }
+
+  /* Onboarding plan table: compact rows on phones */
+  @media (max-width: 640px) {
+    .budget-table th, .budget-table td { padding: 4px 8px !important; font-size: 12px; }
+    .bt-cat { padding: 4px 10px !important; font-size: 12px; }
+    .bt-input { height: 20px; font-size: 13px; width: 5.5ch; }
+    .bt-input-wrap { padding: 2px 5px; }
+    .bt-month-head { min-width: 0; }
+  }
+
+  /* Monthly review table: equal-height rows, numbers never wrap */
+  @media (max-width: 640px) {
+    .review-row { grid-template-columns: 1.15fr 0.85fr 0.85fr 1fr; gap: 6px; padding: 10px 10px; font-size: 12.5px; }
+    .review-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .review-cat { gap: 6px; }
+  }
+
+  /* Bank accounts card: header stacks cleanly on phones */
+  @media (max-width: 640px) {
+    .ba-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .ba-total { font-size: 22px; }
+  }
+
+  /* Long-Term Plan projected chart: values hidden on phones, shown on tap */
+  .ltp-proj-chart .trend-tip { display: none; }
+  @media (max-width: 640px) {
+    .ltp-proj-chart .trend-tip { display: block; }
   }
