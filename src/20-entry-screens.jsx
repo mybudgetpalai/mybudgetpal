@@ -639,7 +639,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
   return (
     <div className="page stage-fade">
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
-      <div className={"glass-card onboard-card" + (step === 0 ? " onboard-compact" : "")}>
+      <div className={"glass-card onboard-card" + (step === 0 ? " onboard-compact" : "") + (step === 4 && isDual ? " onboard-card-wide" : "")}>
         <div className="progress-dots">
           {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
             <div key={i} className={"dot " + (i <= step ? "dot-active" : "")} />
