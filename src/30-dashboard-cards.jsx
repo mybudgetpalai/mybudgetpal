@@ -351,7 +351,7 @@ function PieChart({ slices, total, activeName, onPick }) {
     </div>
   );
 }
-function BreakdownPage({ transactions, targets, onOpenCatReview }) {
+function BreakdownPage({ transactions, targets, allTargets, onOpenCatReview }) {
   const txs = transactions || [];
   const monthsWithData = React.useMemo(() => {
     const set = new Set(txs.filter((t) => t.date && t.amount < 0).map((t) => t.date.slice(0, 7)));
@@ -362,7 +362,26 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
   const [compareTargets, setCompareTargets] = useState(false);
   const activeKey = monthsWithData.includes(monthKey) ? monthKey : (monthsWithData[0] || monthKey);
   const isCurrentMonth = activeKey === currentMonthKey();
-  const bdTarget = (targets && isCurrentMonth) ? TX_CATEGORIES.reduce((s, c) => s + (Number(targets[c]) || 0), 0) : 0;
+  /* Targets for the month actually on screen, not whatever the current month is.
+     Same precedence as Monthly Review: own targets, then nearest earlier month,
+     then earliest on record (covers months that predate signup). borrowedFrom is
+     surfaced in the copy so a cross-month comparison is never silent. */
+  const [monthTargets, borrowedFrom] = (() => {
+    const own = (allTargets && allTargets[activeKey]) || null;
+    if (own && TX_CATEGORIES.some((c) => Number(own[c]) > 0)) return [own, null];
+    const all = allTargets ? Object.keys(allTargets).sort() : [];
+    const earlier = all.filter((k) => k <= activeKey);
+    for (let i = earlier.length - 1; i >= 0; i--) {
+      const t = allTargets[earlier[i]] || {};
+      if (TX_CATEGORIES.some((c) => Number(t[c]) > 0)) return [t, earlier[i]];
+    }
+    for (let i = 0; i < all.length; i++) {
+      const t = allTargets[all[i]] || {};
+      if (TX_CATEGORIES.some((c) => Number(t[c]) > 0)) return [t, all[i]];
+    }
+    return [targets || {}, null];
+  })();
+  const bdTarget = monthTargets ? TX_CATEGORIES.reduce((s, c) => s + (Number(monthTargets[c]) || 0), 0) : 0;
 
   const byCat = spendByCategoryForMonth(txs, activeKey);
   const prevKey = addMonths(activeKey, -1);
@@ -447,12 +466,17 @@ function BreakdownPage({ transactions, targets, onOpenCatReview }) {
               <span>Compare to targets</span>
             </label>
           </div>
+          {compareTargets && borrowedFrom && borrowedFrom !== activeKey && (
+            <p className="subtitle" style={{ margin: "-4px 0 12px", fontSize: 12 }}>
+              You hadn't set budgets yet in {monthLabelFromKey(activeKey)}, so we're comparing against your {monthLabelFromKey(borrowedFrom)} targets.
+            </p>
+          )}
           <div className={"category-list bd-list" + (openCat ? " bd-has-open" : "")}>
             {cats.map((name) => {
               const amount = byCat[name] || 0;
               const color = catColor(name);
               const sharePct = total > 0 && amount > 0 ? Math.round((amount / total) * 100) : 0;
-              const budget = targets && Number(targets[name]) > 0 ? Number(targets[name]) : 0;
+              const budget = monthTargets && Number(monthTargets[name]) > 0 ? Number(monthTargets[name]) : 0;
               const isOpen = openCat === name;
               let fillPct, amtLabel, noTarget = false, over = false, shareLabel;
               if (compareTargets) {
