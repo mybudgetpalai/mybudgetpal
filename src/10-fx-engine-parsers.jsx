@@ -55,6 +55,19 @@ function fxRate(month, from, to) {
   return FX_FALLBACK[from + ">" + to] || 1;
 }
 function fxConvert(amount, from, month) { return amount * fxRate(month || nowMonth(), from, FX.home); }
+/* Invertible pair rate for HOME-CURRENCY SWITCHES only. fxRate() may hold two
+   independently-fetched rates for the same pair (AED>GBP and GBP>AED) that are
+   not exact inverses, so A->B->A drifts. This picks ONE canonical direction per
+   pair (alphabetical) and derives the other as its exact reciprocal — a round
+   trip multiplies by r * (1/r) and lands back on the same number. */
+function fxRateStable(month, from, to) {
+  if (from === to) return 1;
+  const a = from < to ? from : to, b = from < to ? to : from;
+  let canon = FX.rates[fxKey(month, a, b)];
+  if (!canon) { const inv = FX.rates[fxKey(month, b, a)]; if (inv) canon = 1 / inv; }
+  if (!canon) { canon = FX_FALLBACK[a + ">" + b] || (FX_FALLBACK[b + ">" + a] ? 1 / FX_FALLBACK[b + ">" + a] : 1); }
+  return from === a ? canon : 1 / canon;
+}
 function convStartingBal(r) {
   const amt = Number(r && r.starting_balance) || 0;
   const cur = (FX.bankCurrency && FX.bankCurrency[r.bank_name]) || (r && r.currency) || "GBP";
