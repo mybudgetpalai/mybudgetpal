@@ -264,7 +264,7 @@
   .processing-card { max-width: 400px; align-items: center; text-align: center; }
   .breakdown-screen-card { max-width: 640px; }
   .target-card { max-width: 760px; max-height: 88vh; overflow-y: auto; }
-  .budget-table-wrap { overflow-x: auto; margin: 16px 0 6px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+  .budget-table-wrap { overflow-x: auto; margin: 16px 0 6px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-2); }
   .budget-table { border-collapse: collapse; width: 100%; }
   .budget-table th, .budget-table td { padding: 5px 12px; text-align: center; }
   .bt-corner { text-align: left !important; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; background: var(--surface-2); border-bottom: 1px solid var(--line); padding: 7px 12px; }
@@ -1058,7 +1058,7 @@
   .plan-opt-sub b { color: var(--ink); }
 
   /* ---- long-term plan grid ---- */
-  .ltp-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+  .ltp-wrap { overflow-x: auto; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-2); }
   .ltp-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
   .ltp-table th, .ltp-table td { padding: 7px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .ltp-table thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
@@ -1624,7 +1624,7 @@
   .beta-callout strong { font-weight: 800; }
 
   /* ===== Unified table skin: Targets / Long-Term Plan / Monthly Review ===== */
-  .budget-table-wrap, .ltp-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .budget-table-wrap, .ltp-wrap { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; }
   .budget-table th, .budget-table td, .ltp-table th, .ltp-table td { padding: 8px 12px !important; font-size: 13px; }
   .budget-table thead th, .ltp-table thead th { background: var(--surface-2) !important; color: var(--ink-3) !important; font-size: 11px !important; font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line); }
   .bt-corner, .bt-month-head { font-size: 11px !important; font-weight: 600 !important; color: var(--ink-3) !important; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -2301,6 +2301,10 @@
 
   /* P2-3: collapsible "How this works" on Long-Term Plan */
   .ltp-how { margin-top: 8px; }
+  /* D5: the card holding this <details> must grow when it opens, otherwise the
+     paragraph renders past the card's bottom edge (26px overflow). Scoped to the
+     card that actually contains the panel rather than every .dash-card. */
+  .dash-card:has(> .ltp-how) { height: auto; padding-bottom: 20px; }
   .ltp-how > summary { list-style: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
   .ltp-how > summary::-webkit-details-marker { display: none; }
   .ltp-how > summary::before { content: "\203a"; display: inline-block; transition: transform 0.18s ease; }
@@ -2317,7 +2321,7 @@
   /* P4-1: right-edge scroll hint on wide tables (first column already frozen) */
   .ltp-wrap, .table-wrap, .budget-table-wrap {
     background-image:
-      linear-gradient(to left, var(--card), rgba(255,255,255,0) 26px),
+      linear-gradient(to left, var(--surface-2), rgba(255,255,255,0) 26px),
       radial-gradient(farthest-side at 100% 50%, rgba(16,24,40,0.16), rgba(16,24,40,0));
     background-position: right center, right center;
     background-size: 26px 100%, 15px 100%;
@@ -2506,3 +2510,7 @@
      Heights are set explicitly rather than derived from padding, so the same class
      can't render at different heights in different containers (catman-input was
      40px in one place and 52px in another). */
+
+  /* --- D3 (2026-07-22): .ltp-wrap and .budget-table-wrap were 14px radius on a
+     white background while every other card is 16px on --surface-2. Now matched,
+     including the horizontal scroll-shadow gradient that faded to the old colour. */
