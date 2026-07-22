@@ -1494,6 +1494,21 @@ function App() {
             });
             setTargets((prev) => Object.fromEntries(Object.entries(prev || {}).map(([c, v]) => [c, Math.round((Number(v) || 0) * cvRate)])));
           }
+          /* The long-term plan is stored as bare numbers in the home currency too
+             (plan_target_balance / plan_opening_balance on profiles). Without this
+             the goal keeps its old magnitude and simply changes symbol — e.g. an
+             AED 241,403 goal reads as GBP 241,403 after switching to GBP. Convert
+             both by the same locked rate so the plan stays meaningful. */
+          setPlan((prev) => {
+            if (!prev) return prev;
+            const nextPlan = {
+              ...prev,
+              targetBalance: Math.round((Number(prev.targetBalance) || 0) * cvRate),
+              openingBalance: prev.openingBalance == null ? prev.openingBalance : Math.round((Number(prev.openingBalance) || 0) * cvRate),
+            };
+            savePlanToDb(userId, nextPlan).catch((e) => console.error("Plan currency conversion save failed (non-fatal):", e));
+            return nextPlan;
+          });
         }
       } catch (e) { console.error("Target currency conversion after home switch failed (non-fatal):", e); }
     }
