@@ -443,8 +443,21 @@ function remainingBillsThisMonth(txs, excludes) {
   const paidThisMonth = new Set(
     (txs || []).filter((t) => t.amount < 0 && t.date && t.date.slice(0, 7) === key).map((t) => norm(t.name))
   );
-  return detectRecurringBills(txs || [])
-    .filter((b) => ex.includes(b.name) && b.amount > 0)
+  const detected = detectRecurringBills(txs || []);
+  const detectedNames = new Set(detected.map((b) => b.name));
+  /* Manually-added bills (confirmed but not detected as recurring) must show here
+     too — the Bills page lists them, so the Overview checklist has to match. */
+  const manual = ex.filter((n) => !detectedNames.has(n)).map((n) => {
+    const want = norm(n);
+    let rows = (txs || []).filter((t) => t.amount < 0 && norm(t.name) === want);
+    if (!rows.length) rows = (txs || []).filter((t) => t.amount < 0 && t.name === n);
+    const avg = rows.length ? rows.reduce((s, t) => s + Math.abs(t.amount), 0) / rows.length : 0;
+    const days = rows.map((t) => +String(t.date || "").slice(8, 10)).filter((d) => d >= 1 && d <= 31);
+    const due = days.length ? String(Math.round(days.reduce((a, b) => a + b, 0) / days.length)) : "";
+    return { name: n, amount: Math.round(avg * 100) / 100, frequency: "Monthly", due };
+  });
+  return [...detected.filter((b) => ex.includes(b.name)), ...manual]
+    .filter((b) => b.amount > 0)
     .map((b) => {
       const dueDay = parseInt(b.due, 10) || 0;
       const paid = paidThisMonth.has(norm(b.name));
