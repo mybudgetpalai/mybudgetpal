@@ -117,9 +117,36 @@ try {
 } catch (e) {}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('/sw.js').catch(function(){});
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(function(){});
   });
 }
+/* Stale-page guard: when the page is restored from a snapshot or comes back on
+   screen, compare the running build to the server's; reload once if out of date. */
+window.__BUILD_ID = "__BUILD_ID__";
+(function(){
+  var checking = false;
+  function checkVersion(){
+    if (checking) return;
+    checking = true;
+    fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        checking = false;
+        if (d && d.v && d.v !== window.__BUILD_ID) {
+          try {
+            if (sessionStorage.getItem('tp_reloaded_to') === d.v) return;
+            sessionStorage.setItem('tp_reloaded_to', d.v);
+          } catch (e) {}
+          location.reload();
+        }
+      })
+      .catch(function(){ checking = false; });
+  }
+  window.addEventListener('pageshow', function(e){ if (e.persisted) checkVersion(); });
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') checkVersion();
+  });
+})();
 </script>
 </head>
 <body>
