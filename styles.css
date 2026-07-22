@@ -2603,8 +2603,12 @@
 
   /* Monthly review table: equal-height rows, numbers never wrap */
   @media (max-width: 640px) {
-    .review-row { grid-template-columns: 1.15fr 0.85fr 0.85fr 1fr; gap: 6px; padding: 10px 10px; font-size: 12.5px; }
-    .review-row > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Numbers must never truncate — size the numeric columns to their content and
+       let only the category name ellipsize; long "unbudgeted" notes may wrap. */
+    .review-row { grid-template-columns: minmax(0, 1.2fr) auto auto auto; gap: 6px; padding: 10px 10px; font-size: 12.5px; }
+    .review-row > span { white-space: nowrap; }
+    .review-row > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+    .review-row > span:nth-child(4) { white-space: normal; overflow-wrap: anywhere; }
     .review-cat { gap: 6px; }
   }
 
@@ -2619,3 +2623,15 @@
   @media (max-width: 640px) {
     .ltp-proj-chart .trend-tip { display: block; }
   }
+
+/* --- 2026-07-23: NCJ month-table sticky label column ---
+   iOS Safari drops position:sticky on a table cell whose display is changed to
+   flex, so the label column scrolled away and month headers hid under the frozen
+   "Category" head. Keep the td a table-cell (dot aligns inline), give the frozen
+   column a solid edge, and cap its width on phones so months stay visible. */
+.month-table td.row-label { display: table-cell; }
+.month-table .row-label .cat-dot { display: inline-block; vertical-align: middle; margin-right: 8px; }
+.month-table th:first-child, .month-table td:first-child { border-right: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .month-table .row-label-head, .month-table td.row-label { max-width: 150px; min-width: 110px; white-space: normal; overflow-wrap: anywhere; }
+}
