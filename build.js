@@ -56,7 +56,11 @@ if (!out.includes('src="/app.js"')) {
 
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
+const BUILD_ID = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
+if (!out.includes("__BUILD_ID__")) { console.error("BUILD FAILED: __BUILD_ID__ placeholder missing in index.html"); process.exit(1); }
+out = out.replace("__BUILD_ID__", BUILD_ID);
 fs.writeFileSync(path.join(DIST, "index.html"), out);
+fs.writeFileSync(path.join(DIST, "version.json"), JSON.stringify({ v: BUILD_ID }));
 fs.writeFileSync(path.join(DIST, "app.js"), code);
 
 const ASSETS = ["styles.css", "manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "og-image.png"];
