@@ -678,8 +678,9 @@ function TrendsCard({ transactions, compact }) {
           {months.map((m, i) => (
             <div className="trend-bar-col" key={"s" + m + i}>
               <div className="trend-bar-wrap">
-                <div className="trend-bar" style={{ height: (spend[i] / spendMax) * 100 + "%" }} />
-                <span className="trend-tip">{formatMoney(spend[i])}</span>
+                <div className="trend-bar" style={{ height: (spend[i] / spendMax) * 100 + "%" }}>
+                  <span className="trend-tip">{formatMoney(spend[i])}</span>
+                </div>
               </div>
               <span className="trend-bar-label">{m}</span>
             </div>
@@ -700,8 +701,9 @@ function TrendsCard({ transactions, compact }) {
           {months.map((m, i) => (
             <div className="trend-bar-col" key={"c" + m + i}>
               <div className="trend-bar-wrap">
-                <div className="trend-bar" style={{ height: (catSpend[i] / catMax) * 100 + "%", background: catColor(cat) }} />
-                <span className="trend-tip">{formatMoney(catSpend[i])}</span>
+                <div className="trend-bar" style={{ height: (catSpend[i] / catMax) * 100 + "%", background: catColor(cat) }}>
+                  <span className="trend-tip">{formatMoney(catSpend[i])}</span>
+                </div>
               </div>
               <span className="trend-bar-label">{m}</span>
             </div>
@@ -1642,6 +1644,7 @@ function LongTermPlanCard({ transactions, allTargets, banks, accountData, plan, 
               <div className="trend-bar-wrap">
                 <div className={"trend-bar ltp-bar " + (r.actual ? "plan-bar-actual" : "plan-bar-forecast")} style={{ height: (((r.close - minB) / span) * 100) + "%" }} title={formatMoney(r.close)}>
                   <span className="ltp-bar-val">{formatMoney(r.close)}</span>
+                  <span className="trend-tip">{formatMoney(r.close)}</span>
                 </div>
               </div>
               <span className="trend-bar-label">{monthLabelFromKey(r.k)}</span>
