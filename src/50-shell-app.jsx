@@ -540,8 +540,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
     })();
     return () => { alive = false; };
   }, []);
-  const [notifBudget, setNotifBudget] = useState(true);
-  const [notifWeekly, setNotifWeekly] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const categories = Object.keys(targets || {}).filter((c) => c !== "Income");
   const [editingTargets, setEditingTargets] = useState(false);
@@ -805,22 +803,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
               </button>
             </div>
           )}
-        </div>
-
-        <div className="dash-card settings-section">
-          <span className="card-label">Notifications</span>
-          <div className="toggle-row">
-            <span>Budget overspend alerts</span>
-            <button className={"switch " + (notifBudget ? "switch-on" : "")} onClick={() => setNotifBudget((v) => !v)} aria-label="Budget overspend alerts" role="switch" aria-checked={notifBudget}>
-              <span className="switch-knob" />
-            </button>
-          </div>
-          <div className="toggle-row">
-            <span>Weekly spending summary</span>
-            <button className={"switch " + (notifWeekly ? "switch-on" : "")} onClick={() => setNotifWeekly((v) => !v)} aria-label="Weekly spending summary" role="switch" aria-checked={notifWeekly}>
-              <span className="switch-knob" />
-            </button>
-          </div>
         </div>
 
         <button className="glass-btn danger" onClick={onLogout}>Log out</button>
