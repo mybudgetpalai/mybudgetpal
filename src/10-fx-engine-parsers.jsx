@@ -470,8 +470,21 @@ function detectRecurringBills(txs) {
 }
 function buildInsights(txs, targets) {
   const out = [];
-  const cur = overviewMonthKey(txs);
+  /* Insights are pinned to the REAL calendar month (Option B, same as the hero).
+     They used to read overviewMonthKey, which falls back to the latest month with
+     data — so on an empty month you got last month's figures under "this month"
+     copy, contradicting the hero right next to them. When the current month has
+     no activity we say so instead of reporting stale numbers. */
+  const cur = currentMonthKey();
   const prev = lastNMonthKeys(cur, 2)[0];
+  const curHasData = spendForMonth(txs, cur) > 0 || incomeForMonth(txs, cur) > 0;
+  if (!curHasData) {
+    const last = latestMonthKey(txs);
+    if (last && last < cur) {
+      out.push({ type: "info", kind: "nodata", text: "Nothing recorded for " + monthLabelFromKey(cur) + " yet \u2014 upload your latest statement to see this month's insights." });
+    }
+    return out;
+  }
   /* Comparisons must be like-for-like: a month still in progress is only
      compared against the SAME day-of-month last month, otherwise early in
      the month a partial total vs a full month always reads as a huge drop
