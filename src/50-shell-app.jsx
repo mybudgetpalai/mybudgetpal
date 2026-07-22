@@ -365,7 +365,7 @@ function MobileBottomNav({ active, menuOpen, onHome, onBreakdown, onUpload, onTa
     </div>
   );
 }
-function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, onSetPersona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billRejects, onRejectBill, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
+function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onOpenAdmin, isAdmin, signupMonth, onOpenSettings, onOpenMapping, showExtraBanner, onCompleteExtra, onDismissExtra, setupPending, onResumeSetup, setupIntroOpen, onSetupStart, onSetupSkip, setupQuestionsOpen, setupQuestionsProps, persona, onSetPersona, hasData, onLogout, transactions, onAddTransactions, pushToast, overviewSlots, onChangeOverviewSlots, homeLayout, onChangeHomeLayout, goals, goalsApi, accountData, isDev, onResetDev, onRecategorize, runTour, onFinishTour, navViews, onChangeNavViews, billExcludes, onToggleBillExclude, allTargets, usingDemo, theme, rollovers, onOpenReview, onSaveAllTargets, openTargetsEdit, onConsumeTargetsEdit, overlayScreen, catConfig, onSaveCatConfig, onRescanCategories, userId, onOpenLegal, onSaveName, onRemoveBank, onAddBank, onSaveTargets, onChangeTheme, onSaveCurrency, onSaveFxRate, billRejects, onRejectBill, billsSetupDone, billsSetupOpen, onOpenBillsSetup, onCloseBillsSetup, onSaveBillsSetup, billsNudgeHidden, onDismissBillsNudge }) {
   const [panelOpen, setPanelOpen] = useState(() => { if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) return false; return !runTour; });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [view, setView] = useHashView(openTargetsEdit ? "targets" : "overview");
@@ -527,7 +527,7 @@ const THEMES = [
   { key: "dark", label: "Dark", preview: "linear-gradient(135deg, #171C25 55%, #6C8CFF 55%)" },
 ];
 function normalizeTheme(t) { return t === "dark" ? "dark" : "light"; }
-function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, name, banks, bankRows, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
+function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, name, banks, bankRows, targets, userId, onBack, onOpenLegal, pushToast, onLogout, onSaveName, onRemoveBank, onAddBank, onSaveTargets, theme, onChangeTheme, onSaveCurrency, onSaveFxRate, extraPending, onCompleteExtra, onEditTargetsPage }) {
   const [displayName, setDisplayName] = useState(name);
   const [email, setEmail] = useState("");
   React.useEffect(() => {
@@ -575,6 +575,41 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
   const [savingCur, setSavingCur] = useState(false);
   const [showRates, setShowRates] = useState(false);
   const [rateDrafts, setRateDrafts] = useState({});
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwSending, setPwSending] = useState(false);
+  const [addBankOpen, setAddBankOpen] = useState(false);
+  const [addBankPick, setAddBankPick] = useState(null);
+  const [addBankCur, setAddBankCur] = useState(null);
+  const [addingBank, setAddingBank] = useState(false);
+  /* Currencies to offer as bank groups in the add-bank picker: whatever the
+     user already banks in, plus their home currency, in CURRENCIES order. */
+  const addBankGroups = Array.from(new Set([...Object.values(bankCurs || {}), homeCur].filter(Boolean)))
+    .sort((a, b) => CURRENCIES.indexOf(a) - CURRENCIES.indexOf(b));
+  const sendPasswordReset = async () => {
+    setPwSending(true);
+    try {
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+      if (error) throw error;
+      pushToast("Reset link sent \u2014 check your inbox", "success");
+      setPwOpen(false);
+    } catch (e) {
+      pushToast("Couldn't send reset link: " + ((e && e.message) || "unknown error"), "error");
+    }
+    setPwSending(false);
+  };
+  const confirmAddBank = async () => {
+    if (!addBankPick || !addBankCur) return;
+    setAddingBank(true);
+    try {
+      await onAddBank(addBankPick, addBankCur);
+      setBankCurs((prev) => ({ ...prev, [addBankPick]: addBankCur }));
+      pushToast(addBankPick + " added", "success");
+      setAddBankOpen(false); setAddBankPick(null); setAddBankCur(null);
+    } catch (e) {
+      pushToast("Couldn't add bank: " + ((e && e.message) || "unknown error"), "error");
+    }
+    setAddingBank(false);
+  };
   const curDirty = homeCur !== FX.home || (banks || []).some((b) => (bankCurLookup[b] || FX.bankCurrency[b] || "GBP") !== bankCurs[b]);
   const saveCurrency = async () => {
     setSavingCur(true);
@@ -637,15 +672,15 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
             <input className="glass-input" type="email" placeholder="you@example.com" value={email} readOnly style={{ opacity: 0.75, cursor: "default" }} />
             <p className="subtitle" style={{ margin: "6px 0 0", fontSize: 12 }}>This is the email you signed in with.</p>
           </div>
-          <button className="link-btn inline" style={{ marginTop: 4, padding: "10px 2px", display: "inline-block" }}>Change password</button>
+          <button className="link-btn inline" style={{ marginTop: 4, padding: "10px 2px", display: "inline-block" }} onClick={() => setPwOpen(true)}>Change password</button>
           <button className="glass-btn primary" style={{ marginTop: 14, marginLeft: 14, flex: "none" }} disabled={!profileDirty || savingProfile} onClick={saveProfile}>
             {savingProfile ? <span className="btn-spinner" /> : "Save"}
           </button>
         </div>
 
         <div className="dash-card settings-section">
-          <span className="card-label">Currency</span>
-          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Each bank keeps its own currency. Combined views convert everything into your home currency using a rate locked per month (fetched automatically — editable below).</p>
+          <span className="card-label">Banks &amp; currency</span>
+          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Your banks, what currency each one is in, and how combined totals are displayed.</p>
           <div className="field-group">
             <label className="field-label">View everything in</label>
             <div className="cur-toggle">
@@ -658,18 +693,25 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
                 );
               })}
             </div>
-            <p className="subtitle" style={{ margin: "8px 0 0", fontSize: 12 }}>Tap to switch — the blue one is what your dashboard shows. Your data doesn't change, just the display currency.</p>
+            <p className="subtitle" style={{ margin: "8px 0 0", fontSize: 12 }}>Totals convert into this currency using a rate locked per month. Your data doesn't change, just the display currency.</p>
           </div>
+          <div className="settings-divider" />
+          <label className="field-label">Your banks</label>
           <div className="settings-bank-list">
-            {(banks || []).map((b) => (
-              <div className="settings-bank-row" key={b}>
-                <span>{b}</span>
-                <select className="glass-input" style={{ width: 100, padding: "6px 10px" }} value={bankCurs[b] || "GBP"} onChange={(e) => { const v = e.target.value; setBankCurs((p) => ({ ...p, [b]: v })); }}>
-                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+            {(banks && banks.length > 0 ? banks : []).map((b) => (
+              <div className="settings-bank-row settings-bank-row-2" key={b}>
+                <span className="sb-name"><span className="sb-avatar">{String(b).trim().charAt(0).toUpperCase()}</span>{b}</span>
+                <span className="sb-actions">
+                  <select className="glass-input" style={{ width: 100, padding: "6px 10px" }} value={bankCurs[b] || "GBP"} onChange={(e) => { const v = e.target.value; setBankCurs((p) => ({ ...p, [b]: v })); }}>
+                    {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <button className="link-btn inline" onClick={() => onRemoveBank(b)} style={{ padding: "10px 8px", display: "inline-block" }}>Remove</button>
+                </span>
               </div>
             ))}
+            {(!banks || banks.length === 0) && <div className="settings-bank-row"><span>No banks linked yet</span></div>}
           </div>
+          <button className="link-btn inline" style={{ marginTop: 10, display: "block" }} onClick={() => { setAddBankPick(null); setAddBankCur(null); setAddBankOpen(true); }}>+ Add another bank</button>
           <button className="glass-btn primary" style={{ marginTop: 14, flex: "none" }} disabled={!curDirty || savingCur} onClick={saveCurrency}>
             {savingCur ? <span className="btn-spinner" /> : "Save"}
           </button>
@@ -714,19 +756,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
           <p className="persona-note">Switching applies to your Overview straight away — any widgets you’ve added or rearranged there will be replaced by the new view’s layout.</p>
           <button className="glass-btn primary" style={{ marginTop: 12, flex: "none" }} disabled={!personaDirty} onClick={savePersona}>Save</button>
         </div>
-        <div className="dash-card settings-section">
-          <span className="card-label">Linked banks</span>
-          <div className="settings-bank-list">
-            {(banks && banks.length > 0 ? banks : ["No banks linked yet"]).map((b) => (
-              <div className="settings-bank-row" key={b}>
-                <span>{b}</span>
-                {banks && banks.length > 0 && <button className="link-btn inline" onClick={() => onRemoveBank(b)} style={{ padding: "10px 8px", display: "inline-block" }}>Remove</button>}
-              </div>
-            ))}
-          </div>
-          <button className="link-btn inline" style={{ marginTop: 10 }}>+ Add another bank</button>
-        </div>
-
         <div className="dash-card settings-section">
           <span className="card-label">Appearance</span>
           <p className="subtitle" style={{ margin: "2px 0 12px" }}>Choose light or dark mode for your dashboard. Only you see it — it doesn't affect the public site.</p>
@@ -795,6 +824,69 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
         </div>
 
         <button className="glass-btn danger" onClick={onLogout}>Log out</button>
+
+        {pwOpen && (
+          <div className="modal-overlay" onClick={() => !pwSending && setPwOpen(false)}>
+            <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+              <h3 className="modal-title">Change your password</h3>
+              <p className="subtitle" style={{ margin: "0 0 16px" }}>We'll email a secure reset link to <b>{email}</b>. The link expires in 1 hour.</p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="glass-btn" style={{ flex: 1 }} disabled={pwSending} onClick={() => setPwOpen(false)}>Cancel</button>
+                <button className="glass-btn primary" style={{ flex: 1 }} disabled={pwSending || !email} onClick={sendPasswordReset}>
+                  {pwSending ? <span className="btn-spinner" /> : "Send reset link"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {addBankOpen && (
+          <div className="modal-overlay" onClick={() => !addingBank && setAddBankOpen(false)}>
+            <div className="modal-card settings-addbank" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+              <h3 className="modal-title">Add a bank</h3>
+              <p className="subtitle" style={{ margin: "0 0 10px" }}>Pick the bank, then the currency it's held in.</p>
+              {addBankGroups.map((cur) => {
+                const country = LIVE_COUNTRIES.concat(HOME_COUNTRIES).find((c) => c.cur === cur);
+                return (
+                  <div className="currency-bank-group" key={cur}>
+                    <div className="currency-bank-head">{country ? country.flag + " " + country.label : cur}</div>
+                    <div className="bank-grid">
+                      {(CURRENCY_BANKS[cur] || BANKS).filter((b) => b !== "Other").map((b) => {
+                        const already = (banks || []).indexOf(b) !== -1;
+                        const sel = addBankPick === b;
+                        return (
+                          <button key={cur + b} className={"chip bank-chip " + (sel ? "chip-selected " : "") + (already ? "chip-disabled" : "")}
+                            disabled={already}
+                            onClick={() => { setAddBankPick(b); setAddBankCur(cur); }}>
+                            <span>{b}</span>
+                            {(sel || already) && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {addBankPick && (
+                <div className="field-group" style={{ marginTop: 14 }}>
+                  <label className="field-label">Currency for {addBankPick}</label>
+                  <div className="cur-toggle" style={{ marginTop: 4 }}>
+                    {CURRENCIES.map((c) => {
+                      const sym = (CURRENCY_SYMBOLS[c] || "").trim();
+                      return <button key={c} className={"cur-seg" + (addBankCur === c ? " cur-seg-active" : "")} onClick={() => setAddBankCur(c)}>{c}{sym && sym !== c ? " " + sym : ""}</button>;
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button className="glass-btn" style={{ flex: 1 }} disabled={addingBank} onClick={() => setAddBankOpen(false)}>Cancel</button>
+                <button className="glass-btn primary" style={{ flex: 1 }} disabled={addingBank || !addBankPick || !addBankCur} onClick={confirmAddBank}>
+                  {addingBank ? <span className="btn-spinner" /> : "Add bank"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="settings-legal-row">
           <button className="link-btn inline" onClick={() => onOpenLegal("privacy")}>Privacy Policy</button>
@@ -1682,6 +1774,17 @@ function App() {
       } catch (e) { pushToast("Couldn't save targets", "error"); }
     }
   };
+  const handleAddBank = async (bankName, currency) => {
+    if (!userId || !bankName) return;
+    const { error } = await supabaseClient.from("banks").insert({ user_id: userId, bank_name: bankName, currency: currency || FX.home });
+    if (error) throw error;
+    FX.bankCurrency[bankName] = currency || FX.home;
+    setBanks((prev) => (prev.indexOf(bankName) === -1 ? [...prev, bankName] : prev));
+    try {
+      const rows = await fetchBanks(userId);
+      setBankRows(rows);
+    } catch (e) { console.error("Bank list refresh after add failed (non-fatal):", e); }
+  };
   const handleRemoveBank = async (bankName) => {
     setBanks((prev) => prev.filter((b) => b !== bankName));
     setUploadedFiles((prev) => { const next = { ...prev }; delete next[bankName]; return next; });
@@ -1909,6 +2012,7 @@ function App() {
         onLogout={handleLogout}
         onSaveName={handleSaveName}
         onRemoveBank={handleRemoveBank}
+        onAddBank={handleAddBank}
         onSaveTargets={handleSaveTargets}
         theme={theme}
         onChangeTheme={handleChangeTheme}
@@ -2003,6 +2107,7 @@ function App() {
         onOpenLegal={openLegal}
         onSaveName={handleSaveName}
         onRemoveBank={handleRemoveBank}
+        onAddBank={handleAddBank}
         onSaveTargets={handleSaveTargets}
         onChangeTheme={handleChangeTheme}
         onSaveCurrency={handleSaveCurrency}
