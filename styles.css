@@ -2514,3 +2514,58 @@
   /* --- D3 (2026-07-22): .ltp-wrap and .budget-table-wrap were 14px radius on a
      white background while every other card is 16px on --surface-2. Now matched,
      including the horizontal scroll-shadow gradient that faded to the old colour. */
+
+  /* --- M1b (2026-07-22): Trends axis/label collision is NOT mobile-only ---
+     .lpd2-tgrid spanned the full plot area with its labels flush left, so the
+     axis text (£1.5k) printed underneath the bar figures (£1,240); and
+     .lpd2-tlab was absolutely positioned at bottom:0 inside a column whose bar
+     ran the full height, so month names landed on top of the bars. Fixed at
+     every width by reserving a top gutter for values and a bottom strip for
+     months, and by shrinking/lightening the axis labels. */
+  .lpd2-trend { height: 220px; padding-top: 18px; }
+  .lpd2-tgrid { top: 18px; bottom: 28px; }
+  .lpd2-tgrid span { font-size: 9.5px; opacity: 0.7; }
+  .lpd2-tbars { padding-bottom: 28px; }
+  .lpd2-tlab { bottom: 4px; color: var(--ink-2); }
+
+  /* --- M1 (2026-07-22): landing demo cards at phone widths ---
+     Three genuine breakages at <=560px, all in the step-3 preview:
+       1. Trends  — .lpd2-tgrid axis labels sat in the same space as the
+          .lpd2-tval bar figures (£1.5k printed behind £1,240) and .lpd2-tlab
+          month names were painted over the bars because .lpd2-tbars kept its
+          full height while padding-bottom only reserved 26px.
+       2. Review  — the 4-column grid's fixed 84px pill column could not hold
+          "£253 under", so the pill overflowed the row.
+       3. Breakdown legend ran tight once the donut kept 108px. */
+  @media (max-width: 560px) {
+    /* --- Trends --- */
+    .lpd2-trend { height: 240px; padding: 20px 0 0; }
+    /* Axis labels move to their own gutter so bar values never overlap them. */
+    .lpd2-tgrid { top: 20px; bottom: 30px; }
+    .lpd2-tgrid span { font-size: 9px; padding-left: 0; opacity: 0.75; }
+    /* Reserve real space for the month row instead of overlaying it. */
+    .lpd2-tbars { gap: 6px; padding-bottom: 30px; }
+    .lpd2-tcol { min-width: 0; }
+    .lpd2-tval { font-size: 9px; margin-bottom: 3px; }
+    .lpd2-tbar { max-width: 30px; }
+    /* Month labels sit below the bar baseline, on the card, not on the bar. */
+    .lpd2-tlab { font-size: 10px; bottom: 6px; color: var(--ink-2); }
+
+    /* --- Monthly review ---
+       The header row's column labels are dropped and re-attached to each
+       figure instead, so the pill can take a full-width second row rather
+       than being squeezed into an 84px column it never fitted. */
+    .lpd2-revh { display: none; }
+    .lpd2-rrow { grid-template-columns: 1fr auto auto; gap: 6px 12px; padding: 12px 14px; }
+    .lpd2-rnm { grid-column: 1; grid-row: 1; font-size: 13.5px; }
+    .lpd2-rval { grid-column: auto; grid-row: 1; font-size: 12.5px; }
+    .lpd2-rval::before { display: block; font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; color: var(--ink-3); line-height: 1.4; }
+    .lpd2-rrow .lpd2-rval:nth-of-type(1)::before { content: "Planned"; }
+    .lpd2-rrow .lpd2-rval:nth-of-type(2)::before { content: "Actual"; }
+    .lpd2-pill { grid-column: 1 / -1; grid-row: 2; justify-self: start; font-size: 11px; padding: 3px 10px; }
+
+    /* --- Breakdown legend breathing room --- */
+    .lpd2-bd { gap: 14px; }
+    .lpd2-lg-nm, .lpd2-lg-amt { font-size: 12.5px; }
+  }
