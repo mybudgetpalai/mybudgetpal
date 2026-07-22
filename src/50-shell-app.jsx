@@ -376,16 +376,8 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
     () => (billsSetupDone || !hasData) ? 0 : detectRecurringBills(transactions || []).filter((b) => b.amount > 0).length,
     [billsSetupDone, hasData, transactions]);
   const billsNudge = billsNudgeHidden ? 0 : billsDetectedN;
-  /* One-time: open the sheet by itself on the first dashboard after onboarding.
-     Never while the tour is running — two overlays at once. */
-  const billsAutoRef = React.useRef(false);
-  React.useEffect(() => {
-    if (billsAutoRef.current) return;
-    if (runTour || setupIntroOpen || setupQuestionsOpen) return;
-    if (billsSetupDone || !hasData || billsDetectedN === 0) return;
-    billsAutoRef.current = true;
-    onOpenBillsSetup();
-  }, [billsSetupDone, hasData, billsDetectedN, runTour, setupIntroOpen, setupQuestionsOpen]);
+  /* The bills sheet never opens by itself — it surfaces as an inbox task instead
+     (popping up mid-session on reopen felt random and interruptive). */
   /* Cards nested well below this can request a page via goToView(). */
   React.useEffect(() => {
     const handler = (e) => { if (e && e.detail) { setView(e.detail); setTInitEdit(false); } };
@@ -441,6 +433,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
   const uncatCount = (viewTransactions || []).filter((t) => t.category === "Uncategorized").length;
   const completedMonths = completedMonthsWithData(viewTransactions || []);
   const inboxTasks = [];
+  if (billsDetectedN > 0) inboxTasks.push({ id: "bills-setup", icon: "bank", title: "Are these your bills?", desc: "We spotted " + billsDetectedN + " repeating payment" + (billsDetectedN !== 1 ? "s" : "") + " \u2014 confirm which ones are bills.", action: () => onOpenBillsSetup() });
   if (uncatCount > 0) inboxTasks.push({ id: "uncat", icon: "tag", title: uncatCount + " transaction" + (uncatCount !== 1 ? "s" : "") + " to categorise", desc: "Assign a category so they land in the right budget.", action: () => setCatReviewOpen(true) });
   /* setupPending only reflects profile.setup_completed; if targets already exist the task is
      stale and unclearable, so treat real targets as evidence setup is effectively done. */
