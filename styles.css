@@ -278,7 +278,7 @@
   .bt-input-wrap:hover { background: var(--surface-2); }
   .bt-input-wrap:focus-within { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-shadow); }
   .bt-cur { color: var(--ink-3); font-size: 13px; font-weight: 500; }
-  .bt-input { width: 6.5ch; background: transparent; border: none; color: var(--ink); font-size: 13px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
+  .bt-input { width: 6.5ch; height: 22px; background: transparent; border: none; color: var(--ink); font-size: 14px; font-family: inherit; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; text-align: right; padding: 0; cursor: pointer; -moz-appearance: textfield; }
   .bt-input::-webkit-outer-spin-button, .bt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .bt-total-row td { border-top: 2px solid var(--line-strong); border-bottom: none !important; padding-top: 8px; background: var(--surface-3); }
   .bt-total-cell { color: var(--accent); font-size: 13px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -300,9 +300,9 @@
   .field-label { display: block; color: var(--ink-2); font-size: 12px; font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
 
   .glass-input {
-    width: 100%; padding: 14px 16px; font-size: 16px; color: var(--ink);
+    width: 100%; height: 48px; padding: 0 16px; font-size: 16px; color: var(--ink);
     background: var(--surface-2); border: 1px solid var(--line);
-    border-radius: 16px; outline: none; margin-top: 4px;
+    border-radius: 14px; outline: none; margin-top: 4px;
   }
   .glass-input::placeholder { color: var(--ink-3); }
   .glass-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); }
@@ -420,7 +420,7 @@
   .net-negative { color: var(--neg); }
   .target-input-wrap { display: flex; align-items: center; gap: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
   .target-currency { color: var(--ink-3); font-size: 13px; }
-  .target-input { width: 70px; background: none; border: none; color: var(--ink); font-size: 14px; font-family: inherit; outline: none; text-align: right; }
+  .target-input { width: 70px; height: 22px; background: none; border: none; color: var(--ink); font-size: 14px; font-family: inherit; outline: none; text-align: right; }
 
   /* dashboard */
   .app-shell { min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
@@ -516,7 +516,7 @@
   .page-intro b { color: var(--accent); font-weight: 600; }
   .mr-sample-note { color: #ffb84f !important; }
   .tx-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
-  .tx-input { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none; }
+  .tx-input { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; height: 36px; padding: 0 12px; font-size: 14px; font-family: inherit; outline: none; }
   .tx-input::placeholder { color: var(--ink-3); }
   .tx-input:focus { border-color: var(--accent); }
   .tx-search { flex: 1 1 220px; min-width: 160px; }
@@ -569,7 +569,7 @@
   .bd-headline { color: var(--ink); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; line-height: 1.05; font-variant-numeric: tabular-nums; }
   .bd-sub { color: var(--ink-2); font-size: 13px; margin-top: 4px; }
   .bd-total-delta { font-size: 13px; font-weight: 500; margin-top: 5px; }
-  .bd-month-select { background-color: var(--accent-soft); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238fb4ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; color: var(--ink); border: 1px solid var(--accent); border-radius: 10px; padding: 8px 32px 8px 12px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; transition: background-color 0.15s, border-color 0.15s; }
+  .bd-month-select { background-color: var(--accent-soft); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238fb4ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; color: var(--ink); border: 1px solid var(--accent); border-radius: 12px; height: 36px; padding: 0 32px 0 12px; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; -webkit-appearance: none; appearance: none; transition: background-color 0.15s, border-color 0.15s; }
   .bd-month-select:hover { background-color: var(--accent-soft); border-color: var(--accent); }
   .bd-month-select option { color: #111; }
   .bd-list { margin-top: 16px; gap: 10px; }
@@ -2101,7 +2101,7 @@
   .catman { display: flex; flex-direction: column; gap: 16px; }
   .catman-list { display: flex; flex-direction: column; gap: 10px; }
   .catman-row { display: flex; align-items: center; gap: 10px; }
-  .catman-input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--input-bg, rgba(127,127,127,0.06)); color: var(--ink); font: inherit; }
+  .catman-input { flex: 1; min-width: 0; height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--input-bg, rgba(127,127,127,0.06)); color: var(--ink); font: inherit; font-size: 16px; }
   .catman-orig { font-size: 12px; color: var(--muted); white-space: nowrap; }
   .catman-del { border: none; background: none; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
   .catman-custom { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
@@ -2497,3 +2497,12 @@
   @media (max-width: 560px) {
     .onboard-card-wide .currency-bank-group .bank-grid { grid-template-columns: 1fr; }
   }
+
+  /* --- D1: input size standard (2026-07-22) ---
+     Eight control sizes were in use (16/19/34/40/41/49/52px). Now three roles:
+       Large  48px r14 16px  -> glass-input, catman-input (forms, Settings, onboarding, dates)
+       Small  36px r12 14px  -> tx-input, bd-month-select (filters, pickers, toolbars)
+       Cell   22px borderless 14px -> target-input, bt-input (editable numbers inside grids)
+     Heights are set explicitly rather than derived from padding, so the same class
+     can't render at different heights in different containers (catman-input was
+     40px in one place and 52px in another). */
