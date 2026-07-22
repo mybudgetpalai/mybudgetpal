@@ -428,12 +428,6 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
       <div className="glass-card auth-card">
         <div className="brand-row">{onBack && <button className="icon-btn back-btn" onClick={onBack} aria-label="Back">←</button>}<div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
-        {isSignup && (
-          <div className="beta-callout">
-            <span className="beta-callout-tag">BETA</span>
-            <span>Please don't use a real password. For now, just use <strong>123456</strong>.</span>
-          </div>
-        )}
         {isForgot ? (
           <><h1 className="title">Reset your password</h1><p className="subtitle">We'll send a reset link to your email.</p></>
         ) : (
@@ -935,11 +929,6 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
         <div className="brand-row"><div className="brand-dot" /><span className="brand-name">{APP_NAME}</span></div>
         <h1 className="title">Upload your bank statements</h1>
         <p className="subtitle">Add at least 3 months per bank so we can spot regular patterns.</p>
-        <div className="beta-callout">
-          <span className="beta-callout-tag">BETA</span>
-          <span>No need for a real statement — just hit <strong>Skip for now</strong> and we'll load dummy data so you can test.</span>
-        </div>
-
         <div className="bank-upload-list">
           {banks.map((b) => (
             <div key={b}>
