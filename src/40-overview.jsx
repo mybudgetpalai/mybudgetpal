@@ -121,7 +121,16 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   // pass, no smooth-scroll lag.
   const pickTourEl = () => {
     const els = Array.from(document.querySelectorAll('[data-tour-active="1"]'));
-    const vis = (n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight; };
+    /* "Visible" must mean MOSTLY on screen — a closed side drawer whose edge peeks
+       past x=0 was being picked over the bottom-nav burger on mobile, so the ring
+       hugged a sliver at the left edge. Require at least half the element in view. */
+    const vis = (n) => {
+      const r = n.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return false;
+      const ow = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
+      const oh = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
+      return ow >= r.width * 0.5 && oh >= r.height * 0.5;
+    };
     return els.find(vis) || els[0] || null;
   };
   const readRect = React.useCallback(() => {
@@ -131,7 +140,7 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const r = el.getBoundingClientRect();
     const x = Math.max(0, r.left - PAD), y = Math.max(0, r.top - PAD);
     const w = Math.min(vw - x, r.width + PAD * 2), h = r.height + PAD * 2;
-    setRect({ x, y, w, h, vw, vh });
+    setRect((prev) => (prev && Math.abs(prev.x - x) < 0.5 && Math.abs(prev.y - y) < 0.5 && Math.abs(prev.w - w) < 0.5 && Math.abs(prev.h - h) < 0.5 && prev.vw === vw && prev.vh === vh) ? prev : { x, y, w, h, vw, vh });
   }, []);
   const place = React.useCallback(() => {
     const el = pickTourEl();
@@ -181,11 +190,16 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const t0 = setTimeout(place, 60);
     const t1 = setTimeout(place, 240);
     const t2 = setTimeout(place, 520);
-    const t3 = setTimeout(readRect, 900);
+    /* Keep the ring glued to the target: the fixed chrome can shift after a
+       one-off measure (banners mounting, sticky bars engaging, the browser
+       toolbar collapsing), so track the element every frame while the step is
+       up. readRect bails out of the state update when nothing moved. */
+    let raf = 0;
+    const track = () => { readRect(); raf = requestAnimationFrame(track); };
+    raf = requestAnimationFrame(track);
     const onWin = () => readRect();
     window.addEventListener("resize", onWin);
-    window.addEventListener("scroll", onWin, true);
-    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); window.removeEventListener("resize", onWin); window.removeEventListener("scroll", onWin, true); };
+    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); cancelAnimationFrame(raf); window.removeEventListener("resize", onWin); };
   }, [stepIndex, place, readRect]);
 
   const dim = "rgba(16,24,40,0.60)";
