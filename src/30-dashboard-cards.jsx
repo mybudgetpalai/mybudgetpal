@@ -1365,17 +1365,30 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
   const done = completedMonthsWithData(txs);
   const [monthKey, setMonthKey] = useState(done.length ? done[done.length - 1] : currentMonthKey());
   if (!done.length) return <EmptyState text="Your monthly review appears once a month has finished. Upload statements covering a completed month to see how you did versus your plan." />;
-  /* Fall back to the most recent month that has targets — matches plannedCatFor.
-     A strict per-month lookup made every month without its own row read "no budget". */
-  const rawBudgets = (() => {
+  /* Budget lookup for the reviewed month, in priority order: its own targets, then
+     the most recent earlier month with targets, then the EARLIEST targets on record.
+     The last case covers completed months that predate signup — targets start at the
+     signup month, so a new user's first review would otherwise have nothing to compare
+     against. Whichever month we borrow from is surfaced to the user in the copy below. */
+  /* Which month's targets we ended up using, so the copy can be honest about it.
+     null = this month's own targets. */
+  const [rawBudgets, borrowedFrom] = (() => {
     const own = (allTargets && allTargets[monthKey]) || {};
-    if (TX_CATEGORIES.some((c) => Number(own[c]) > 0)) return own;
-    const keys = allTargets ? Object.keys(allTargets).filter((k) => k <= monthKey).sort() : [];
-    for (let i = keys.length - 1; i >= 0; i--) {
-      const t = allTargets[keys[i]] || {};
-      if (TX_CATEGORIES.some((c) => Number(t[c]) > 0)) return t;
+    if (TX_CATEGORIES.some((c) => Number(own[c]) > 0)) return [own, null];
+    const all = allTargets ? Object.keys(allTargets).sort() : [];
+    /* Prefer the most recent month at or before this one. */
+    const earlier = all.filter((k) => k <= monthKey);
+    for (let i = earlier.length - 1; i >= 0; i--) {
+      const t = allTargets[earlier[i]] || {};
+      if (TX_CATEGORIES.some((c) => Number(t[c]) > 0)) return [t, earlier[i]];
     }
-    return own;
+    /* Nothing before this month — a completed month that predates signup. Use the
+       EARLIEST targets on record as the baseline rather than showing no budget. */
+    for (let i = 0; i < all.length; i++) {
+      const t = allTargets[all[i]] || {};
+      if (TX_CATEGORIES.some((c) => Number(t[c]) > 0)) return [t, all[i]];
+    }
+    return [own, null];
   })();
   const hasRealBudget = TX_CATEGORIES.some((c) => Number(rawBudgets[c]) > 0);
   const usingSampleTargets = isDev && !hasRealBudget;
@@ -1407,6 +1420,11 @@ function MonthlyReviewCard({ transactions, allTargets, isDev, onOpenReview, sign
         <p className="page-intro">How {label} actually turned out, next to what you planned.</p>
         {onOpenReview && monthKey >= (signupMonth || new Date().toISOString().slice(0, 7)) && <button className="link-btn inline" style={{ margin: "-6px 0 14px" }} onClick={() => onOpenReview(monthKey)}>▶ Run the month-end review for {monthLabelFromKey(monthKey)}</button>}
         {usingSampleTargets && <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>Preview only — showing sample targets (dev account). Set real budgets in Settings.</p>}
+        {!usingSampleTargets && borrowedFrom && borrowedFrom !== monthKey && (
+          <p className="subtitle mr-sample-note" style={{ margin: "-8px 0 14px" }}>
+            You hadn't set budgets yet in {monthLabelFromKey(monthKey)}, so we're comparing against your {monthLabelFromKey(borrowedFrom)} targets.
+          </p>
+        )}
         <div className="review-cards">
           <div className={"review-tile " + (spendDiff === 0 ? "rt-flat" : (spendDiff < 0 ? "rt-good" : "rt-bad"))}>
             <span className="rt-label">You spent</span>
