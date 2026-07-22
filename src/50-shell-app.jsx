@@ -827,7 +827,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
 
         {pwOpen && (
           <div className="modal-overlay" onClick={() => !pwSending && setPwOpen(false)}>
-            <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="glass-card modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
               <h3 className="modal-title">Change your password</h3>
               <p className="subtitle" style={{ margin: "0 0 16px" }}>We'll email a secure reset link to <b>{email}</b>. The link expires in 1 hour.</p>
               <div style={{ display: "flex", gap: 10 }}>
@@ -842,7 +842,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
 
         {addBankOpen && (
           <div className="modal-overlay" onClick={() => !addingBank && setAddBankOpen(false)}>
-            <div className="modal-card settings-addbank" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div className="glass-card modal-card settings-addbank" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
               <h3 className="modal-title">Add a bank</h3>
               <p className="subtitle" style={{ margin: "0 0 10px" }}>Pick the bank, then the currency it's held in.</p>
               {addBankGroups.map((cur) => {
