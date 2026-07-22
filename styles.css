@@ -2472,7 +2472,8 @@
 
   /* --- Settings: merged Banks & currency card (2026-07-22) --- */
   .settings-divider { height: 1px; background: var(--line); margin: 18px 0 14px; }
-  .settings-bank-row-2 { gap: 12px; }
+  .settings-bank-row-2 { gap: 12px; background: var(--card); }
+  .settings-bank-row-2 select.glass-input { background: var(--surface-2); }
   .settings-bank-row-2 .sb-name { display: flex; align-items: center; gap: 10px; font-weight: 600; min-width: 0; }
   .settings-bank-row-2 .sb-avatar { width: 26px; height: 26px; border-radius: 8px; background: var(--grad-2); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
   .settings-bank-row-2 .sb-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
