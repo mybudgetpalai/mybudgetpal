@@ -839,6 +839,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
   const [balanceByBank, setBalanceByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, { balance: "", date: "" }])));
   const [errorsByBank, setErrorsByBank] = useState(() => Object.fromEntries(banks.map((b) => [b, null])));
   const [submitting, setSubmitting] = useState(false);
+  const [crunchNote, setCrunchNote] = useState("");
 
   const addFiles = (bank, fileList) => {
     const incoming = [];
@@ -867,6 +868,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
 
   const handleContinue = async (skip) => {
     setSubmitting(true);
+    setCrunchNote(skip ? "" : "Crunching your numbers\u2026");
     const allParsed = [];
     const savedStatements = [];
     let totalSkipped = 0;
@@ -882,6 +884,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
       }
       if (skip) continue;
       for (const f of filesByBank[bank]) {
+        setCrunchNote("Reading your " + bank + " statement\u2026");
         try {
           const path = userId + "/" + bank + "/" + Date.now() + "_" + f.name;
           await supabaseClient.storage.from("statements").upload(path, f.rawFile);
@@ -907,6 +910,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
     }
     let saved = allParsed;
     if (allParsed.length) {
+      setCrunchNote("Sorting your spending into categories\u2026");
       try {
         saved = [];
         const byStmt = {};
@@ -943,6 +947,9 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
           ))}
         </div>
 
+        {submitting && (
+          <div className="crunch-note"><span className="btn-spinner crunch-spin" /><span>{crunchNote || "Crunching your numbers\u2026"}</span></div>
+        )}
         <div className="nav-row">
           {onBack && <button className="glass-btn ghost" disabled={submitting} onClick={onBack}>Back</button>}
           <button className="glass-btn ghost" disabled={submitting} onClick={() => (onSkip ? onSkip() : handleContinue(true))}>Skip for now</button>
