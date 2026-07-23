@@ -655,25 +655,21 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
               <button className="glass-btn primary settings-nudge-btn" onClick={onCompleteExtra}>Complete now</button>
             </div>
           )}
-          <div className="field-group" style={{ marginTop: 14 }}>
-            <label className="field-label">Name</label>
-            <input className="glass-input" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          <div className="sp-rows">
+            <div className="sp-row"><span className="sp-key">Name</span><input className="glass-input sp-inp" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
+            <div className="sp-row"><span className="sp-key">Email</span><span className="sp-ro" title="This is the email you signed in with">{email || "\u2014"}</span></div>
           </div>
-          <div className="field-group">
-            <label className="field-label">Email</label>
-            <input className="glass-input" type="email" placeholder="you@example.com" value={email} readOnly style={{ opacity: 0.75, cursor: "default" }} />
-            <p className="subtitle" style={{ margin: "6px 0 0", fontSize: 12 }}>This is the email you signed in with.</p>
+          <div className="sp-actions">
+            <button className="link-btn inline" onClick={() => setPwOpen(true)}>Change password</button>
+            <button className="glass-btn primary sp-save" disabled={!profileDirty || savingProfile} onClick={saveProfile}>
+              {savingProfile ? <span className="btn-spinner" /> : "Save"}
+            </button>
           </div>
-          <button className="link-btn inline" style={{ marginTop: 4, padding: "10px 2px", display: "inline-block" }} onClick={() => setPwOpen(true)}>Change password</button>
-          <button className="glass-btn primary" style={{ marginTop: 14, marginLeft: 14, flex: "none" }} disabled={!profileDirty || savingProfile} onClick={saveProfile}>
-            {savingProfile ? <span className="btn-spinner" /> : "Save"}
-          </button>
         </div>
 
         <div className="dash-card settings-section">
           <span className="card-label">Banks &amp; currency</span>
-          <p className="subtitle" style={{ margin: "2px 0 12px" }}>Your banks, what currency each one is in, and how combined totals are displayed.</p>
-          <div className="field-group">
+          <div className="field-group" style={{ marginTop: 10 }}>
             <label className="field-label">View everything in</label>
             <div className="cur-toggle">
               {Array.from(new Set([...Object.values(bankCurs || {}), homeCur].filter(Boolean)))
@@ -685,7 +681,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
                 );
               })}
             </div>
-            <p className="subtitle" style={{ margin: "8px 0 0", fontSize: 12 }}>Totals convert into this currency using a rate locked per month. Your data doesn't change, just the display currency.</p>
+            <p className="subtitle" style={{ margin: "8px 0 0", fontSize: 12 }}>Totals convert into this currency at a rate locked per month.</p>
           </div>
           <div className="settings-divider" />
           <label className="field-label">Your banks</label>
@@ -703,11 +699,16 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
             ))}
             {(!banks || banks.length === 0) && <div className="settings-bank-row"><span>No banks linked yet</span></div>}
           </div>
-          <button className="link-btn inline" style={{ marginTop: 10, display: "block" }} onClick={() => { setAddBankPick(null); setAddBankCur(null); setAddBankOpen(true); }}>+ Add another bank</button>
-          <button className="glass-btn primary" style={{ marginTop: 14, flex: "none" }} disabled={!curDirty || savingCur} onClick={saveCurrency}>
-            {savingCur ? <span className="btn-spinner" /> : "Save"}
-          </button>
-          <button className="link-btn inline" style={{ marginTop: 10, display: "block" }} onClick={() => setShowRates((s) => !s)}>{showRates ? "Hide exchange rates" : "View / edit exchange rates"}</button>
+          <div className="sp-actions">
+            <span className="sp-links">
+              <button className="link-btn inline" onClick={() => { setAddBankPick(null); setAddBankCur(null); setAddBankOpen(true); }}>+ Add bank</button>
+              <span className="sp-dotsep">{"\u00B7"}</span>
+              <button className="link-btn inline" onClick={() => setShowRates((s) => !s)}>{showRates ? "Hide rates" : "Exchange rates"}</button>
+            </span>
+            <button className="glass-btn primary sp-save" disabled={!curDirty || savingCur} onClick={saveCurrency}>
+              {savingCur ? <span className="btn-spinner" /> : "Save"}
+            </button>
+          </div>
           {showRates && (
             <div className="settings-bank-list" style={{ marginTop: 8 }}>
               {fxEntries.length === 0 ? (
