@@ -388,14 +388,22 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
   /* Changing page used to keep the browser's old scroll position, so opening a
      page from the menu landed you halfway down it. Reset both scroll contexts
      (the desktop .main-content pane and the window itself) on every view change.
-     Instant, not smooth — the Cx should never see the page travel upward. */
+     html/body carry a global `scroll-behavior: smooth`, which OVERRIDES a JS
+     instant scroll and makes the page visibly travel upward on every nav. Flip
+     scroll-behavior to auto on the scrolling roots for the duration of the jump,
+     then restore it — same trick as scrollTourTargetIntoView. */
   React.useEffect(() => {
+    const pane = (() => { try { return document.querySelector(".main-content"); } catch (e) { return null; } })();
+    const roots = [document.documentElement, document.body, pane];
+    const prev = roots.map((r) => (r && r.style ? r.style.scrollBehavior : ""));
+    roots.forEach((r) => { if (r && r.style) r.style.scrollBehavior = "auto"; });
     try {
-      const pane = document.querySelector(".main-content");
       if (pane) pane.scrollTop = 0;
-    } catch (e) {}
-    try { window.scrollTo(0, 0); } catch (e) {}
-    try { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; } catch (e) {}
+      try { window.scrollTo(0, 0); } catch (e) {}
+      try { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; } catch (e) {}
+    } finally {
+      roots.forEach((r, i) => { if (r && r.style) r.style.scrollBehavior = prev[i]; });
+    }
   }, [view]);
   const [tourStep, setTourStep] = useState(0);
   React.useEffect(() => {
