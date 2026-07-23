@@ -385,26 +385,6 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
     return () => window.removeEventListener("mbp-goto", handler);
   }, []);
   const [uploadOpen, setUploadOpen] = useState(false);
-  /* Changing page used to keep the browser's old scroll position, so opening a
-     page from the menu landed you halfway down it. Reset both scroll contexts
-     (the desktop .main-content pane and the window itself) on every view change.
-     html/body carry a global `scroll-behavior: smooth`, which OVERRIDES a JS
-     instant scroll and makes the page visibly travel upward on every nav. Flip
-     scroll-behavior to auto on the scrolling roots for the duration of the jump,
-     then restore it — same trick as scrollTourTargetIntoView. */
-  React.useEffect(() => {
-    const pane = (() => { try { return document.querySelector(".main-content"); } catch (e) { return null; } })();
-    const roots = [document.documentElement, document.body, pane];
-    const prev = roots.map((r) => (r && r.style ? r.style.scrollBehavior : ""));
-    roots.forEach((r) => { if (r && r.style) r.style.scrollBehavior = "auto"; });
-    try {
-      if (pane) pane.scrollTop = 0;
-      try { window.scrollTo(0, 0); } catch (e) {}
-      try { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; } catch (e) {}
-    } finally {
-      roots.forEach((r, i) => { if (r && r.style) r.style.scrollBehavior = prev[i]; });
-    }
-  }, [view]);
   const [tourStep, setTourStep] = useState(0);
   React.useEffect(() => {
     if (!runTour) return;
@@ -423,6 +403,75 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
   const SPECIAL_VIEWS = ["settings", "mapping", "ask"];
   const effectiveView = runTour ? "overview" : ((navKeys.includes(view) || SPECIAL_VIEWS.includes(view)) ? view : "overview");
+  /* Per-view scroll memory. Each page remembers where you left it for the rest of
+     the session: leave Overview halfway down, go to Breakdown (which opens at the
+     top because it has no saved position yet), come back to Overview and you land
+     where you were. Cleared on refresh/logout because it's a plain ref, not storage.
+     Desktop scrolls an inner .main-content pane; mobile scrolls the window — both
+     are captured. */
+  const scrollMemory = React.useRef({});
+  React.useEffect(() => {
+    /* html/body carry a global `scroll-behavior: smooth`, which OVERRIDES a JS
+       instant scroll and would make the page visibly travel on every nav. Flip it
+       to auto for the duration of the jump, then restore — same trick as
+       scrollTourTargetIntoView. */
+    const getPane = () => { try { return document.querySelector(".main-content"); } catch (e) { return null; } };
+    const withInstantScroll = (fn) => {
+      const roots = [document.documentElement, document.body, getPane()];
+      const prev = roots.map((r) => (r && r.style ? r.style.scrollBehavior : ""));
+      roots.forEach((r) => { if (r && r.style) r.style.scrollBehavior = "auto"; });
+      try { fn(); } finally { roots.forEach((r, i) => { if (r && r.style) r.style.scrollBehavior = prev[i]; }); }
+    };
+    const readPos = () => {
+      const pane = getPane();
+      let win = 0;
+      try { win = window.pageYOffset || (document.scrollingElement ? document.scrollingElement.scrollTop : 0) || 0; } catch (e) {}
+      return { pane: pane ? pane.scrollTop : 0, win: win };
+    };
+    const applyPos = (pos) => {
+      withInstantScroll(() => {
+        const pane = getPane();
+        if (pane) pane.scrollTop = pos.pane;
+        try { window.scrollTo(0, pos.win); } catch (e) {}
+        try { if (document.scrollingElement) document.scrollingElement.scrollTop = pos.win; } catch (e) {}
+      });
+    };
+
+    /* Key off the view actually RENDERED (effectiveView), not the requested one:
+       during the tour, and for a view that isn't in the visible nav, the shell
+       falls back to overview — keying on `view` would file the position under a
+       page that was never on screen. */
+    const key = effectiveView;
+    const saved = scrollMemory.current[key];
+    /* Restore on the next frame: the incoming page's content has to exist before it
+       can be scrolled, otherwise the container is still short and the position
+       clamps to 0. A saved position of 0 (or none) is just a normal jump to top. */
+    let raf1 = 0, raf2 = 0;
+    applyPos(saved || { pane: 0, win: 0 });
+    if (saved && (saved.pane > 0 || saved.win > 0)) {
+      raf1 = requestAnimationFrame(() => {
+        applyPos(saved);
+        raf2 = requestAnimationFrame(() => applyPos(saved));
+      });
+    }
+
+    /* Track the live position while this page is open. Passive listeners so
+       scrolling stays smooth; the value is only read on the way out. */
+    let latest = saved || { pane: 0, win: 0 };
+    const onScroll = () => { latest = readPos(); };
+    const pane = getPane();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    if (pane) pane.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf1); cancelAnimationFrame(raf2);
+      window.removeEventListener("scroll", onScroll);
+      if (pane) pane.removeEventListener("scroll", onScroll);
+      /* Cleanup runs while the OUTGOING page is still on screen, so this captures
+         where the Cx actually left it. */
+      scrollMemory.current[key] = latest;
+    };
+  }, [effectiveView]);
   const tourHasTargets = TX_CATEGORIES.some((c) => Number((targets || {})[c]) > 0);
   const tourMonthKey = overviewMonthKey(transactions || []);
   const tourCopy = overviewTour({
