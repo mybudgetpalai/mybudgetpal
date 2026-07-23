@@ -2739,3 +2739,24 @@
 /* Nudge stays one line on phones (button used to wrap onto its own row). */
 .settings-nudge { flex-wrap: nowrap; padding: 10px 12px; }
 .settings-nudge > span { flex: 1; min-width: 0; line-height: 1.35; }
+
+/* --- Tour: glide the spotlight between steps (2026-07-23) ---
+   The ring used to teleport while the card faded, and three staggered
+   reposition passes made it visibly shuffle into place. Now the ring eases
+   between positions so the eye follows it to the next widget. The dim panels
+   are four separate rects that would tear if animated independently, so they
+   cross-fade in opacity instead of animating geometry.
+   `.tour-settling` is set while the late measurement passes run, so any
+   correction lands instantly rather than gliding a second time. */
+.tour-ring {
+  transition: left 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: left, top, width, height;
+}
+.tour-dim { transition: opacity 0.34s ease; }
+.tour-root.tour-settling .tour-ring { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring, .tour-dim { transition: none; }
+}
