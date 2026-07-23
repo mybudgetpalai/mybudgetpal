@@ -2658,3 +2658,41 @@
 @media (max-width: 640px) {
   .topbar-profile-btn { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; font-family: inherit; }
 }
+
+/* --- 2026-07-23: mobile QA feedback round --- */
+
+/* 1. NCJ spending summary: category labels left-align. `.month-table td`'s
+   text-align:right outranked `.row-label` once the cell went back to
+   display:table-cell for the sticky column. */
+.month-table td.row-label { text-align: left; }
+
+/* 2. Plan table ("Here is your plan"): one number size everywhere. Totals cells
+   inherited the card's base size (~15px) while inputs sat at 14px, so the grid
+   read as mixed fonts. Bold stays reserved for the two total rows. */
+.budget-table td { font-size: 14px; }
+.bt-input, .bt-total-num { font-size: 14px; font-weight: 500; }
+.bt-total-row .bt-total-num { font-weight: 700; }
+.bt-cur { font-size: 12px; }
+
+/* 3. "Your tasks" panel: on phones the 300px popover anchored to the bell ran
+   off the left edge. Pin it to the viewport instead, full-width under the bar. */
+@media (max-width: 640px) {
+  .inbox-menu { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; max-width: none; }
+}
+
+/* 4. Settings banks: one compact line per bank, name sized like the AED/GBP
+   segments above, monogram carries the bank's brand colour. */
+.settings-bank-row-2 .sb-name { font-size: 15px; font-weight: 700; }
+.settings-bank-row-2 { padding: 8px 12px; }
+.settings-bank-row-2 .sb-avatar { width: 30px; height: 30px; border-radius: 9px; font-size: 13px; }
+@media (max-width: 560px) {
+  .settings-bank-row-2 { flex-wrap: nowrap; }
+  .settings-bank-row-2 .sb-actions { width: auto; justify-content: flex-end; gap: 6px; }
+  .settings-bank-row-2 .sb-actions select.glass-input { width: 78px !important; padding: 6px 8px !important; }
+  .settings-bank-row-2 .sb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* 5. NCJ upload: "crunching" status while statements are being read. */
+.crunch-note { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent); color: var(--ink); font-size: 13px; font-weight: 600; }
+.crunch-note .crunch-spin { flex-shrink: 0; }
+.crunch-note .crunch-spin { border-color: rgba(46,91,255,0.25); border-top-color: var(--accent); }
