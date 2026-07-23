@@ -774,35 +774,35 @@ function CategoryVsTargetCard({ transactions, targets, billExcludes }) {
   const upcomingBills = remainingBillsThisMonth(transactions, billExcludes).filter((b) => b.upcoming);
   const earliestDue = upcomingBills.length ? Math.min(...upcomingBills.map((b) => b.dueDay || 31)) : null;
   const tickPct = Math.round(elapsed * 100);
-  const allUnder = rows.every((r) => r.target <= 0 || r.spent <= r.target * elapsed);
+  /* Compact layout (Option C, 2026-07-23): one line per category — name · spent/short
+     target · over/under — then a slim bar. Tick stays INSIDE the bar. */
+  const shortT = (t) => t >= 1000 ? ((t / 1000).toFixed(1).replace(/\.0$/, "") + "k") : String(Math.round(t));
   return (
     <div className="glass-card dash-card">
-      <div className="cvt2-head">
-        <span className="card-label" style={{ margin: 0 }}>Category vs target</span>
-        <span className="cvt2-cap">bar fills to target · <span className="cvt2-cap-tick">tick = day-{day} pace ({tickPct}%)</span></span>
-      </div>
-      <div className="cvt2-grid">
-        <span className="cvt2-h">Category</span><span></span><span className="cvt2-h cvt2-r">Spent / target</span><span className="cvt2-h cvt2-r">Vs pace</span>
+      <span className="card-label">Category vs target</span>
+      <div style={{ marginTop: 10 }}>
         {rows.map((r) => {
           const over = r.spent - r.target * elapsed > 0;
           const fill = r.target > 0 ? Math.min(100, (r.spent / r.target) * 100) : 0;
           const isBillsPending = r.c === "Bills" && r.spent === 0 && r.target > 0 && earliestDue !== null;
           const d = r.spent - r.target * elapsed;
           return (
-            <div className="cvt2-row" key={r.c}>
-              <span className="cvt2-nm">{displayCat(r.c)}</span>
-              <div className="cvt2-track"><div className="cvt2-fill" style={{ width: fill + "%", background: catColor(r.c) }} /><div className="cvt2-tick" style={{ left: tickPct + "%" }} /></div>
-              <span className="cvt2-num">{formatMoney(Math.round(r.spent))} <span className="cvt2-tgt">/ {formatMoney(Math.round(r.target))}</span></span>
-              {isBillsPending
-                ? <span className="cvt2-d cvt2-mut">due {ordinalDay(earliestDue)}</span>
-                : r.target > 0
-                ? <span className={"cvt2-d " + (over ? "cvt2-bad" : "cvt2-ok")}>{formatMoney(Math.round(Math.abs(d)))} {over ? "over" : "under"}</span>
-                : <span className="cvt2-d cvt2-mut">—</span>}
+            <div className="cvt3-row" key={r.c}>
+              <div className="cvt3-top">
+                <span className="cvt3-nm"><span className="cat-dot" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+                <span className="cvt3-spent">{formatMoney(Math.round(r.spent))}{r.target > 0 ? <small> / {shortT(r.target)}</small> : null}</span>
+                {isBillsPending
+                  ? <span className="cvt3-d cvt3-mut">due {ordinalDay(earliestDue)}</span>
+                  : r.target > 0
+                  ? <span className={"cvt3-d " + (over ? "cvt3-bad" : "cvt3-ok")}>{formatMoney(Math.round(Math.abs(d)))} {over ? "over" : "under"}</span>
+                  : <span className="cvt3-d cvt3-mut">—</span>}
+              </div>
+              <div className="cvt3-track"><div className="cvt3-fill" style={{ width: fill + "%", background: catColor(r.c) }} /><div className="cvt3-tick" style={{ left: tickPct + "%" }} /></div>
             </div>
           );
         })}
       </div>
-      <div className="cvt2-foot">{allUnder ? "Every category is left of the pace tick — you're tracking under target across the board." : "Bars past the tick are running ahead of where you'd expect by day " + day + "."}</div>
+      <div className="cvt3-foot">Bar fills to target · black tick = day-{day} pace ({tickPct}%). Left of the tick = tracking under.</div>
     </div>
   );
 }
