@@ -385,6 +385,18 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
     return () => window.removeEventListener("mbp-goto", handler);
   }, []);
   const [uploadOpen, setUploadOpen] = useState(false);
+  /* Changing page used to keep the browser's old scroll position, so opening a
+     page from the menu landed you halfway down it. Reset both scroll contexts
+     (the desktop .main-content pane and the window itself) on every view change.
+     Instant, not smooth — the Cx should never see the page travel upward. */
+  React.useEffect(() => {
+    try {
+      const pane = document.querySelector(".main-content");
+      if (pane) pane.scrollTop = 0;
+    } catch (e) {}
+    try { window.scrollTo(0, 0); } catch (e) {}
+    try { if (document.scrollingElement) document.scrollingElement.scrollTop = 0; } catch (e) {}
+  }, [view]);
   const [tourStep, setTourStep] = useState(0);
   React.useEffect(() => {
     if (!runTour) return;
