@@ -124,19 +124,21 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     /* "Visible" must mean MOSTLY on screen — a closed side drawer whose edge peeks
        past x=0 was being picked over the bottom-nav burger on mobile, so the ring
        hugged a sliver at the left edge. Require at least half the element in view. */
+    /* Degenerate targets (a collapsed pill, a closed drawer's edge) produced
+       sliver rings — anything under ~20px in either dimension is never a real
+       spotlight target. */
+    const real = els.filter((n) => { const r = n.getBoundingClientRect(); return r.width >= 20 && r.height >= 14; });
     const vis = (n) => {
       const r = n.getBoundingClientRect();
-      /* Degenerate targets (a collapsed pill, a closed drawer's edge) produced
-         sliver rings — anything under ~20px in either dimension is not a real
-         spotlight target. */
-      if (r.width < 20 || r.height < 14) return false;
       const ow = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
       const oh = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
       return ow >= r.width * 0.5 && oh >= r.height * 0.5;
     };
-    /* No els[0] fallback: highlighting an off-screen/collapsed element drew a
-       sliver ring at the screen edge. Better to dim everything with no ring. */
-    return els.find(vis) || null;
+    /* Prefer a visible element; otherwise fall back to any REAL-sized one so the
+       overlay can scroll it into view (dropping this fallback entirely broke the
+       scroll on steps whose widget starts below the fold). Only when every
+       candidate is a degenerate sliver do we return null (full dim, no ring). */
+    return real.find(vis) || real[0] || null;
   };
   const readRect = React.useCallback(() => {
     const el = pickTourEl();
