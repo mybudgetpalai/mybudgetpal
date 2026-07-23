@@ -454,7 +454,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
           <button className="demo-reminder-btn" onClick={() => setUploadOpen(true)}>Add your real bank statement</button>
         </div>
       )}
-      {runTour && <div className="welcome-banner">Hey {name || "there"}, welcome to your {APP_NAME} dashboard{demoActive && <span className="demo-badge">Sample data — upload a statement to see your own</span>}</div>}
+
       <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} onOpenAsk={() => { setView("ask"); setTInitEdit(false); }} tasks={inboxTasks} dataGap={dataGap} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} tourSpot={tourSpot} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
@@ -692,7 +692,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
           <div className="settings-bank-list">
             {(banks && banks.length > 0 ? banks : []).map((b) => (
               <div className="settings-bank-row settings-bank-row-2" key={b}>
-                <span className="sb-name"><span className="sb-avatar">{String(b).trim().charAt(0).toUpperCase()}</span>{b}</span>
+                <span className="sb-name"><span className="sb-avatar" style={{ background: bankBrand(b).bg, color: bankBrand(b).fg }}>{String(b).trim().charAt(0).toUpperCase()}</span>{b}</span>
                 <span className="sb-actions">
                   <select className="glass-input" style={{ width: 100, padding: "6px 10px" }} value={bankCurs[b] || "GBP"} onChange={(e) => { const v = e.target.value; setBankCurs((p) => ({ ...p, [b]: v })); }}>
                     {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1119,7 +1119,11 @@ function App() {
   const [billExcludes, setBillExcludes] = useState([]);
   /* Item 16: bills setup is a one-time prompt after onboarding. Persisted on the
      profile so it doesn't reappear on every login. */
-  const [billsSetupDone, setBillsSetupDone] = useState(true);
+  /* Default FALSE: the NCJ path reaches the dashboard without re-reading the
+     profile, so a `true` default suppressed the bills nudge (and its "Needs
+     you" row) until the app was hard-closed and reopened. Login/session-restore
+     both set the real value from the profile before any data exists. */
+  const [billsSetupDone, setBillsSetupDone] = useState(false);
   const [billsSetupOpen, setBillsSetupOpen] = useState(false);
   const [billsNudgeHidden, setBillsNudgeHidden] = useState(false);
   const [billRejects, setBillRejects] = useState([]);
