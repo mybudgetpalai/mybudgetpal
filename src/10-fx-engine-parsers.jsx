@@ -222,11 +222,21 @@ function isTransferDesc(desc) {
   const d = " " + String(desc || "").toLowerCase() + " ";
   return ["bank transfer", "transfer to", "transfer from", "internal transfer", "faster payment", "standing order", " trf ", " xfer ", "to savings", "from savings", "savings transfer", "own account"].some((k) => d.includes(k));
 }
+const INCOME_HINTS = ["salary", "income", "payroll", "wages", "wage ", "bonus", "commission", "dividend", "pension", "rent received", "rental income", "payout", "stipend", "freelance", "invoice paid", "interest earned", "interest paid", "cashback"];
+const REFUND_HINTS = ["refund", "reversal", "reversed", "rebate", "chargeback", "returned", " return ", "rtn "];
 function categorizeByRules(desc, amount) {
   const ck = customKeywordCategory(desc);
   if (ck) return ck;
   if (isTransferDesc(desc)) return "Uncategorized";
   const d = " " + String(desc || "").toLowerCase() + " ";
+  /* Credits (money in) must never fall into a spend category via merchant keywords —
+     "RENTAL INCOME" was landing in Bills through the "rent" keyword and turning monthly
+     spend negative. A credit only reaches the spend rules when it is explicitly
+     refund-marked (so refunds still reduce the category they came from). */
+  if (amount > 0) {
+    if (INCOME_HINTS.some((k) => d.includes(k))) return "Income";
+    if (!REFUND_HINTS.some((k) => d.includes(k))) return "Income";
+  }
   /* Multi-word keywords win first (e.g. "tesco mobile" -> Bills before "tesco" -> Groceries) */
   for (const cat of TX_CATEGORIES) {
     if (CATEGORY_RULES[cat].some((k) => k.includes(" ") && k.trim().includes(" ") && d.includes(k))) return cat;
