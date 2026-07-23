@@ -2696,3 +2696,30 @@
 .crunch-note { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent); color: var(--ink); font-size: 13px; font-weight: 600; }
 .crunch-note .crunch-spin { flex-shrink: 0; }
 .crunch-note .crunch-spin { border-color: rgba(46,91,255,0.25); border-top-color: var(--accent); }
+
+/* --- 2026-07-23 round 2: retest feedback --- */
+
+/* Monthly Review "By category": mobile override used auto-sized columns, so each
+   row's numbers sized independently and nothing lined up vertically. Shared fr
+   tracks + right alignment restore straight columns. */
+@media (max-width: 640px) {
+  .review-row { grid-template-columns: minmax(0, 1.15fr) 0.85fr 0.85fr 1.2fr; gap: 8px; }
+  .review-row > span:nth-child(2), .review-row > span:nth-child(3), .review-row > span:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .review-cat { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Header: drop the glow on the Ask pill. */
+@media (max-width: 640px) {
+  .topbar-ask-btn { box-shadow: none; }
+}
+
+/* Settings banks: the currency control must read as a dropdown (chevron), and
+   name / currency / Remove sit on one straight centre line. */
+.settings-bank-row-2 .sb-actions select.glass-input {
+  appearance: none; -webkit-appearance: none;
+  padding: 7px 26px 7px 12px !important; height: 34px; line-height: 1.2;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' stroke='%23667085' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat; background-position: right 9px center;
+}
+.settings-bank-row-2 { align-items: center; }
+.settings-bank-row-2 .sb-actions .link-btn { padding: 7px 4px !important; line-height: 1.2; }
