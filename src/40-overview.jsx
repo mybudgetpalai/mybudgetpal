@@ -106,6 +106,11 @@ function TourTarget({ active, className, children }) {
 function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   const [rect, setRect] = useState(null);
   const cardRef = React.useRef(null);
+  /* Mirrors `rect` so the placement effect can ask "has a ring ever been drawn?"
+     without taking `rect` as a dependency — doing that would re-run the effect on
+     every ring move and restart its timers forever. */
+  const hasRectRef = React.useRef(false);
+  React.useEffect(() => { hasRectRef.current = !!rect; }, [rect]);
   // cardPlace: "bottom" (default) or "top". Content steps flip it based on where the
   // target sits; chrome steps (upload/inbox/menu) always stay at the bottom.
   const [cardPlace, setCardPlace] = useState("bottom");
@@ -192,21 +197,58 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   }, [isChromeStep, spot]);
 
   React.useEffect(() => {
-    // Two instant passes: one after the step's widgets mount, one after layout settles.
-    // No smooth scrolling anywhere — that was the mobile "lag".
-    const t0 = setTimeout(place, 60);
-    const t1 = setTimeout(place, 240);
-    const t2 = setTimeout(place, 520);
+    /* Movement model (2026-07-23): the ring GLIDES to its new home (CSS transition
+       on .tour-ring), so the eye follows it from one widget to the next.
+
+       Previously three staggered passes (60/240/520ms) each moved the ring, which
+       read as a visible shuffle. Now the scroll + layout decision happens ONCE, up
+       front, and the ring animates to that final position. The later passes are
+       kept — they exist because widgets can still be mounting and the sticky
+       chrome can settle late — but they run with the transition suppressed
+       (.tour-settling), so any correction is an invisible snap rather than a
+       second animation. */
+    const rootEl = () => document.querySelector(".tour-root");
+    const settle = (on) => { const n = rootEl(); if (n) n.classList.toggle("tour-settling", !!on); };
+
+    /* The FIRST ring of the tour has no previous position to travel from, so
+       letting it transition would swoop it in from the top-left corner. Place
+       step 1 with the transition suppressed; every later step glides. */
+    const firstEver = stepIndex === 0 && !hasRectRef.current;
+    let t0;
+    if (firstEver) {
+      settle(true);
+      t0 = setTimeout(() => { place(); }, 60);
+    } else {
+      /* settle(false) must run AFTER .tour-root is in the DOM (on the very first
+         mount it isn't yet), otherwise the class is never cleared and every
+         later step stays snapped. A microtask-ish timeout covers both cases. */
+      const clear = setTimeout(() => settle(false), 0);
+      t0 = setTimeout(() => { clearTimeout(clear); settle(false); place(); }, 60);
+    }
+    // Later corrections: transition OFF, so they land instantly and invisibly.
+    const t1 = setTimeout(() => { settle(true); place(); }, 380);
+    const t2 = setTimeout(() => { settle(true); place(); }, 620);
+
     /* Keep the ring glued to the target: the fixed chrome can shift after a
        one-off measure (banners mounting, sticky bars engaging, the browser
        toolbar collapsing), so track the element every frame while the step is
-       up. readRect bails out of the state update when nothing moved. */
+       up. readRect bails out of the state update when nothing moved.
+       Per-frame tracking must never animate — it would fight the transition —
+       so it only starts once the glide has finished. */
     let raf = 0;
-    const track = () => { readRect(); raf = requestAnimationFrame(track); };
-    raf = requestAnimationFrame(track);
-    const onWin = () => readRect();
+    const startTrack = setTimeout(() => {
+      settle(true);
+      const track = () => { readRect(); raf = requestAnimationFrame(track); };
+      raf = requestAnimationFrame(track);
+    }, 460);
+
+    const onWin = () => { settle(true); readRect(); };
     window.addEventListener("resize", onWin);
-    return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); cancelAnimationFrame(raf); window.removeEventListener("resize", onWin); };
+    return () => {
+      clearTimeout(t0); clearTimeout(t1); clearTimeout(t2); clearTimeout(startTrack);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onWin);
+    };
   }, [stepIndex, place, readRect]);
 
   const dim = "rgba(16,24,40,0.60)";
