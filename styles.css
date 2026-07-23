@@ -2723,3 +2723,19 @@
 }
 .settings-bank-row-2 { align-items: center; }
 .settings-bank-row-2 .sb-actions .link-btn { padding: 7px 4px !important; line-height: 1.2; }
+
+/* --- 2026-07-23: compact Settings (approved mockup) --- */
+.sp-rows { margin-top: 8px; }
+.sp-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.sp-row:last-child { border-bottom: none; }
+.sp-key { width: 64px; flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.sp-inp.glass-input { flex: 1; min-width: 0; padding: 8px 12px; font-size: 14px; }
+.sp-ro { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.sp-actions .link-btn { padding: 8px 2px; }
+.sp-links { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.sp-dotsep { color: var(--ink-3); }
+.glass-btn.sp-save { flex: 0 0 auto; width: auto; padding: 9px 22px; font-size: 13px; border-radius: 999px; }
+/* Nudge stays one line on phones (button used to wrap onto its own row). */
+.settings-nudge { flex-wrap: nowrap; padding: 10px 12px; }
+.settings-nudge > span { flex: 1; min-width: 0; line-height: 1.35; }
