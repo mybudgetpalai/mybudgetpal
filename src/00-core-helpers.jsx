@@ -327,6 +327,22 @@ const BANKS = [
   "JPMorgan Chase", "Bank of America", "Wells Fargo", "Deutsche Bank", "BNP Paribas",
   "Santander", "Revolut", "Monzo", "Wise", "N26",
 ];
+/* Brand-coloured monogram per bank (used where a logo would sit — we can't ship
+   real trademarked logos, so it's the bank's brand colour + initial). fg only
+   set where white text wouldn't read. */
+const BANK_BRAND = {
+  "HSBC": { bg: "#DB0011" }, "Barclays": { bg: "#00AEEF" }, "Emirates NBD": { bg: "#1D3E7B" },
+  "ADCB": { bg: "#C8102E" }, "Dubai Islamic Bank": { bg: "#00733B" }, "Mashreq": { bg: "#FF5E00" },
+  "First Abu Dhabi Bank": { bg: "#002E5D" }, "RAKBANK": { bg: "#DA291C" }, "Citibank": { bg: "#003B70" },
+  "Standard Chartered": { bg: "#0473EA" }, "JPMorgan Chase": { bg: "#117ACA" }, "Bank of America": { bg: "#E31837" },
+  "Wells Fargo": { bg: "#D71E28" }, "Deutsche Bank": { bg: "#0018A8" }, "BNP Paribas": { bg: "#009A5C" },
+  "Santander": { bg: "#EC0000" }, "Revolut": { bg: "#191C1F" }, "Monzo": { bg: "#FF4F40" },
+  "Wise": { bg: "#9FE870", fg: "#163300" }, "N26": { bg: "#36A18B" },
+};
+function bankBrand(name) {
+  const b = BANK_BRAND[String(name || "").trim()] || null;
+  return { bg: (b && b.bg) || "var(--grad-2)", fg: (b && b.fg) || "#fff" };
+}
 const SAVVY_OPTIONS = [
   { key: "beginner", label: "Just starting out" },
   { key: "intermediate", label: "Getting the hang of it" },
