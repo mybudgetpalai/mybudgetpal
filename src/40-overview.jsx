@@ -126,12 +126,17 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
        hugged a sliver at the left edge. Require at least half the element in view. */
     const vis = (n) => {
       const r = n.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return false;
+      /* Degenerate targets (a collapsed pill, a closed drawer's edge) produced
+         sliver rings — anything under ~20px in either dimension is not a real
+         spotlight target. */
+      if (r.width < 20 || r.height < 14) return false;
       const ow = Math.min(r.right, window.innerWidth) - Math.max(r.left, 0);
       const oh = Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0);
       return ow >= r.width * 0.5 && oh >= r.height * 0.5;
     };
-    return els.find(vis) || els[0] || null;
+    /* No els[0] fallback: highlighting an off-screen/collapsed element drew a
+       sliver ring at the screen edge. Better to dim everything with no ring. */
+    return els.find(vis) || null;
   };
   const readRect = React.useCallback(() => {
     const el = pickTourEl();
@@ -1774,7 +1779,20 @@ function ThisMonthV2({ persona, transactions, targets, billExcludes, onResumeSet
 /* Option A: everything that nags collapses into a single pill placed BELOW the
    hero, so the first thing on screen is always a number. Expanding the pill
    reveals the same rows that used to sit above the fold. */
-function NeedsPill({ items, expanded, onToggle }) {
+function NeedsPill({ items, expanded, onToggle, tourPlaceholder }) {
+  /* During the tour this pill is the spotlight target for the "Needs you" step —
+     if nothing needs action yet it used to render null, leaving the tour ring
+     hugging an empty sliver. Show an "all clear" pill instead. */
+  if ((!items || items.length === 0) && tourPlaceholder) {
+    return (
+      <div className="oh-needs-wrap">
+        <div className="oh-needs-pill">
+          <span className="oh-needs-pill-ic"><Icon name="checkcircle" size={15} /></span>
+          <span className="oh-needs-pill-tx">All clear {"\u2014"} anything that needs you will show up here</span>
+        </div>
+      </div>
+    );
+  }
   if (!items || items.length === 0) return null;
   const n = items.length;
   return (
@@ -1848,7 +1866,7 @@ function OverviewHome({ name, targets, transactions, rollovers, banks, accountDa
           and it can never fall below the fold on a tall hero like Goal Getter. */}
       {showNeeds && (!runTour || tourStep >= 3) && (
         <TourTarget active={runTour && tourStep === 3}>
-          <NeedsPill items={needs} expanded={needsOpen || (runTour && tourStep === 3)} onToggle={() => setNeedsOpen((v) => !v)} />
+          <NeedsPill items={needs} tourPlaceholder={runTour && tourStep === 3} expanded={needsOpen || (runTour && tourStep === 3)} onToggle={() => setNeedsOpen((v) => !v)} />
         </TourTarget>
       )}
 
