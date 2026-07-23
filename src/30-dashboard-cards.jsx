@@ -28,6 +28,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
           <button className="glass-btn primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
+        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={15} /><span className="topbar-ask-label">Ask</span></button>
         <div className={"inbox-wrap" + (tourSpot === "inbox" ? " tour-spot" : "")} ref={inboxRef} data-tour-active={tourSpot === "inbox" ? "1" : undefined}>
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="bell" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
@@ -46,7 +47,6 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
             </div>
           )}
         </div>
-        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={15} /><span className="topbar-ask-label">Ask</span></button>
         <button className="topbar-profile-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenSettings(); }} aria-label="Settings" title="Settings">{initial}</button>
         <div className="avatar-wrap" ref={menuRef}>
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
@@ -67,7 +67,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
 function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose, tourSpot }) {
   const list = views || VIEWS;
   return (
-    <div className={"side-panel " + (open ? "side-panel-open" : "") + (tourSpot === "menu" ? " tour-spot" : "")} data-tour-active={tourSpot === "menu" ? "1" : undefined}>
+    <div className={"side-panel " + (open ? "side-panel-open" : "") + (tourSpot === "menu" && open ? " tour-spot" : "")} data-tour-active={tourSpot === "menu" && open ? "1" : undefined}>
       <div className="side-panel-label-row">
         <span className="side-panel-label">Views</span>
         <div className="side-panel-label-actions">
