@@ -47,6 +47,7 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
           )}
         </div>
         <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={15} /><span className="topbar-ask-label">Ask</span></button>
+        <button className="topbar-profile-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenSettings(); }} aria-label="Settings" title="Settings">{initial}</button>
         <div className="avatar-wrap" ref={menuRef}>
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
