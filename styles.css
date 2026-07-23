@@ -2635,3 +2635,20 @@
 @media (max-width: 640px) {
   .month-table .row-label-head, .month-table td.row-label { max-width: 150px; min-width: 110px; white-space: normal; overflow-wrap: anywhere; }
 }
+
+/* --- 2026-07-23: compact Category vs Target (Option C) --- */
+.cvt3-row { padding: 8px 0; }
+.cvt3-row:first-of-type { padding-top: 2px; }
+.cvt3-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; min-width: 0; }
+.cvt3-nm { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cvt3-nm .cat-dot { width: 9px; height: 9px; }
+.cvt3-spent { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: auto; }
+.cvt3-spent small { font-weight: 500; color: var(--ink-3); font-size: 12px; }
+.cvt3-d { font-size: 12px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; flex: none; min-width: 96px; text-align: right; }
+.cvt3-d.cvt3-ok { color: var(--pos); }
+.cvt3-d.cvt3-bad { color: var(--neg); }
+.cvt3-d.cvt3-mut { color: var(--ink-3); font-weight: 600; }
+.cvt3-track { position: relative; height: 7px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line-strong); overflow: hidden; }
+.cvt3-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+.cvt3-tick { position: absolute; top: 0; bottom: 0; width: 2.5px; background: var(--ink); }
+.cvt3-foot { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; font-size: 12px; line-height: 1.4; color: var(--ink-3); }
