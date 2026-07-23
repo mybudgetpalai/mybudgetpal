@@ -2652,3 +2652,9 @@
 .cvt3-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
 .cvt3-tick { position: absolute; top: 0; bottom: 0; width: 2.5px; background: var(--ink); }
 .cvt3-foot { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; font-size: 12px; line-height: 1.4; color: var(--ink-3); }
+
+/* Mobile top-bar profile button — customer initial, opens Settings (sits right of Ask) */
+.topbar-profile-btn { display: none; }
+@media (max-width: 640px) {
+  .topbar-profile-btn { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: var(--grad-3); color: var(--on-accent); font-size: 14px; font-weight: 600; border: 1px solid var(--line); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; font-family: inherit; }
+}
