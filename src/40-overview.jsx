@@ -1677,11 +1677,17 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
         <div className="v2pt-cap">{isCurrentMonth ? <>bar fills to target · <span className="v2pt-tk">tick = day-{day} pace ({tickPct}%)</span></> : <>bar fills to target · full month</>}</div>
         <div className="bwa-rows">
           {enrich.map((r) => (
-            <div className="bwa-row" key={r.c}>
+            <div className="bwa-row bwa-oneline" key={r.c}>
               <div className="bwa-top">
                 <span className="bwa-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-                <span className="bwa-val"><b>{formatMoney(Math.round(r.spent))}</b> / {formatMoney(Math.round(r.target))}</span>
-                <span className={"bwa-pill " + (r.over ? "bwa-pill-bad" : "bwa-pill-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
+                <span className="bwa-val">
+                  <span className="bwa-amt-full"><b>{formatMoney(Math.round(r.spent))}</b> / {formatMoney(Math.round(r.target))}</span>
+                  <span className="bwa-amt-short"><b>{Math.round(r.spent).toLocaleString()}</b> / {Math.round(r.target).toLocaleString()}</span>
+                </span>
+                <span className={"bwa-pill " + (r.over ? "bwa-pill-bad" : "bwa-pill-good")}>
+                  <span className="bwa-amt-full">{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
+                  <span className="bwa-amt-short">{r.delta.toLocaleString()} {r.over ? "over" : "under"}</span>
+                </span>
               </div>
               <div className="bwa-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} />{isCurrentMonth && <span className="bwa-tick" style={{ left: tickPct + "%" }} />}</div>
             </div>
