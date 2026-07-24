@@ -393,6 +393,28 @@ function SetupPushBand({ onResumeSetup }) {
   );
 }
 
+/* Donut segments separated by small gaps in the card colour (approved 2026-07-24).
+   Gaps scale away when a single segment would fill the ring. */
+function donutGapStops(seg, total) {
+  const live = seg.filter((s) => s.v > 0);
+  const GAP = 4;
+  if (live.length <= 1) {
+    let acc = 0;
+    return seg.map((sg) => { const s = (acc / total) * 360; acc += sg.v; const e = (acc / total) * 360; return sg.color + " " + s + "deg " + e + "deg"; }).join(", ");
+  }
+  const scale = (360 - GAP * live.length) / 360;
+  let acc = 0; const parts = [];
+  seg.forEach((sg) => {
+    if (sg.v <= 0) return;
+    const span = (sg.v / total) * 360 * scale;
+    parts.push("var(--card) " + acc + "deg " + (acc + GAP / 2) + "deg");
+    parts.push(sg.color + " " + (acc + GAP / 2) + "deg " + (acc + GAP / 2 + span) + "deg");
+    parts.push("var(--card) " + (acc + GAP / 2 + span) + "deg " + (acc + GAP + span) + "deg");
+    acc += GAP + span;
+  });
+  return parts.join(", ");
+}
+
 function MiniBreakdown({ transactions }) {
   const k = currentMonthKey();
   const cats = spendByCategoryForMonth(transactions || [], k);
@@ -400,8 +422,7 @@ function MiniBreakdown({ transactions }) {
   const total = entries.reduce((s, e) => s + e[1], 0);
   if (!total) return (<div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>);
   const seg = entries.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
-  let acc = 0;
-  const stops = seg.map((sg) => { const start = (acc / total) * 100; acc += sg.v; const end = (acc / total) * 100; return sg.color + " " + start + "% " + end + "%"; }).join(", ");
+  const stops = donutGapStops(seg, total);
   return (
     <div className="glass-card dash-card">
       <span className="card-label">Where it's gone</span>
@@ -1548,8 +1569,7 @@ function CompositionCardV2({ transactions, depth }) {
 
   if (depth === "compact") {
     const seg = entries.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
-    let acc = 0;
-    const stops = seg.map((sg) => { const start = (acc / total) * 100; acc += sg.v; const end = (acc / total) * 100; return sg.color + " " + start + "% " + end + "%"; }).join(", ");
+    const stops = donutGapStops(seg, total);
     const twoSum = entries.slice(0, 2).reduce((s, e) => s + e[1], 0);
     const foot = entries.length >= 2
       ? displayCat(entries[0][0]) + " and " + displayCat(entries[1][0]) + " make up " + Math.round((twoSum / total) * 100) + "% of your spend."
