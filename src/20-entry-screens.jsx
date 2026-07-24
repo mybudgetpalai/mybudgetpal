@@ -1282,7 +1282,11 @@ function MonthlyBreakdownScreen({ onDone, transactions, onBack, bankRows }) {
   const hasReal = transactions && transactions.length > 0;
   let categories, monthLabels, byCatByMonth, incomeByMonth, openingByMonth, closingByMonth;
   if (hasReal) {
-    const dataKeys = [...new Set(transactions.map((t) => (t.date || "").slice(0, 7)).filter((k) => /^\d{4}-\d{2}$/.test(k)))].sort();
+    const nowKey = currentMonthKey();
+    /* A statement that straddles a month end (or any stray future-dated row)
+       must not drag this window into a month that has barely started — cap the
+       window at the current month so the customer sees three real months. */
+    const dataKeys = [...new Set(transactions.map((t) => (t.date || "").slice(0, 7)).filter((k) => /^\d{4}-\d{2}$/.test(k)))].sort().filter((k) => k <= nowKey);
     const keys = dataKeys.length ? dataKeys.slice(-3) : lastNMonthKeys(latestMonthKey(transactions), 1);
     monthLabels = keys.map(monthLabelFromKey);
     const perMonth = keys.map((k) => spendByCategoryForMonth(transactions, k));
