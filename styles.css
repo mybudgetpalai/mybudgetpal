@@ -2877,3 +2877,32 @@
 /* actions rows: links left, nothing ragged */
 .settings-body .sp-actions { margin-top: 12px; min-height: 36px; }
 .settings-body .subtitle { margin-top: 0; }
+
+/* C3/C4 polish: calmer grid, delta as a soft pill, gentler pace tick */
+.v2pt-row { grid-template-columns: 104px 1fr 150px; gap: 14px; }
+.v2pt-chips { grid-template-columns: 104px 1fr 140px 86px; }
+.v2pt-full { grid-template-columns: 104px 1fr 150px 122px; }
+.v2pt-rows { gap: 13px; }
+.v2pt-track { height: 9px; }
+.v2pt-tick { top: -3px; bottom: -3px; width: 2px; background: var(--ink-3); opacity: .8; }
+.v2pt-pill { display: inline-flex; align-items: center; justify-content: center; justify-self: end; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.v2pt-pill-good { background: rgba(18,161,80,0.12); color: var(--pos); }
+.v2pt-pill-bad { background: rgba(217,45,32,0.10); color: var(--neg); }
+.v2pt-st strong, .v2pt-val strong { font-weight: 700; }
+
+/* C9 round 3 */
+/* no divider lines between profile rows — Name and Email read identically */
+.settings-body .sp-row { border-bottom: none; padding: 7px 0; }
+.settings-body .sp-ro { display: flex; align-items: center; height: 36px; font-size: 13.5px; }
+/* bank row: select + Remove aligned as one control group */
+.settings-body .settings-bank-row-2 .sb-actions { gap: 8px; }
+.settings-body .settings-bank-row-2 .sb-actions .link-btn { height: 36px; display: inline-flex; align-items: center; padding: 0 10px !important; }
+/* Log out is a real button, not a sliver */
+.settings-body .glass-btn.danger { height: 48px; font-size: 14.5px; font-weight: 700; border-radius: 14px; }
+
+/* C12: Monthly Review columns — numeric columns equal + fixed, hugging the right */
+.review-row { grid-template-columns: 1fr 150px 150px 170px; gap: 14px; }
+
+/* C16: bank avatar spans both text lines */
+.ba-bank-row { gap: 12px; }
+.ba-avatar { width: 34px; height: 34px; border-radius: 10px; font-size: 15px; align-self: center; }
