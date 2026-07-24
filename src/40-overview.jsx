@@ -1547,10 +1547,7 @@ function CompositionCardV2({ transactions, depth }) {
   const topPct = pctOf(entries[0][1]);
 
   if (depth === "compact") {
-    const top = entries.slice(0, 4);
-    const otherTotal = entries.slice(4).reduce((s, e) => s + e[1], 0);
-    const seg = top.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
-    if (otherTotal > 0) seg.push({ label: "Other", v: otherTotal, color: "#9aa4b8" });
+    const seg = entries.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
     let acc = 0;
     const stops = seg.map((sg) => { const start = (acc / total) * 100; acc += sg.v; const end = (acc / total) * 100; return sg.color + " " + start + "% " + end + "%"; }).join(", ");
     const twoSum = entries.slice(0, 2).reduce((s, e) => s + e[1], 0);
@@ -1662,7 +1659,7 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
               <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
               <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} />{isCurrentMonth && <span className="v2pt-tick" style={{ left: tickPct + "%" }} />}</div>
               <span className="v2pt-st"><strong>{formatMoney(Math.round(r.spent))}</strong> / {formatMoney(Math.round(r.target))}</span>
-              <span className={"v2pt-dd " + (r.over ? "v2-bad" : "v2-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
+              <span className={"v2pt-dd v2pt-pill " + (r.over ? "v2pt-pill-bad" : "v2pt-pill-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
             </div>
           ))}
         </div>
