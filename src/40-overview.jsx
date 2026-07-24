@@ -1435,7 +1435,7 @@ function BudgetHawkHeroV2({ targets, transactions, rollovers, billExcludes }) {
   const pre = p.showProj ? (
     <div className="v2-ledger v2-calc-ledger">
       <div className="v2-ln"><span>Your pace: {formatMoney(s.spent)} {"\u00F7"} {p.day} days</span><span className="v2-dots" /><b>{formatMoney(p.paceDay)}/day</b></div>
-      <div className="v2-ln"><span>At {formatMoney(p.paceDay)}/day for {p.dim} days</span><span className="v2-dots" /><b>{formatMoney(p.paceDay * p.dim)}</b></div>
+      <div className="v2-ln"><span>At about {formatMoney(p.paceDay)}/day for {p.dim} days</span><span className="v2-dots" /><b>{formatMoney(p.projected - (s.reserved > 0 ? s.reserved : 0))}</b></div>
       {s.reserved > 0 && <div className="v2-ln"><span>+ Bills still to come</span><span className="v2-dots" /><b>{formatMoney(s.reserved)}</b></div>}
       <div className="v2-ln"><span>= Projected {currentMonthName()} spend</span><span className="v2-dots" /><b>{formatMoney(p.projected)}</b></div>
       <div className="v2-ln v2-total"><span>{p.under ? "Saved vs" : "Over"} your {formatMoney(s.pot)} plan</span><span className="v2-dots-blank" /><b className={p.under ? "v2-total-pos" : "v2-total-neg"}>{formatMoney(p.diff)}</b></div>
