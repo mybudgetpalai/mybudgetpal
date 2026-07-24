@@ -1,10 +1,10 @@
 /* ---------------- Multi-currency (FX) ---------------- */
 const CURRENCIES = ["AED", "GBP", "USD", "EUR"];
 const CURRENCY_SYMBOLS = { GBP: "£", AED: "AED ", USD: "$", EUR: "€" };
-const UAE_BANKS = ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK"];
+const UAE_BANKS = ["Emirates NBD", "ADCB", "Mashreq", "First Abu Dhabi Bank", "RAKBANK"];
 const CURRENCY_BANKS = {
   GBP: ["HSBC", "Barclays", "Santander", "Monzo", "Revolut", "Wise", "Standard Chartered", "Citibank", "Other"],
-  AED: ["Emirates NBD", "ADCB", "Dubai Islamic Bank", "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "HSBC", "Standard Chartered", "Wise", "Other"],
+  AED: ["Emirates NBD", "ADCB", "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "HSBC", "Standard Chartered", "Wise", "Other"],
   USD: ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citibank", "HSBC", "Revolut", "Wise", "Other"],
   EUR: ["Deutsche Bank", "BNP Paribas", "N26", "Santander", "Revolut", "Wise", "Other"],
 };
