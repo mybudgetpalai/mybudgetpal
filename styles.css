@@ -2965,3 +2965,9 @@ html.has-session .boot-sub { display: block; opacity: 0; animation: bootWord 0.4
   .bwa-val { grid-column: 2; margin-left: 0; justify-self: end; }
   .bwa-pill { grid-column: 1 / -1; justify-self: end; }
 }
+
+/* C9: label column hugs the words — inputs start right after NAME / EMAIL */
+.settings-body .sp-row { grid-template-columns: 64px 1fr; gap: 14px; }
+@media (max-width: 640px) {
+  .settings-body .sp-row { grid-template-columns: 64px 1fr; }
+}
