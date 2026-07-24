@@ -82,12 +82,12 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
         <div className="side-accounts-wrap">
           <div className="side-divider" />
           <button className={"side-item side-item-accounts " + (active === "accounts" ? "side-item-active" : "")} onClick={() => setActive("accounts")}>
-            <span className="side-accounts-icon"><Icon name="bank" size={15} /></span><span>Bank Accounts</span>
+            <span>Bank Accounts</span>
           </button>
         </div>
       )}
       <button className={"side-item side-item-accounts " + (active === "settings" ? "side-item-active" : "")} onClick={() => onOpenSettings && onOpenSettings()}>
-        <span className="side-accounts-icon"><Icon name="sliders" size={15} /></span><span>Settings</span>
+        <span>Settings</span>
       </button>
       <button className="side-item side-item-logout" onClick={() => onLogout && onLogout()}>
         <span>Log out</span>
