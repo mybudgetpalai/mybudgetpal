@@ -738,7 +738,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
           )}
           <div className="sp-rows">
             <div className="sp-row"><span className="sp-key">Name</span><input className="glass-input sp-inp" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
-            <div className="sp-row"><span className="sp-key">Email</span><span className="sp-ro" title="This is the email you signed in with">{email || "\u2014"}</span></div>
+            <div className="sp-row"><span className="sp-key">Email</span><input className="glass-input sp-inp" type="text" value={email || "\u2014"} disabled readOnly title="This is the email you signed in with" /></div>
           </div>
           <div className="sp-actions">
             <button className="link-btn inline" onClick={() => setPwOpen(true)}>Change password</button>
