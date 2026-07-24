@@ -161,10 +161,9 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
     const cardH = cardRef.current ? cardRef.current.offsetHeight : 240;
 
     if (isChromeStep) {
-      // Chrome target: on phones the target lives in the BOTTOM nav, so the card
-      // flips to the top; on desktop it's in the top bar, card stays at the bottom.
-      const mob = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
-      setCardPlace(mob ? "top" : "bottom");
+      // Chrome target (upload / inbox / menu): anchor the card right next to the
+      // target instead of parking it at the far edge of the screen.
+      setCardPlace("chrome");
     } else {
       // Free vertical space above a bottom-pinned card vs below a top-pinned card.
       const targetH = el.getBoundingClientRect().height;
@@ -260,6 +259,24 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
   ] : [{ left: 0, top: 0, width: "100%", height: "100%" }];
 
   const cardStyleTop = cardPlace === "top";
+  /* Chrome steps: place the card adjacent to the spotlight — below a top-bar target,
+     above a bottom-nav target — and horizontally centred on it (desktop). */
+  const chromeStyle = (() => {
+    if (cardPlace !== "chrome" || !rect) return null;
+    const mob2 = rect.vw <= 640;
+    const below = rect.y < rect.vh / 2;
+    const s = {};
+    if (below) { s.top = Math.round(rect.y + rect.h + 14); s.bottom = "auto"; }
+    else { s.bottom = Math.round(rect.vh - rect.y + 14); s.top = "auto"; }
+    if (mob2) { s.left = 14; s.right = 14; }
+    else {
+      const w = 400;
+      let l = rect.x + rect.w / 2 - w / 2;
+      l = Math.max(14, Math.min(l, rect.vw - w - 14));
+      s.left = Math.round(l); s.right = "auto"; s.width = w;
+    }
+    return s;
+  })();
 
   return (
     <div className="tour-root">
@@ -272,7 +289,8 @@ function TourOverlay({ stepIndex, total, title, body, spot, onNext, onSkip }) {
       <div ref={cardRef} className="tour-card-v2" style={{ position: "fixed", zIndex: 2147483002,
         left: 14, right: 14,
         top: cardStyleTop ? (HEADER + 12) : "auto",
-        bottom: cardStyleTop ? "auto" : 20 }}>
+        bottom: cardStyleTop ? "auto" : 20,
+        ...(chromeStyle || {}) }}>
         <button className="tour-skip-x" onClick={onSkip} aria-label="Skip tour"
           style={{ position: "absolute", top: 12, right: 14, background: "none", border: "none", color: "var(--ink-3)", fontSize: 16, lineHeight: 1, cursor: "pointer", padding: 4 }}>{"\u2715"}</button>
         <div className="tour-step-count">Step {stepIndex + 1} of {total}</div>
@@ -381,10 +399,7 @@ function MiniBreakdown({ transactions }) {
   const entries = Object.entries(cats).filter(([c, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((s, e) => s + e[1], 0);
   if (!total) return (<div className="glass-card dash-card"><span className="card-label">Where it's gone</span><div className="oh-sub" style={{ marginTop: 8 }}>No spending yet this month.</div></div>);
-  const top = entries.slice(0, 4);
-  const otherTotal = entries.slice(4).reduce((s, e) => s + e[1], 0);
-  const seg = top.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
-  if (otherTotal > 0) seg.push({ label: "Other", v: otherTotal, color: "#9aa4b8" });
+  const seg = entries.map(([c, v]) => ({ label: displayCat(c), v, color: catColor(c) }));
   let acc = 0;
   const stops = seg.map((sg) => { const start = (acc / total) * 100; acc += sg.v; const end = (acc / total) * 100; return sg.color + " " + start + "% " + end + "%"; }).join(", ");
   return (
@@ -457,7 +472,7 @@ function NetWorthCard({ banks, accountData, transactions }) {
         <div className="nw2-accts">
           {acctRows.map((r, i) => (
             <div className="nw2-acct" key={i}>
-              <span className="nw2-acct-l"><span className="nw2-av">{String(r.b || "?").charAt(0).toUpperCase()}</span>{r.b}</span>
+              <span className="nw2-acct-l"><span className="nw2-av" style={{ background: bankBrand(r.b).bg, color: bankBrand(r.b).fg || "#fff" }}>{String(r.b || "?").charAt(0).toUpperCase()}</span>{r.b}</span>
               <strong>{formatMoneyNative(r.bal, FX.bankCurrency[r.b] || "GBP")}</strong>
             </div>
           ))}
@@ -702,13 +717,15 @@ function GoalRingCard({ goals, transactions, plan, banks, accountData }) {
   return (
     <div className="glass-card dash-card">
       <span className="card-label">{goal.name || "Savings goal"}</span>
-      <div className="grc-row">
-        <div className="grc-donut" style={{ background: "conic-gradient(var(--accent-solid) 0% " + pct + "%, var(--surface-3) " + pct + "% 100%)" }}>
+      <div className="grc-row grc-row-lg">
+        <div className="grc-donut grc-donut-lg" style={{ background: "conic-gradient(var(--accent-solid) 0% " + pct + "%, var(--surface-3) " + pct + "% 100%)" }}>
           <div className="grc-hole"><span className="grc-hole-pct">{pct}%</span><span className="grc-hole-lb">SAVED</span></div>
         </div>
         <div className="grc-side">
-          <div className="grc-amt">{formatMoney(goal.saved)} <span>of {formatMoney(goal.target)}</span></div>
+          <div className="grc-amt grc-amt-lg">{formatMoney(goal.saved)} <span>of {formatMoney(goal.target)}</span></div>
           <div className="grc-tog"><strong>{formatMoney(Math.max(0, goal.target - goal.saved))}</strong> to go{targetD && !isNaN(targetD) ? " · target " + shortDate(targetD) : ""}</div>
+          <div className="grc-track"><i style={{ width: pct + "%" }} /></div>
+          <div className="grc-track-lbls"><span>{formatMoney(goal.saved)} saved</span><span>{formatMoney(Math.max(0, goal.target - goal.saved))} to go</span></div>
         </div>
       </div>
     </div>
@@ -1225,7 +1242,7 @@ function BillsChecklistCard({ transactions, billExcludes }) {
   const bills = remainingBillsThisMonth(transactions, billExcludes)
     .slice().sort((a, b) => (a.paid ? 1 : 0) - (b.paid ? 1 : 0) || (a.dueDay || 31) - (b.dueDay || 31));
   if (!bills.length) return (
-    <div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>Nothing's a bill until you say so {"\u2014"} pick your regular payments and they'll show up here.</div><button className="link-btn inline" style={{ marginTop: 10 }} onClick={() => goToView("bills")}>Choose your bills {"\u203A"}</button></div>
+    <div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>Nothing's a bill until you say so {"\u2014"} pick your regular payments and they'll show up here.</div><button className="link-btn inline" style={{ marginTop: 10 }} onClick={() => goToBillsSetup()}>Choose your bills {"\u203A"}</button></div>
   );
   const overdueTotal = bills.filter((b) => !b.paid && !b.upcoming).reduce((s, b) => s + b.amount, 0);
   const upcomingTotal = bills.filter((b) => !b.paid && b.upcoming).reduce((s, b) => s + b.amount, 0);
@@ -1296,6 +1313,7 @@ const HOME_WIDGETS = {
 /* Lets a deeply-nested card ask for a page change without threading setView down
    through every intermediate component. DashboardScreen listens. */
 function goToView(v) { window.dispatchEvent(new CustomEvent("mbp-goto", { detail: v })); }
+function goToBillsSetup() { window.dispatchEvent(new CustomEvent("mbp-bills-setup")); }
 
 /* ---- Hash routing -------------------------------------------------------
    Keeps the dashboard page in the URL (#/overview, #/transactions, ...) so the
@@ -1682,7 +1700,7 @@ function BillsV2({ transactions, billExcludes, depth }) {
   const bills = remainingBillsThisMonth(transactions, billExcludes).slice();
   const rank = (b) => b.paid ? 2 : (!b.upcoming ? 0 : 1);
   bills.sort((a, b) => rank(a) - rank(b) || (a.dueDay || 31) - (b.dueDay || 31));
-  if (!bills.length) return (<div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>Nothing's a bill until you say so {"\u2014"} pick your regular payments and they'll show up here.</div><button className="link-btn inline" style={{ marginTop: 10 }} onClick={() => goToView("bills")}>Choose your bills {"\u203A"}</button></div>);
+  if (!bills.length) return (<div className="glass-card dash-card"><span className="card-label">Bills this month</span><div className="oh-sub" style={{ marginTop: 8 }}>Nothing's a bill until you say so {"\u2014"} pick your regular payments and they'll show up here.</div><button className="link-btn inline" style={{ marginTop: 10 }} onClick={() => goToBillsSetup()}>Choose your bills {"\u203A"}</button></div>);
   const monthly = bills.reduce((s, b) => s + b.amount, 0);
   const overdue = bills.filter((b) => !b.paid && !b.upcoming).reduce((s, b) => s + b.amount, 0);
   const upcoming = bills.filter((b) => !b.paid && b.upcoming).reduce((s, b) => s + b.amount, 0);
