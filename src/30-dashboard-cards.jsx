@@ -1,4 +1,4 @@
-function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, onOpenUpload, onGoHome, onOpenAsk, tasks, dataGap, isAdmin, onOpenAdmin, tourSpot }) {
+function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onOpenCategories, onLogout, onOpenUpload, onGoHome, onOpenAsk, tasks, dataGap, isAdmin, onOpenAdmin, tourSpot }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const menuRef = React.useRef(null);
@@ -24,11 +24,11 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
         <div className="brand brand-clickable" role="button" tabIndex={0} onClick={onGoHome} title="Go to Overview"><span className="brand-logo-tile"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="12" width="5.2" height="10" rx="2" fill="#fff"/><rect x="9.4" y="6.5" width="5.2" height="15.5" rx="2" fill="#fff"/><rect x="16.8" y="2" width="5.2" height="20" rx="2" fill="#fff"/></svg></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
       </div>
       <div className="topbar-right">
+        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={15} /><span className="topbar-ask-label">Ask</span></button>
         <div className={"upload-statement-wrap" + (tourSpot === "upload" ? " tour-spot" : "")} data-tour-active={tourSpot === "upload" ? "1" : undefined}>
           <button className="glass-btn primary upload-statement-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenUpload(); }} aria-label="Upload statement" title="Upload statement"><Icon name="plus" size={17} className="upload-btn-icon" /></button>
           {dataGap != null && dataGap >= 3 && <span className="upload-alert" title={dataGap + " days of data missing"}>!</span>}
         </div>
-        <button className="topbar-ask-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenAsk && onOpenAsk(); }} aria-label="Ask TwoPockets" title="Ask TwoPockets"><Icon name="ask" size={15} /><span className="topbar-ask-label">Ask</span></button>
         <div className={"inbox-wrap" + (tourSpot === "inbox" ? " tour-spot" : "")} ref={inboxRef} data-tour-active={tourSpot === "inbox" ? "1" : undefined}>
           <button className="inbox-btn" onClick={() => { setInboxOpen((v) => !v); setMenuOpen(false); }} aria-label="Tasks" title="Tasks">
             <Icon name="bell" size={18} />{taskList.length > 0 && <span className="inbox-badge">{taskList.length}</span>}
@@ -47,16 +47,16 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
             </div>
           )}
         </div>
-        <button className="topbar-profile-btn" onClick={() => { setMenuOpen(false); setInboxOpen(false); onOpenSettings(); }} aria-label="Settings" title="Settings">{initial}</button>
         <div className="avatar-wrap" ref={menuRef}>
         <button className="avatar" onClick={() => { setMenuOpen((v) => !v); setInboxOpen(false); }}>{initial}</button>
         {menuOpen && <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />}
         {menuOpen && (
           <div className="avatar-menu">
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>Settings</button>
+            <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenCategories && onOpenCategories(); }}>Categories</button>
             <button className="menu-item" onClick={() => { setMenuOpen(false); onOpenMapping(); }}>Mapping</button>
             {isAdmin && <button className="menu-item menu-item-admin" onClick={() => { setMenuOpen(false); onOpenAdmin(); }}>Admin tools</button>}
-            <button className="menu-item" onClick={onLogout}>Log out</button>
+            <button className="menu-item menu-item-logout" onClick={onLogout}>Log out</button>
           </div>
         )}
         </div>
@@ -64,10 +64,10 @@ function TopBar({ onToggleMenu, name, onOpenSettings, onOpenMapping, onLogout, o
     </div>
   );
 }
-function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose, tourSpot }) {
+function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustomise, onClose, tourSpot, onOpenSettings, onLogout }) {
   const list = views || VIEWS;
   return (
-    <div className={"side-panel " + (open ? "side-panel-open" : "") + (tourSpot === "menu" && open ? " tour-spot" : "")} data-tour-active={tourSpot === "menu" && open ? "1" : undefined}>
+    <div className={"side-panel " + (open ? "side-panel-open" : "")} data-tour-active={tourSpot === "menu" && open ? "1" : undefined}>
       <div className="side-panel-label-row">
         <span className="side-panel-label">Views</span>
         <div className="side-panel-label-actions">
@@ -75,7 +75,7 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
           <button className="side-close-btn" onClick={onClose} aria-label="Close menu" title="Close menu">×</button>
         </div>
       </div>
-      {list.filter((v) => v.key !== "accounts").map((v) => (
+      {list.filter((v) => v.key !== "accounts" && v.key !== "categories").map((v) => (
         <button key={v.key} className={"side-item " + (active === v.key ? "side-item-active" : "")} onClick={() => setActive(v.key)}>{v.label}</button>
       ))}
       {list.some((v) => v.key === "accounts") && (
@@ -86,8 +86,11 @@ function SidePanel({ open, active, setActive, isDev, onResetDev, views, onCustom
           </button>
         </div>
       )}
-      <button className={"side-ask-btn " + (active === "ask" ? "side-ask-active" : "")} onClick={() => setActive("ask")}>
-        <span className="side-ask-ic"><Icon name="ask" size={16} /></span>Ask TwoPockets
+      <button className={"side-item side-item-accounts " + (active === "settings" ? "side-item-active" : "")} onClick={() => onOpenSettings && onOpenSettings()}>
+        <span className="side-accounts-icon"><Icon name="sliders" size={15} /></span><span>Settings</span>
+      </button>
+      <button className="side-item side-item-logout" onClick={() => onLogout && onLogout()}>
+        <span>Log out</span>
       </button>
       {isDev && <button className="side-reset-btn" onClick={onResetDev}>RESET</button>}
     </div>
@@ -267,7 +270,7 @@ function TransactionFeed({ limit, transactions, onRecategorize }) {
     <div className="glass-card dash-card">
       <div className="summary-head">
         <span className="card-label">Transactions</span>
-        <span className="tx-count">{filtered.length} {filtered.length === 1 ? "result" : "results"}{totalParts.length ? " \u00B7 " + totalParts.join(" \u00B7 ") : ""}</span>
+        <span className="tx-count"><span className="tx-count-n">{filtered.length} {filtered.length === 1 ? "result" : "results"}</span>{totalParts.length ? <span className="tx-count-io">{totalParts.join(" \u00B7 ")}</span> : null}</span>
       </div>
       <p className="page-intro">Search or filter to find any transaction. Hit <b>EDIT</b> under a category to recategorise it — the change applies to that merchant everywhere.</p>
       <div className="tx-filters">
@@ -842,7 +845,7 @@ function BillsSetupModal({ transactions, confirmed, onSave, onClose }) {
   );
 }
 
-function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejected, onReject }) {
+function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejected, onReject, onOpenSetup }) {
   /* Rejections must persist — local state meant "No" was forgotten on reload and
      the same payment was asked about forever. */
   const dismissed = rejected || [];
@@ -900,22 +903,12 @@ function BillsCard({ transactions, confirmed, onToggleConfirm, editable, rejecte
   return (
     <div className="glass-card dash-card">
       <div className="summary-head"><span className="card-label">Bills & subscriptions</span></div>
-      <p className="page-intro">Nothing's counted as a bill until you say so. {suspected.length > 0
-        ? <>We've spotted a few regular payments below {"—"} tell us which are really bills, and add any we missed.</>
-        : <>Add any regular payments you want tracked as bills.</>}</p>
+      <p className="page-intro">Nothing's counted as a bill until you say so.{suspected.length > 0 ? "" : " Add any regular payments you want tracked as bills."}</p>
 
       {suspected.length > 0 && (
-        <div style={{ marginBottom: 4 }}>
-          <span className="card-label" style={{ display: "block", margin: "0 0 6px" }}>Is this a bill?</span>
-          {suspected.map((b) => (
-            <div className="tx-row" key={b.name}>
-              <div className="tx-info"><span className="tx-name">{b.name}</span><span className="tx-category">{b.frequency} {"\u00B7"} ~{formatMoney(b.amount)}{b.due ? " \u00B7 due " + b.due : ""}</span></div>
-              <div className="bill-right">
-                <button className="glass-btn primary" style={{ padding: "5px 12px", fontSize: 13 }} onClick={() => onToggleConfirm(b.name)}>Yes</button>
-                <button className="bill-remove" onClick={() => onReject && onReject(b.name)}>No</button>
-              </div>
-            </div>
-          ))}
+        <div className="bills-review-banner">
+          <span>We've pulled through <b>{suspected.length}</b> payment{suspected.length !== 1 ? "s" : ""} that look like bills {"\u2014"} help us confirm them.</span>
+          <button className="glass-btn primary" style={{ flex: "0 0 auto" }} onClick={() => onOpenSetup && onOpenSetup()}>Review my bills</button>
         </div>
       )}
 
@@ -998,7 +991,7 @@ function BankAccountsCard({ banks, transactions, accountData }) {
             <div className="account-block" key={b}>
               <div className="tx-row" style={{ borderBottom: "none" }}>
                 <div className="tx-info">
-                  <span className="tx-name">{b}</span>
+                  <span className="tx-name"><span className="sb-avatar" style={{ background: bankBrand(b).bg, color: bankBrand(b).fg || "#fff", marginRight: 8 }}>{String(b).trim().charAt(0).toUpperCase()}</span>{b}</span>
                   <span className="tx-category">{balance !== null ? "Estimated balance from statements" : "Add balances to see an estimate"}</span>
                 </div>
                 {balance !== null && <span className={"tx-amount " + (balance >= 0 ? "tx-positive" : "")}>{formatMoneyNative(balance, FX.bankCurrency[b] || "GBP")}</span>}
