@@ -2971,3 +2971,14 @@ html.has-session .boot-sub { display: block; opacity: 0; animation: bootWord 0.4
 @media (max-width: 640px) {
   .settings-body .sp-row { grid-template-columns: 64px 1fr; }
 }
+
+/* Budget Hawk mobile: one line per category — bare numbers, no AED prefix (approved) */
+.bwa-amt-short { display: none; }
+@media (max-width: 640px) {
+  .bwa-oneline .bwa-amt-full { display: none; }
+  .bwa-oneline .bwa-amt-short { display: inline; }
+  .bwa-oneline .bwa-top { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 8px; }
+  .bwa-oneline .bwa-nm { flex: 1 1 auto; min-width: 0; }
+  .bwa-oneline .bwa-val { flex: none; margin-left: auto; font-size: 12.5px; }
+  .bwa-oneline .bwa-pill { flex: none; font-size: 11px; padding: 2px 8px; }
+}
