@@ -19,7 +19,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
       <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
 
       <div className="lp-nav">
-        <div className="brand"><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
+        <div className="brand"><span className="brand-logo-tile"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="12" width="5.2" height="10" rx="2" fill="#fff"/><rect x="9.4" y="6.5" width="5.2" height="15.5" rx="2" fill="#fff"/><rect x="16.8" y="2" width="5.2" height="20" rx="2" fill="#fff"/></svg></span><span className="brand-word">Two<span className="brand-word-2">Pockets</span></span></div>
         <div className="lp-nav-actions">
           <button className="btn btn-ghost" onClick={onLogin}>Log in</button>
           <button className="btn btn-primary" onClick={onSignup}>Start free trial</button>
@@ -31,7 +31,7 @@ function LandingScreen({ onSignup, onLogin, onSkip, onTest }) {
         <div className="lp-hero-copy">
           <span className="hero-eyebrow">Built in Dubai for UAE expats</span>
           <h1>Your money here <em style={{fontStyle:"normal", color:"var(--accent)"}}>and</em> back home. One clear picture.</h1>
-          <p>One salary, two countries &mdash; your UAE and home-country banks in one clear total. No bank login, no spreadsheets.</p>
+          <p>One salary, two countries &mdash; your UAE and home-country banks in one clear total. <span className="hero-nologin">No bank login, no spreadsheets.</span></p>
           <div className="hero-actions">
             <button className="btn btn-primary btn-large" onClick={onSignup}>Start free trial</button>
             <button className="btn btn-ghost btn-large" onClick={() => document.getElementById("lp-how").scrollIntoView({ behavior: "smooth" })}>See how it works</button>
@@ -506,6 +506,7 @@ function AuthScreen({ onDone, onSkip, initialMode, onOpenLegal, onError, onBack 
 
 function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, initialBanks, isDev, onSkipToTour }) {
   const [step, setStep] = useState(0);
+  React.useEffect(() => { try { window.scrollTo(0, 0); } catch (e) {} }, [step]);
   const [name, setName] = useState(initialName || "");
   const [baseKey, setBaseKey] = useState("UAE");
   const [homeKey, setHomeKey] = useState("UK");
@@ -672,7 +673,7 @@ function OnboardingScreen({ onDone, userId, pushToast, onLogout, initialName, in
               </button>
               <button className={"segment " + (expatChoice === "single" ? "segment-active" : "")}
                 onClick={() => { setExpatChoice("single"); setSingleCurrency(true); }}>
-                <span>No — but I want to use the app<span className="segment-sub">Track one currency of your choice</span></span>
+                <span>No — but I still want to use the app<span className="segment-sub">Track one currency of your choice</span></span>
                 {expatChoice === "single" && <span className="check-badge"><Icon name="check" size={11} strokeWidth={3.2} /></span>}
               </button>
             </div>
@@ -884,7 +885,7 @@ function UploadScreen({ banks, onDone, pushToast, userId, onBack, onSkip }) {
       }
       if (skip) continue;
       for (const f of filesByBank[bank]) {
-        setCrunchNote("Reading your " + bank + " statement\u2026");
+        setCrunchNote("Give us a minute while we crunch the numbers\u2026");
         try {
           const path = userId + "/" + bank + "/" + Date.now() + "_" + f.name;
           await supabaseClient.storage.from("statements").upload(path, f.rawFile);
@@ -1242,7 +1243,7 @@ function OpeningBalanceScreen({ banks, statements, userId, pushToast, onDone, on
             <div className="bank-upload-block" key={p.bank}>
               <div className="bank-upload-head">
                 <span className="bank-upload-name">{p.bank}</span>
-                {p.suggested !== null && p.suggested !== undefined && <span className="bank-upload-count count-good">detected from statement</span>}
+                {p.suggested !== null && p.suggested !== undefined && <span className="bank-upload-count count-good">Detected from statement</span>}
               </div>
               <div className="balance-row">
                 <div className="balance-field">
@@ -1592,6 +1593,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
                   <td key={m.key} className="bt-cell">
                     <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
                       <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key].Income)}
+                        style={{ width: Math.max(2, String(fmtBalInput(budgets[m.key].Income)).length + 0.5) + "ch" }}
                         onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], Income: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                     </span>
                   </td>
@@ -1604,6 +1606,7 @@ function TargetSettingScreen({ onDone, pushToast, userId, transactions, onBack, 
                     <td key={m.key} className="bt-cell">
                       <span className="bt-input-wrap"><span className="bt-cur">{homeSym()}</span>
                         <input className="bt-input" type="text" inputMode="numeric" value={fmtBalInput(budgets[m.key][c])}
+                          style={{ width: Math.max(2, String(fmtBalInput(budgets[m.key][c])).length + 0.5) + "ch" }}
                           onChange={(e) => setBudgets((prev) => ({ ...prev, [m.key]: { ...prev[m.key], [c]: e.target.value.replace(/[^0-9.]/g, "") } }))} />
                       </span>
                     </td>
@@ -1721,8 +1724,7 @@ function SetupIntroModal({ name, onStart, onSkip }) {
     <div className="modal-overlay setup-intro-overlay">
       <div className="glass-card modal-card" style={{ maxWidth: 480 }}>
         <h1 className="title" style={{ marginTop: 4, marginBottom: 12 }}>Hi {name || "there"}, welcome to {APP_NAME}</h1>
-        <p className="subtitle" style={{ marginBottom: 12, lineHeight: 1.5 }}>This is your overview {"—"} here's a first look behind this card.</p>
-        <p className="subtitle" style={{ marginBottom: 0, lineHeight: 1.5 }}>Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
+                <p className="subtitle" style={{ marginBottom: 0, lineHeight: 1.5 }}>Let's take 3 minutes to shape it around your financial goals: a few quick questions, then your monthly targets.</p>
         <div className="nav-row" style={{ marginTop: 24 }}>
           <button className="glass-btn ghost" onClick={onSkip}>I'll fill this in later</button>
           <button className="glass-btn primary" onClick={onStart}>Let's go</button>
