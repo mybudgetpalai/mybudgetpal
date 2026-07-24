@@ -187,7 +187,7 @@ function MainContent({ view, name, onOpenUpload, targets, banks, plan, onEditPla
   if (view === "longterm") return hasData ? <LongTermPlanCard transactions={transactions} allTargets={allTargets} banks={banks} accountData={accountData} plan={plan} onEditPlan={onEditPlan} /> : <EmptyState text="No data yet — upload a statement to build your long-term plan." />;
   if (view === "transactions") return hasData ? <TransactionFeed transactions={transactions} onRecategorize={onRecategorize} /> : <EmptyState text="No transactions yet — upload a statement to see them here." />;
   if (view === "trends") return hasData ? <TrendsCard transactions={transactions} /> : <EmptyState text="No trend data yet — upload a few months of statements." />;
-  if (view === "bills") return hasData ? <BillsCard transactions={transactions} confirmed={billExcludes} onToggleConfirm={onToggleBillExclude} rejected={billRejects} onReject={onRejectBill} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
+  if (view === "bills") return hasData ? <BillsCard transactions={transactions} confirmed={billExcludes} onToggleConfirm={onToggleBillExclude} rejected={billRejects} onReject={onRejectBill} onOpenSetup={onOpenBillsSetup} editable /> : <EmptyState text="No bills detected yet — upload a statement to get started." />;
   if (view === "categories") return <CategoryManager transactions={transactions} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} onRecategorize={onRecategorize} />;
   if (view === "accounts") return <BankAccountsCard banks={banks} transactions={transactions} accountData={accountData} />;
   if (view === "insights") return hasData ? <InsightsCard transactions={transactions} targets={targets} onOpenUpload={onOpenUpload} full /> : <EmptyState text="No insights yet — upload a statement to get started." />;
@@ -309,7 +309,8 @@ function FeedbackModal({ name, onClose, onSubmitted, pushToast }) {
 
 function MobileMenuSheet({ open, onClose, name, views, active, onSelect, onOpenSettings, onLogout }) {
   const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  const pages = (views || VIEWS);
+  const pages = (views || VIEWS).filter((v) => v.key !== "accounts" && v.key !== "categories");
+  const hasAccounts = (views || VIEWS).some((v) => v.key === "accounts");
   return (
     <React.Fragment>
       <div className={"mms-scrim" + (open ? " mms-scrim-open" : "")} onClick={onClose} />
@@ -327,6 +328,7 @@ function MobileMenuSheet({ open, onClose, name, views, active, onSelect, onOpenS
           </button>
         ))}
         <div className="mms-label">Account</div>
+        {hasAccounts && <button className={"mms-row" + (active === "accounts" ? " mms-row-active" : "")} onClick={() => { onClose(); onSelect("accounts"); }}><span>Bank Accounts</span></button>}
         <button className="mms-row" onClick={() => { onClose(); onOpenSettings(); }}><span>Settings</span></button>
         <button className="mms-row mms-row-danger" onClick={onLogout}><span>Log out</span></button>
       </div>
@@ -382,7 +384,9 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
   React.useEffect(() => {
     const handler = (e) => { if (e && e.detail) { setView(e.detail); setTInitEdit(false); } };
     window.addEventListener("mbp-goto", handler);
-    return () => window.removeEventListener("mbp-goto", handler);
+    const billsHandler = () => { if (onOpenBillsSetup) onOpenBillsSetup(); };
+    window.addEventListener("mbp-bills-setup", billsHandler);
+    return () => { window.removeEventListener("mbp-goto", handler); window.removeEventListener("mbp-bills-setup", billsHandler); };
   }, []);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
@@ -486,7 +490,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
   React.useEffect(() => {
     if (!tourSpot) return;
     const mob = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
-    if (tourSpot === "menu" && !mob) setPanelOpen(true);
+    if (tourSpot === "menu") setPanelOpen(true);
     const sc = document.querySelector(".main-content-wide");
     const t = setTimeout(() => {
       try { if (sc) sc.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
@@ -494,7 +498,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
     }, 60);
     return () => clearTimeout(t);
   }, [tourSpot]);
-  const advanceTour = () => { if (tourStep >= tourCopy.length - 1) { onFinishTour(); } else setTourStep((s) => s + 1); };
+  const advanceTour = () => { if (tourStep >= tourCopy.length - 1) { setPanelOpen(false); onFinishTour(); } else setTourStep((s) => s + 1); };
   const demoActive = runTour && !hasData;
   const viewTransactions = demoActive ? DEMO_TRANSACTIONS : transactions;
   const viewTargets = demoActive ? DEMO_TARGETS : targets;
@@ -524,10 +528,10 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
         </div>
       )}
 
-      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} onOpenAsk={() => { setView("ask"); setTInitEdit(false); }} tasks={inboxTasks} dataGap={dataGap} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} tourSpot={tourSpot} />
+      <TopBar onToggleMenu={() => setPanelOpen((v) => !v)} name={name} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onOpenMapping={() => { setView("mapping"); setTInitEdit(false); }} onOpenCategories={() => { setView("categories"); setTInitEdit(false); }} onLogout={onLogout} onOpenUpload={() => setUploadOpen(true)} onGoHome={() => { setView("overview"); setTInitEdit(false); }} onOpenAsk={() => { setView("ask"); setTInitEdit(false); }} tasks={inboxTasks} dataGap={dataGap} isAdmin={isAdmin} onOpenAdmin={onOpenAdmin} tourSpot={tourSpot} />
       <div className="body-row">
         <div className={"side-panel-backdrop " + (panelOpen ? "backdrop-visible" : "")} onClick={() => setPanelOpen(false)} />
-        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} />
+        <SidePanel open={panelOpen} active={effectiveView} setActive={(v) => { setView(v); setTInitEdit(false); if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) setPanelOpen(false); }} isDev={isDev} onResetDev={onResetDev} views={visibleViews} onCustomise={() => setCustomiseOpen(true)} onClose={() => setPanelOpen(false)} tourSpot={tourSpot} onOpenSettings={() => { setView("settings"); setTInitEdit(false); }} onLogout={onLogout} />
         <div className={"main-content " + (effectiveView === "overview" ? "main-content-wide" : "")}>{effectiveView === "settings" ? (<SettingsScreen persona={persona} onSetPersona={onSetPersona} setupPending={setupPending} onResumeSetup={onResumeSetup} extraPending={showExtraBanner} onCompleteExtra={onCompleteExtra} name={name} banks={banks} bankRows={bankRows} targets={targets} userId={userId} pushToast={pushToast} onBack={() => { setView("overview"); setTInitEdit(false); }} onOpenLegal={onOpenLegal} onLogout={onLogout} onSaveName={onSaveName} onRemoveBank={onRemoveBank} onAddBank={onAddBank} onSaveTargets={onSaveTargets} theme={theme} onChangeTheme={onChangeTheme} onSaveCurrency={onSaveCurrency} onSaveFxRate={onSaveFxRate} onEditTargetsPage={() => { setView("targets"); setTInitEdit(true); }} />) : effectiveView === "mapping" ? (<MappingScreen transactions={transactions} onRecategorize={onRecategorize} onBack={() => { setView("overview"); setTInitEdit(false); }} theme={theme} />) : (<MainContent onOpenUpload={() => setUploadOpen(true)} signupMonth={signupMonth} view={effectiveView} name={name} targets={viewTargets} banks={banks} plan={plan} onEditPlan={onEditPlan} hasData={viewHasData} transactions={viewTransactions} overviewSlots={overviewSlots} onChangeOverviewSlots={onChangeOverviewSlots} homeLayout={homeLayout} onChangeHomeLayout={onChangeHomeLayout} onResumeSetup={onResumeSetup} persona={persona} goals={goals} goalsApi={goalsApi} accountData={accountData} onRecategorize={onRecategorize} runTour={runTour} tourStep={tourStep} billExcludes={billExcludes} onToggleBillExclude={onToggleBillExclude} billRejects={billRejects} onRejectBill={onRejectBill} allTargets={allTargets} isDev={isDev} onOpenReview={onOpenReview} uncatCount={uncatCount} onOpenCatReview={() => setCatReviewOpen(true)} rollovers={rollovers} onSaveAllTargets={onSaveAllTargets} targetsInitialEdit={tInitEdit && effectiveView === "targets"} catConfig={catConfig} onSaveCatConfig={onSaveCatConfig} onRescanCategories={onRescanCategories} billsNudge={billsNudge} onOpenBillsSetup={onOpenBillsSetup} onDismissBillsNudge={onDismissBillsNudge} />)}</div>
       </div>
       <MobileBottomNav active={effectiveView} menuOpen={mobileMenuOpen} tourSpot={tourSpot}
@@ -608,10 +612,11 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
   const [editingTargets, setEditingTargets] = useState(false);
   const PERSONA_EMOJI = { fresh_start: "🌱", goal_getter: "🎯", budget_hawk: "🦅", power_view: "⚡" };
   const [personaDraft, setPersonaDraft] = useState(persona);
-  const personaDirty = personaDraft && personaDraft !== persona && PERSONA_TEMPLATES[personaDraft];
-  const savePersona = () => {
-    if (!personaDirty) return;
-    try { onSetPersona(personaDraft); pushToast("Overview view updated", "success"); }
+  const [personaTick, setPersonaTick] = useState(false);
+  const pickPersona = (k) => {
+    setPersonaDraft(k);
+    if (k === persona) return;
+    try { onSetPersona(k); pushToast("Updated", "success"); setPersonaTick(true); setTimeout(() => setPersonaTick(false), 2200); }
     catch (e) { pushToast("Couldn't update view", "error"); }
   };
   const [targetDrafts, setTargetDrafts] = useState(targets || {});
@@ -631,6 +636,13 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
   };
 
   const [homeCur, setHomeCur] = useState(FX.home);
+  const [curTick, setCurTick] = useState(false);
+  const pickHomeCur = async (c) => {
+    if (c === homeCur) return;
+    setHomeCur(c);
+    try { await onSaveCurrency(c, bankCurs); pushToast("Updated", "success"); setCurTick(true); setTimeout(() => setCurTick(false), 2200); }
+    catch (e) { pushToast("Couldn't save currency", "error"); setHomeCur(FX.home); }
+  };
   const bankCurLookup = React.useMemo(() => { const m = {}; (bankRows || []).forEach((r) => { if (r && r.bank_name) m[r.bank_name] = r.currency || FX.bankCurrency[r.bank_name] || "GBP"; }); return m; }, [bankRows]);
   const [bankCurs, setBankCurs] = useState(() => { const m = {}; (banks || []).forEach((b) => { m[b] = bankCurLookup[b] || FX.bankCurrency[b] || "GBP"; }); return m; });
   const [savingCur, setSavingCur] = useState(false);
@@ -739,14 +751,14 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
         <div className="dash-card settings-section">
           <span className="card-label">Banks &amp; currency</span>
           <div className="field-group" style={{ marginTop: 10 }}>
-            <label className="field-label">View everything in</label>
+            <label className="field-label">View everything in {curTick && <span className="sp-tick"><Icon name="check" size={11} strokeWidth={3} /> Updated</span>}</label>
             <div className="cur-toggle">
               {Array.from(new Set([...Object.values(bankCurs || {}), homeCur].filter(Boolean)))
                 .sort((a, b) => CURRENCIES.indexOf(a) - CURRENCIES.indexOf(b))
                 .map((c) => {
                 const sym = (CURRENCY_SYMBOLS[c] || "").trim();
                 return (
-                  <button key={c} className={"cur-seg" + (homeCur === c ? " cur-seg-active" : "")} onClick={() => setHomeCur(c)}>{c}{sym && sym !== c ? " " + sym : ""}</button>
+                  <button key={c} className={"cur-seg" + (homeCur === c ? " cur-seg-active" : "")} onClick={() => pickHomeCur(c)}>{c}{sym && sym !== c ? " " + sym : ""}</button>
                 );
               })}
             </div>
@@ -759,7 +771,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
               <div className="settings-bank-row settings-bank-row-2" key={b}>
                 <span className="sb-name"><span className="sb-avatar" style={{ background: bankBrand(b).bg, color: bankBrand(b).fg }}>{String(b).trim().charAt(0).toUpperCase()}</span>{b}</span>
                 <span className="sb-actions">
-                  <select className="glass-input" style={{ width: 100, padding: "6px 10px" }} value={bankCurs[b] || "GBP"} onChange={(e) => { const v = e.target.value; setBankCurs((p) => ({ ...p, [b]: v })); }}>
+                  <select className="glass-input" style={{ width: 100, padding: "6px 10px" }} value={bankCurs[b] || "GBP"} onChange={async (e) => { const v = e.target.value; const next = { ...bankCurs, [b]: v }; setBankCurs(next); try { await onSaveCurrency(homeCur, next); pushToast("Updated", "success"); setCurTick(true); setTimeout(() => setCurTick(false), 2200); } catch (err) { pushToast("Couldn't save currency", "error"); } }}>
                     {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                   <button className="link-btn inline" onClick={() => onRemoveBank(b)} style={{ padding: "10px 8px", display: "inline-block" }}>Remove</button>
@@ -774,9 +786,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
               <span className="sp-dotsep">{"\u00B7"}</span>
               <button className="link-btn inline" onClick={() => setShowRates((s) => !s)}>{showRates ? "Hide rates" : "Exchange rates"}</button>
             </span>
-            <button className="glass-btn primary sp-save" disabled={!curDirty || savingCur} onClick={saveCurrency}>
-              {savingCur ? <span className="btn-spinner" /> : "Save"}
-            </button>
           </div>
           {showRates && (
             <div className="settings-bank-list" style={{ marginTop: 8 }}>
@@ -796,7 +805,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
         </div>
 
         <div className="dash-card settings-section">
-          <span className="card-label">Overview view</span>
+          <span className="card-label">Overview view {personaTick && <span className="sp-tick"><Icon name="check" size={11} strokeWidth={3} /> Updated</span>}</span>
           <p className="subtitle" style={{ margin: "2px 0 0" }}>Pick how your Overview page is laid out. This only changes the Overview — the rest of your dashboard and your data stay exactly the same.</p>
           <div className="persona-grid">
             {Object.keys(PERSONA_TEMPLATES).map((k) => {
@@ -804,7 +813,7 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
               const isCurrent = persona === k;
               const isSelected = personaDraft === k;
               return (
-                <button key={k} className={"persona-option" + (isSelected ? " persona-option-active" : "")} onClick={() => setPersonaDraft(k)}>
+                <button key={k} className={"persona-option" + (isSelected ? " persona-option-active" : "")} onClick={() => pickPersona(k)}>
                   {isCurrent && <span className="persona-current">Current</span>}
                   <span className="persona-dot">{PERSONA_EMOJI[k]}</span>
                   <span className="persona-text">
@@ -816,7 +825,6 @@ function SettingsScreen({ persona, onSetPersona, setupPending, onResumeSetup, na
             })}
           </div>
           <p className="persona-note">Switching applies to your Overview straight away — any widgets you’ve added or rearranged there will be replaced by the new view’s layout.</p>
-          <button className="glass-btn primary" style={{ marginTop: 12, flex: "none" }} disabled={!personaDirty} onClick={savePersona}>Save</button>
         </div>
         <div className="dash-card settings-section">
           <span className="card-label">Appearance</span>
