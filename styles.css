@@ -2906,3 +2906,8 @@
 /* C16: bank avatar spans both text lines */
 .ba-bank-row { gap: 12px; }
 .ba-avatar { width: 34px; height: 34px; border-radius: 10px; font-size: 15px; align-self: center; }
+
+/* C9 round 4: Log out is a substantial button (kills the sliver for good) */
+.settings-body > .glass-btn.danger { height: 52px !important; min-height: 52px; font-size: 15px !important; font-weight: 700; border-radius: 14px; padding: 0 24px !important; display: flex; align-items: center; justify-content: center; }
+/* email input matches Name but reads as locked */
+.settings-body .sp-inp[disabled] { color: var(--ink-2); opacity: 1; cursor: default; background: var(--surface-2); }
