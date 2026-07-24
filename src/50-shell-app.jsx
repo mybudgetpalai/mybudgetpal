@@ -2241,9 +2241,8 @@ function App() {
       }
     } catch (e) {}
     const animated = hasSession
-      && window.matchMedia("(max-width: 760px)").matches
       && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const wait = animated ? Math.max(0, 1500 - (Date.now() - started)) : 0;
+    const wait = animated ? Math.max(0, 2000 - (Date.now() - started)) : 0;
     setTimeout(function () {
       shell.style.transition = "opacity .45s ease";
       shell.style.opacity = "0";
