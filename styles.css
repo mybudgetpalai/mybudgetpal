@@ -2849,3 +2849,31 @@
 .review-cat { gap: 8px; }
 .review-cat .cat-dot { width: 9px; height: 9px; }
 .review-total { padding-top: 12px; }
+
+/* C16: bank monogram styled EVERYWHERE it appears (was scoped to Settings only,
+   so the Bank Accounts page showed a raw unstyled letter) */
+.sb-avatar { width: 28px; height: 28px; border-radius: 9px; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; vertical-align: middle; }
+.tx-name .sb-avatar { width: 26px; height: 26px; font-size: 12px; }
+.tx-name { display: inline-flex; align-items: center; }
+
+/* C9 round 2: Settings alignment pass — one label column, one control rhythm */
+.settings-body .settings-section { padding: 22px; }
+.settings-body .card-label { display: block; margin-bottom: 12px; }
+/* every label+control row shares the same 110px label column */
+.settings-body .sp-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 12px; padding: 9px 0; }
+.settings-body .sp-key { width: auto; font-size: 12px; }
+.settings-body .field-label { font-size: 12px; margin-bottom: 8px; }
+.settings-body .field-group { margin: 0 0 16px; }
+.settings-body .settings-divider { margin: 16px 0; }
+/* one control scale */
+.settings-body .cur-seg { font-size: 13.5px; padding: 9px 22px; }
+.settings-body .glass-input, .settings-body select.glass-input { height: 36px; padding: 0 12px; font-size: 13.5px; }
+.settings-body .sp-inp.glass-input { height: 36px; padding: 0 12px; }
+/* cards inside sections share radius + padding */
+.settings-body .persona-option, .settings-body .theme-swatch, .settings-body .settings-bank-row { border-radius: 14px; }
+.settings-body .settings-bank-row { padding: 10px 14px; }
+.settings-body .persona-option { padding: 14px 16px; }
+.settings-body .theme-swatch { padding: 12px 14px; }
+/* actions rows: links left, nothing ragged */
+.settings-body .sp-actions { margin-top: 12px; min-height: 36px; }
+.settings-body .subtitle { margin-top: 0; }
