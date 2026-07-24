@@ -322,7 +322,7 @@ function parseBillExcludes(profile) {
 /* ---------------- shared data ---------------- */
 
 const BANKS = [
-  "HSBC", "Barclays", "Emirates NBD", "ADCB", "Dubai Islamic Bank",
+  "HSBC", "Barclays", "Emirates NBD", "ADCB",
   "Mashreq", "First Abu Dhabi Bank", "RAKBANK", "Citibank", "Standard Chartered",
   "JPMorgan Chase", "Bank of America", "Wells Fargo", "Deutsche Bank", "BNP Paribas",
   "Santander", "Revolut", "Monzo", "Wise", "N26",
@@ -368,7 +368,6 @@ const VIEWS = [
   { key: "transactions", label: "Transactions" },
   { key: "bills", label: "Bills & Subscriptions" },
   { key: "insights", label: "Insights" },
-  { key: "categories", label: "Manage Categories" },
   { key: "accounts", label: "Bank Accounts" },
 ];
 
