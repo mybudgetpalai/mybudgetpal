@@ -405,7 +405,7 @@ function DashboardScreen({ name, targets, banks, bankRows, plan, onEditPlan, onO
 
   const navKeys = navViews || VIEWS.map((v) => v.key);
   const visibleViews = VIEWS.filter((v) => navKeys.includes(v.key));
-  const SPECIAL_VIEWS = ["settings", "mapping", "ask"];
+  const SPECIAL_VIEWS = ["settings", "mapping", "ask", "categories"];
   const effectiveView = runTour ? "overview" : ((navKeys.includes(view) || SPECIAL_VIEWS.includes(view)) ? view : "overview");
   /* Per-view scroll memory. Each page remembers where you left it for the rest of
      the session: leave Overview halfway down, go to Breakdown (which opens at the
