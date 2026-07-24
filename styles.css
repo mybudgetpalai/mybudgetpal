@@ -2760,3 +2760,10 @@
 @media (prefers-reduced-motion: reduce) {
   .tour-ring, .tour-dim { transition: none; }
 }
+
+/* QA 2026-07-24: on narrow screens the trend tooltip is centred on its bar and
+   set to nowrap, so the tooltip on the last bar ran past the right edge and
+   introduced horizontal scroll on Insights. Allow it to wrap and cap its width. */
+@media (max-width: 560px) {
+  .trend-tip { white-space: normal; max-width: 42vw; text-align: center; }
+}
