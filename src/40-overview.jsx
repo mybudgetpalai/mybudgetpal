@@ -1633,13 +1633,15 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
     return (
       <div className="glass-card dash-card">
         <span className="card-label">How each budget is doing</span>
-        <div className="v2pt-rows" style={{ marginTop: 14 }}>
+        <div className="bwa-rows">
           {enrich.map((r) => (
-            <div className="v2pt-row v2pt-chips" key={r.c}>
-              <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-              <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
-              <span className="v2pt-val">{formatMoney(Math.round(r.spent))} / {formatMoney(Math.round(r.target))}</span>
-              <span className={"v2pt-chip " + (r.over ? "v2pt-over" : "v2pt-ok")}>{r.over ? (isCurrentMonth ? "over pace" : "over") : (isCurrentMonth ? "on track" : "under")}</span>
+            <div className="bwa-row" key={r.c}>
+              <div className="bwa-top">
+                <span className="bwa-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+                <span className="bwa-val"><b>{formatMoney(Math.round(r.spent))}</b> / {formatMoney(Math.round(r.target))}</span>
+                <span className={"bwa-pill " + (r.over ? "bwa-pill-bad" : "bwa-pill-good")}>{r.over ? (isCurrentMonth ? "over pace" : "over") : (isCurrentMonth ? "on track" : "under")}</span>
+              </div>
+              <div className="bwa-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
             </div>
           ))}
         </div>
@@ -1653,13 +1655,15 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
       <div className="glass-card dash-card">
         <span className="card-label">Category vs target</span>
         <div className="v2pt-cap">{isCurrentMonth ? <>bar fills to target · <span className="v2pt-tk">tick = day-{day} pace ({tickPct}%)</span></> : <>bar fills to target · full month</>}</div>
-        <div className="v2pt-rows">
+        <div className="bwa-rows">
           {enrich.map((r) => (
-            <div className="v2pt-row v2pt-full" key={r.c}>
-              <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-              <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} />{isCurrentMonth && <span className="v2pt-tick" style={{ left: tickPct + "%" }} />}</div>
-              <span className="v2pt-st"><strong>{formatMoney(Math.round(r.spent))}</strong> / {formatMoney(Math.round(r.target))}</span>
-              <span className={"v2pt-dd v2pt-pill " + (r.over ? "v2pt-pill-bad" : "v2pt-pill-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
+            <div className="bwa-row" key={r.c}>
+              <div className="bwa-top">
+                <span className="bwa-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+                <span className="bwa-val"><b>{formatMoney(Math.round(r.spent))}</b> / {formatMoney(Math.round(r.target))}</span>
+                <span className={"bwa-pill " + (r.over ? "bwa-pill-bad" : "bwa-pill-good")}>{formatMoney(r.delta)} {r.over ? "over" : "under"}</span>
+              </div>
+              <div className="bwa-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} />{isCurrentMonth && <span className="bwa-tick" style={{ left: tickPct + "%" }} />}</div>
             </div>
           ))}
         </div>
@@ -1674,12 +1678,14 @@ function PacingVsTargetV2({ transactions, targets, depth }) {
   return (
     <div className="glass-card dash-card">
       <span className="card-label">{goal ? "Staying inside your budgets" : "Pacing vs target"}</span>
-      <div className="v2pt-rows" style={{ marginTop: 14 }}>
+      <div className="bwa-rows">
         {enrich.map((r) => (
-          <div className="v2pt-row" key={r.c}>
-            <span className="v2pt-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
-            <div className="v2pt-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
-            <span className="v2pt-val"><strong>{formatMoney(Math.round(r.spent))}</strong> / {formatMoney(Math.round(r.target))}</span>
+          <div className="bwa-row" key={r.c}>
+            <div className="bwa-top">
+              <span className="bwa-nm"><span className="v2-dotc" style={{ background: catColor(r.c) }} />{displayCat(r.c)}</span>
+              <span className="bwa-val bwa-val-last"><b>{formatMoney(Math.round(r.spent))}</b> / {formatMoney(Math.round(r.target))}</span>
+            </div>
+            <div className="bwa-track"><i style={{ width: r.fill + "%", background: catColor(r.c) }} /></div>
           </div>
         ))}
       </div>
