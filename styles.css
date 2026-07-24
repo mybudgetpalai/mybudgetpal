@@ -1116,14 +1116,11 @@
   .inbox-wrap { position: relative; }
   .inbox-btn { position: relative; background: var(--surface-2); border: 1px solid var(--line); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .inbox-btn:hover { background: var(--surface-3); }
-  /* Top-bar Ask button — mobile only (Ask lives in the sidebar on desktop) */
-  .topbar-ask-btn { display: none; }
-  @media (max-width: 640px) {
-    .topbar-ask-btn { flex: 0 0 auto; position: relative; background: linear-gradient(135deg, #2E5BFF, #6A4DFF); border: none; border-radius: 100px; height: 36px; min-width: 0; padding: 0 15px; gap: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; color: #fff; font-family: inherit; font-weight: 700; font-size: 13px; box-shadow: 0 6px 14px rgba(46,91,255,.34); }
-    .topbar-ask-btn:hover { filter: brightness(1.05); }
-    .topbar-ask-btn svg { display: block; }
-    .topbar-ask-label { line-height: 1; }
-  }
+  /* Top-bar Ask button — all screens (gradient pill, 1st icon on the right) */
+  .topbar-ask-btn { flex: 0 0 auto; position: relative; background: linear-gradient(135deg, #2E5BFF, #6A4DFF); border: none; border-radius: 100px; height: 36px; min-width: 0; padding: 0 15px; gap: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1; color: #fff; font-family: inherit; font-weight: 700; font-size: 13px; box-shadow: 0 6px 14px rgba(46,91,255,.34); }
+  .topbar-ask-btn:hover { filter: brightness(1.05); }
+  .topbar-ask-btn svg { display: block; }
+  .topbar-ask-label { line-height: 1; }
   .inbox-badge { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #ff5e7a; color: var(--ink); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #141428; }
   .inbox-menu { position: absolute; top: 46px; right: 0; width: 300px; max-width: 82vw; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px; display: flex; flex-direction: column; gap: 3px; box-shadow: var(--shadow-pop); z-index: 40; }
   .inbox-menu-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); padding: 6px 10px 4px; }
@@ -2236,8 +2233,10 @@
 
   /* ===== v2 . Pacing rows (single-line, aligned) ===== */
   .v2pt-rows { display:flex; flex-direction:column; gap:11px; margin-top:2px; }
-  .v2pt-row { display:grid; grid-template-columns:104px 1fr auto; align-items:center; gap:12px; }
-  .v2pt-chips { grid-template-columns:104px 1fr 88px 70px; }
+  /* Fixed value columns so every row's bar is the SAME length (auto columns sized
+     per-row and made the tracks ragged), wide enough that numbers never collide. */
+  .v2pt-row { display:grid; grid-template-columns:104px 1fr 158px; align-items:center; gap:12px; }
+  .v2pt-chips { grid-template-columns:104px 1fr 148px 86px; }
   .v2pt-nm { display:flex; align-items:center; gap:7px; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
   .v2pt-track { position:relative; height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
   .v2pt-track > i { display:block; height:100%; border-radius:999px; }
@@ -2247,7 +2246,7 @@
   .v2pt-d { margin-left:6px; font-weight:600; }
   .v2pt-cap { font-size:10.5px; color:var(--ink-3); margin:3px 0 14px; }
   .v2pt-tk { color:var(--ink-2); }
-  .v2pt-chip { font-size:10.5px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+  .v2pt-chip { font-size:10.5px; font-weight:700; border-radius:999px; padding:3px 9px; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; min-width:72px; justify-self:end; text-align:center; }
   .v2pt-ok { background:#ECFDF3; color:var(--pos); }
   .v2pt-over { background:#FEF3F2; color:var(--neg); }
 
@@ -2259,7 +2258,7 @@
   /* budget-hawk pacing: aligned 4-column */
   /* Fixed (not auto) trailing columns: auto sizes per-row, which made each 1fr track a
      different width and scattered the day-N pace tick. Pinned = ticks align vertically. */
-  .v2pt-full { grid-template-columns:104px 1fr 88px 72px; }
+  .v2pt-full { grid-template-columns:104px 1fr 148px 118px; }
   .v2pt-st { font-size:12px; text-align:right; white-space:nowrap; color:var(--ink-2); font-variant-numeric:tabular-nums; }
   .v2pt-st strong { color:var(--ink); font-weight:600; }
   .v2pt-dd { font-size:12px; text-align:right; white-space:nowrap; font-weight:600; font-variant-numeric:tabular-nums; }
@@ -2767,3 +2766,85 @@
 @media (max-width: 560px) {
   .trend-tip { white-space: normal; max-width: 42vw; text-align: center; }
 }
+
+/* ===== 2026-07-24 homepage/CWJ feedback batch 1 ===== */
+/* A1: landing nav logo tile (reuses app topbar tile look) */
+.lp-nav .brand { display: inline-flex; align-items: center; gap: 9px; }
+/* A3+A4: mobile hero tweaks */
+@media (max-width: 560px) {
+  .hero-nologin { display: block; margin-top: 8px; }
+  .hero-actions { flex-wrap: nowrap; gap: 10px; }
+  .hero-actions .btn-large { flex: 1 1 0; padding: 14px 12px; font-size: 14px; white-space: nowrap; }
+}
+/* B9: desktop + upload button — rounded square like mobile, not a circle */
+.upload-statement-btn { border-radius: 12px; }
+
+/* B1: mobile CWJ — flex-centred .page clipped the top of tall cards, looked pre-scrolled */
+@media (max-width: 560px) {
+  .page { align-items: flex-start; }
+}
+/* B4: plan grid reads like the summary table — right-aligned, prefix hugging the number */
+.budget-table th, .budget-table td { text-align: right; }
+.bt-cell .bt-input-wrap { display: flex; width: 100%; justify-content: flex-end; }
+.bt-input { text-align: right; }
+/* B8a: on wide screens dock the tour card to the right so it covers less of the widget it describes */
+@media (min-width: 900px) {
+  .tour-card-v2 { margin: 0 0 0 auto; }
+}
+
+/* C8: avatar dropdown now serves mobile too */
+@media (max-width: 640px) {
+  .topbar-right .avatar-wrap { display: block; }
+}
+.topbar-profile-btn { display: none !important; }
+/* C14: red Log out in the avatar dropdown */
+.menu-item-logout { color: #E23B4E; font-weight: 600; border: 1px solid rgba(226,59,78,0.45); background: rgba(226,59,78,0.08); margin-top: 4px; }
+.menu-item-logout:hover { background: rgba(226,59,78,0.15); }
+/* C15: sidebar bottom items + red Log out */
+.side-item-logout { display: flex; align-items: center; justify-content: center; gap: 9px; font-weight: 600; color: #E23B4E; background: rgba(226,59,78,0.08); border: 1px solid rgba(226,59,78,0.45); margin-top: 8px; }
+.side-item-logout:hover { background: rgba(226,59,78,0.15); color: #E23B4E; }
+/* C17: active Bank Accounts / Settings pill — readable text on the gradient */
+.side-item-accounts.side-item-active { background: var(--grad-nav); border-color: transparent; color: var(--on-accent); }
+.side-item-accounts.side-item-active .side-accounts-icon { color: var(--on-accent); }
+
+/* C7: Savings Plan sized for its slot */
+.grc-row-lg { gap: 26px; margin-top: 14px; }
+.grc-donut-lg { width: 148px; height: 148px; }
+.grc-donut-lg .grc-hole { inset: 20px; }
+.grc-donut-lg .grc-hole-pct { font-size: 30px; }
+.grc-donut-lg .grc-hole-lb { font-size: 10px; }
+.grc-amt-lg { font-size: 24px; font-weight: 700; }
+.grc-amt-lg span { font-size: 14px; }
+.grc-track { height: 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); overflow: hidden; margin-top: 16px; }
+.grc-track i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2E5BFF, #6A4DFF); }
+.grc-track-lbls { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+/* C13: mobile transactions header — count on one line, in/out on the next */
+@media (max-width: 640px) {
+  .tx-count { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+}
+.tx-count-io { white-space: nowrap; }
+
+/* C10: inline "Updated" tick beside a control after an instant save */
+.sp-tick { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; color: var(--pos); font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0; vertical-align: middle; animation: spTickIn 0.2s ease; }
+@keyframes spTickIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+/* C9: Settings page unification — one type scale, one button size, consistent spacing */
+.settings-body .settings-section { padding: 20px; }
+.settings-body .card-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
+.settings-body .field-label { font-size: 12px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.settings-body .subtitle { font-size: 13px; line-height: 1.5; }
+.settings-body .glass-btn { height: 38px; font-size: 13.5px; padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; }
+.settings-body .glass-btn.danger { height: 44px; }
+.settings-body .link-btn { font-size: 13px; font-weight: 600; }
+.settings-body .glass-input, .settings-body select.glass-input { font-size: 13.5px; }
+.settings-body .sp-key { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.settings-body .sp-ro { font-size: 13.5px; }
+.settings-body .settings-bank-row { font-size: 13.5px; }
+
+/* C18: bills page routes into the one confirm flow */
+.bills-review-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; background: var(--accent-soft); border: 1px solid var(--accent-shadow); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; font-size: 13.5px; color: var(--ink); flex-wrap: wrap; }
+/* C11/C12: one table system — same type scale and padding as the month table everywhere */
+.review-row { padding: 10px 12px; font-size: 13px; gap: 14px; }
+.review-head { font-size: 11px; padding: 7px 12px; }
+.review-cat { gap: 8px; }
+.review-cat .cat-dot { width: 9px; height: 9px; }
+.review-total { padding-top: 12px; }
