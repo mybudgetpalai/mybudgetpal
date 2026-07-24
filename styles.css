@@ -2769,10 +2769,11 @@
 
 /* ===== 2026-07-24 homepage/CWJ feedback batch 1 ===== */
 /* A1: landing nav logo tile (reuses app topbar tile look) */
-.lp-nav .brand { display: inline-flex; align-items: center; gap: 9px; }
+.lp-nav .brand { display: inline-flex; align-items: center; gap: 0; }
+.lp-nav .brand .brand-logo-tile { margin-right: 7px; }
 /* A3+A4: mobile hero tweaks */
 @media (max-width: 560px) {
-  .hero-nologin { display: block; margin-top: 8px; }
+  .hero-nologin { display: block; }
   .hero-actions { flex-wrap: nowrap; gap: 10px; }
   .hero-actions .btn-large { flex: 1 1 0; padding: 14px 12px; font-size: 14px; white-space: nowrap; }
 }
