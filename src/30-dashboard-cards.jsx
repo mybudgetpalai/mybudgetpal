@@ -989,9 +989,10 @@ function BankAccountsCard({ banks, transactions, accountData }) {
           const bankIssues = issues.filter((i) => i.bank === b);
           return (
             <div className="account-block" key={b}>
-              <div className="tx-row" style={{ borderBottom: "none" }}>
+              <div className="tx-row ba-bank-row" style={{ borderBottom: "none" }}>
+                <span className="sb-avatar ba-avatar" style={{ background: bankBrand(b).bg, color: bankBrand(b).fg || "#fff" }}>{String(b).trim().charAt(0).toUpperCase()}</span>
                 <div className="tx-info">
-                  <span className="tx-name"><span className="sb-avatar" style={{ background: bankBrand(b).bg, color: bankBrand(b).fg || "#fff", marginRight: 8 }}>{String(b).trim().charAt(0).toUpperCase()}</span>{b}</span>
+                  <span className="tx-name">{b}</span>
                   <span className="tx-category">{balance !== null ? "Estimated balance from statements" : "Add balances to see an estimate"}</span>
                 </div>
                 {balance !== null && <span className={"tx-amount " + (balance >= 0 ? "tx-positive" : "")}>{formatMoneyNative(balance, FX.bankCurrency[b] || "GBP")}</span>}
